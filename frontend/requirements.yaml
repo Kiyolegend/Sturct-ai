@@ -1,0 +1,12 @@
+packages:
+  "lightweight-charts": "High-performance financial charts (already in package.json but ensuring it's available)"
+  "date-fns": "For formatting timestamps"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility function to efficiently merge Tailwind CSS classes"
+  "lucide-react": "Beautiful icons for the UI"
+
+images: []
+
+notes:
+  - Integration with Python FastAPI at /trading-api
+  - Custom HTML overlay system for Session and Support/Resistance Zones to match TradingView style
