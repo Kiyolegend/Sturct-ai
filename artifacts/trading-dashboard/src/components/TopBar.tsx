@@ -66,29 +66,92 @@ function BiasBadge({ label, trend }: { label: string; trend?: TrendDir }) {
   );
 }
 
-function MT5Badge() {
-  const { data } = useMT5Status();
-  const online = data?.online ?? false;
-  const age = data?.last_contact_secs_ago;
-  const label = online ? "MT5 ● Live" : "API ● Backup";
-  const tooltip = online
-    ? `MT5 connected — last push ${age}s ago`
-    : age != null ? `MT5 offline ${age}s ago — using Twelve Data` : "MT5 not connected — using Twelve Data";
+function ApiBadge() {
+  const { status, isError } = useMT5Status();
+  const online = status === "success" && !isError;
   return (
     <div
       className={cn(
         "flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider cursor-default select-none",
         online ? "bg-green-500/10 border-green-500/30 text-green-400"
-               : "bg-orange-500/10 border-orange-500/30 text-orange-400"
+               : "bg-red-500/10 border-red-500/30 text-red-400"
       )}
-      title={tooltip}
+      title={online
+        ? "API server reachable on port 8001"
+        : "API server not responding — make sure the API window is running"}
     >
       <span className={cn(
         "w-1.5 h-1.5 rounded-full",
         online ? "bg-green-400 shadow-[0_0_6px_2px_rgba(74,222,128,0.5)]"
-               : "bg-orange-400 shadow-[0_0_6px_2px_rgba(251,146,60,0.4)]"
+               : "bg-red-400 shadow-[0_0_6px_2px_rgba(248,113,113,0.5)]"
       )} />
-      {label}
+      API
+    </div>
+  );
+}
+
+function BridgeBadge() {
+  const { data, isError } = useMT5Status();
+
+  if (isError || !data) {
+    return (
+      <div
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider cursor-default select-none bg-white/5 border-white/10 text-white/40"
+        title="Bridge status unknown — API not responding"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+        MT5 ● ?
+      </div>
+    );
+  }
+
+  const online = data.online;
+  const age = data.last_contact_secs_ago;
+
+  let state: "fresh" | "slow" | "down";
+  if (!online || (age != null && age > 120)) {
+    state = "down";
+  } else if (age != null && age > 60) {
+    state = "slow";
+  } else {
+    state = "fresh";
+  }
+
+  const styles = {
+    fresh: {
+      bg: "bg-green-500/10 border-green-500/30 text-green-400",
+      dot: "bg-green-400 shadow-[0_0_6px_2px_rgba(74,222,128,0.5)]",
+      label: "MT5 ● LIVE",
+      tip: `Bridge healthy — last push ${age}s ago`,
+    },
+    slow: {
+      bg: "bg-yellow-500/10 border-yellow-500/30 text-yellow-400",
+      dot: "bg-yellow-400 shadow-[0_0_6px_2px_rgba(250,204,21,0.5)]",
+      label: "MT5 ● SLOW",
+      tip: `Bridge slow — last push ${age}s ago (expected <30s)`,
+    },
+    down: {
+      bg: "bg-red-500/10 border-red-500/30 text-red-400",
+      dot: "bg-red-400 shadow-[0_0_6px_2px_rgba(248,113,113,0.5)]",
+      label: "MT5 ● DOWN",
+      tip: !online
+        ? `Bridge offline${age != null ? ` — last push ${age}s ago` : ""} — restart the bridge window`
+        : `Bridge stale — last push ${age}s ago — restart the bridge window`,
+    },
+  } as const;
+
+  const s = styles[state];
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider cursor-default select-none",
+        s.bg
+      )}
+      title={s.tip}
+    >
+      <span className={cn("w-1.5 h-1.5 rounded-full", s.dot)} />
+      {s.label}
     </div>
   );
 }
@@ -211,14 +274,15 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
         </div>
       </div>
 
-      {/* RIGHT: Bias + MT5 */}
+      {/* RIGHT: Bias + API + Bridge */}
       <div className="flex items-center space-x-2">
         <div className="hidden lg:flex items-center gap-1">
           <BiasBadge label="15M" trend={bias15m} />
           <BiasBadge label="1H"  trend={bias1h}  />
           <BiasBadge label="4H"  trend={bias4h}  />
         </div>
-        <MT5Badge />
+        <ApiBadge />
+        <BridgeBadge />
       </div>
     </div>
   );
