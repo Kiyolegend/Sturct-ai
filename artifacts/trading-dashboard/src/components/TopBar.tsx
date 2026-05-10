@@ -16,6 +16,9 @@ export interface ToggleState {
   sr1h: boolean;
   sr4h: boolean;
   sessions: boolean;
+  bos: boolean;
+  ob: boolean;   // NEW — Order Blocks
+  fvg: boolean;  // NEW — Fair Value Gaps
 }
 
 type TrendDir = "bullish" | "bearish" | "neutral";
@@ -260,6 +263,31 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
           <button onClick={() => toggleLayer('sessions')} aria-pressed={toggles.sessions}
             className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors", toggles.sessions ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
             title="Toggle Sessions">SESS</button>
+          <button onClick={() => toggleLayer('bos')} aria-pressed={toggles.bos}
+            className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+              toggles.bos
+                ? "text-amber-400 bg-amber-500/15 border border-amber-500/30"
+                : "text-white/40 hover:text-white/70"
+            )}
+            title="Toggle BOS / CHOCH structure breaks (1H)">BOS</button>
+
+          {/* NEW — Order Blocks toggle (emerald green when active) */}
+          <button onClick={() => toggleLayer('ob')} aria-pressed={toggles.ob}
+            className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+              toggles.ob
+                ? "text-emerald-400 bg-emerald-500/15 border border-emerald-500/30"
+                : "text-white/40 hover:text-white/70"
+            )}
+            title="Toggle Order Blocks — institutional entry zones">OB</button>
+
+          {/* NEW — Fair Value Gap toggle (sky blue when active) */}
+          <button onClick={() => toggleLayer('fvg')} aria-pressed={toggles.fvg}
+            className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+              toggles.fvg
+                ? "text-sky-400 bg-sky-500/15 border border-sky-500/30"
+                : "text-white/40 hover:text-white/70"
+            )}
+            title="Toggle Fair Value Gaps — price imbalance zones">FVG</button>
         </div>
 
         <div className="flex items-center gap-1 bg-[#161e2c] rounded-lg p-1 border border-white/5">

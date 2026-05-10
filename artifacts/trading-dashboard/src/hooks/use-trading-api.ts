@@ -103,6 +103,11 @@ export interface SRLevelsResponse {
   levels: SRLevel[];
 }
 
+// Patient retry: keeps trying for ~15s during bridge warmup on first app open
+const PATIENT_RETRY = 12;
+const patientRetryDelay = (attemptIndex: number) =>
+  Math.min(1000 * 2 ** attemptIndex, 15000);
+
 export function useSRLevels(symbol: string = "USD/JPY") {
   return useQuery<SRLevelsResponse, Error>({
     queryKey: ["sr-levels", symbol],
@@ -112,8 +117,9 @@ export function useSRLevels(symbol: string = "USD/JPY") {
       if (!res.ok) throw new Error(`SR levels API error: ${await res.text()}`);
       return res.json();
     },
-    refetchInterval: 5 * 60 * 1000, // refresh every 5 minutes (levels don't change fast)
-    retry: 2,
+    refetchInterval: 5 * 60 * 1000,
+    retry: PATIENT_RETRY,
+    retryDelay: patientRetryDelay,
     staleTime: 4 * 60 * 1000,
   });
 }
@@ -132,11 +138,19 @@ export interface BosChochResponse {
   levels: BosChochLevel[];
 }
 
+export interface MTFBias {
+  trend: "bullish" | "bearish" | "neutral";
+  confidence: number;
+  current_price: number | null;
+  last_high_price: number | null;
+  last_low_price: number | null;
+}
+
 export interface MTFBiasResponse {
   symbol: string;
-  bias_15m: { trend: "bullish" | "bearish" | "neutral"; confidence: number };
-  bias_1h: { trend: "bullish" | "bearish" | "neutral"; confidence: number };
-  bias_4h: { trend: "bullish" | "bearish" | "neutral"; confidence: number };
+  bias_15m: MTFBias;
+  bias_1h: MTFBias;
+  bias_4h: MTFBias;
 }
 
 export function useMTFBias(symbol: string = "USD/JPY") {
@@ -148,8 +162,9 @@ export function useMTFBias(symbol: string = "USD/JPY") {
       if (!res.ok) throw new Error(`MTF bias API error: ${await res.text()}`);
       return res.json();
     },
-    refetchInterval: 5 * 60 * 1000,
-    retry: 2,
+    refetchInterval: 60 * 1000,
+    retry: PATIENT_RETRY,
+    retryDelay: patientRetryDelay,
     staleTime: 4 * 60 * 1000,
   });
 }
@@ -164,7 +179,8 @@ export function useBosChoch(symbol: string = "USD/JPY") {
       return res.json();
     },
     refetchInterval: 5 * 60 * 1000,
-    retry: 2,
+    retry: PATIENT_RETRY,
+    retryDelay: patientRetryDelay,
     staleTime: 4 * 60 * 1000,
   });
 }
@@ -193,7 +209,8 @@ export function useSessions(symbol: string = "USD/JPY", interval: string = "5m")
       return res.json();
     },
     refetchInterval: 60 * 1000,
-    retry: 2,
+    retry: PATIENT_RETRY,
+    retryDelay: patientRetryDelay,
     staleTime: 55 * 1000,
   });
 }
@@ -227,18 +244,19 @@ export function useTradingAnalysis(symbol: string = "USD/JPY", interval: string 
         interval,
         outputsize: outputsize.toString(),
       });
-      
+
       const res = await fetch(`/trading-api/analysis?${params.toString()}`);
-      
+
       if (!res.ok) {
         if (res.status === 404) throw new Error("Endpoint not found. Make sure the Trading API is running.");
         const err = await res.text();
         throw new Error(`API Error: ${err}`);
       }
-      
+
       return res.json();
     },
-    refetchInterval: 60000, // Refresh every minute
-    retry: 2,
+    refetchInterval: 60000,
+    retry: PATIENT_RETRY,
+    retryDelay: patientRetryDelay,
   });
 }

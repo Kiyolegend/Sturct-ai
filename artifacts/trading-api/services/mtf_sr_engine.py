@@ -1,93 +1,169 @@
 """
-Multi-Timeframe Support/Resistance Engine.
+Multi-Timeframe Support/Resistance Engine — v2 (scored + recency-weighted)
 
 For each higher timeframe (15m, 1h, 4h):
   1. Detect swing points using the ZigZag engine
   2. Swing HIGHS → resistance candidates
   3. Swing LOWS  → support candidates
   4. Cluster nearby prices within a pip threshold
-  5. Only keep clusters with >= min_touches (means price visited repeatedly)
-  6. Apply S/R flip: relabel each level as support (below price) or
+  5. Only keep clusters with >= min_touches (raised to 3 for 15m/1h)
+  6. Score each level by recency — how recently price tested this level.
+     Recent levels rank higher; stale levels are naturally deprioritised.
+  7. Apply S/R flip: relabel each level as support (below price) or
      resistance (above price) based on its position relative to current price.
-     A former resistance that price has risen above becomes support, and vice versa.
-  7. Apply proximity filter: discard levels too far from current price.
-  8. Return labelled levels: {price, kind, timeframe, touches}
+  8. Apply proximity filter: discard levels too far from current price.
+  9. Return labelled levels sorted by score descending:
+     {price, kind, timeframe, touches, score}
 
 Resistance = above current price (yellow on chart)
 Support    = below current price (purple on chart)
 
-Clustering thresholds (USDJPY — 1 pip = 0.01):
-  4h  → 0.15  (15 pips tolerance; large candles)
-  1h  → 0.07  (7 pips)
-  15m → 0.03  (3 pips)
+Clustering thresholds (pip-aware, applied at runtime):
+  4h  → 15 pips
+  1h  → 7  pips
+  15m → 3  pips
 
-Proximity limits (pips from current price):
+Proximity limits:
   4h  → 300 pips
   1h  → 200 pips
   15m → 100 pips
+
+Deduplication: 10 pips (pip-aware — works correctly for all pairs)
+
+min_touches raised:
+  15m: 2 → 3  (reduces noise; 3 confirmed reactions needed)
+  1h:  2 → 3  (same)
+  4h:  2 → 2  (unchanged; fewer pivots available on 4H)
+
+Recency decay:
+  Each level is scored by how recently price last tested it.
+  score = exp(-bars_since_last_touch / decay_half_life)
+  decay_half_life per timeframe:
+    15m → 150 bars (~37 hours)
+    1h  → 80  bars (~80 hours / 3.3 days)
+    4h  → 40  bars (~160 hours / 6.6 days)
 """
 
+import math
 from .zigzag_engine import detect_swings
 
-# Per-timeframe config: (cluster_threshold, min_touches, max_distance_pips)
+# Per-timeframe config stored in pips (symbol-agnostic).
+# pip_size is computed at runtime from current_price — no symbol name needed:
+#   JPY pairs  (USD/JPY, EUR/JPY, GBP/JPY) → price ~100–200 → pip_size = 0.01
+#   Other pairs (EUR/USD, GBP/USD, etc.)   → price ~0.5–2.0 → pip_size = 0.0001
+# Keys: (cluster_pips, min_touches, max_dist_pips, recency_decay_bars)
 TF_CONFIG = {
-    "4h":  (0.15, 2, 300),   # 15-pip cluster, 300-pip proximity limit
-    "1h":  (0.07, 2, 200),   # 7-pip cluster,  200-pip proximity limit
-    "15m": (0.03,  2, 100),  # 3-pip cluster,  100-pip proximity limit
+    "4h":  {"cluster_pips": 15, "min_touches": 2, "max_dist_pips": 300, "decay_bars": 40},
+    "1h":  {"cluster_pips":  7, "min_touches": 3, "max_dist_pips": 200, "decay_bars": 80},
+    "15m": {"cluster_pips":  3, "min_touches": 3, "max_dist_pips": 100, "decay_bars": 150},
 }
 
+# Deduplication tolerance in pips — applied pip-aware at runtime.
+# 10 pips for any pair (was hardcoded 0.10 which only worked for JPY).
+DEDUP_PIPS = 10
 
-def _cluster_levels(prices: list[float], threshold: float) -> list[dict]:
+
+def _pip_size(price: float) -> float:
+    """
+    Infer pip size from current price.
+    JPY pairs trade 100–200, all others trade 0.5–2.0.
+    This avoids needing the symbol name while being 100% reliable for forex.
+    """
+    return 0.01 if price > 50 else 0.0001
+
+
+def _cluster_levels(swing_data: list[dict], threshold: float) -> list[dict]:
     """
     Group nearby prices into clusters.
-    Returns list of {center, touches, prices} dicts.
-    Greedy: iterate sorted prices, grow cluster while within threshold of cluster seed.
+    Each swing_data item: {price, bar_index}
+    Returns list of {center, touches, prices, last_bar_index} dicts.
+
+    last_bar_index = the most recent bar at which this cluster was touched.
+    This is used for recency scoring.
+
+    Greedy: iterate sorted prices, grow cluster while within threshold of seed.
     """
-    if not prices:
+    if not swing_data:
         return []
 
-    sorted_prices = sorted(prices)
+    sorted_data = sorted(swing_data, key=lambda x: x["price"])
     clusters: list[dict] = []
-    used = [False] * len(sorted_prices)
+    used = [False] * len(sorted_data)
 
-    for i in range(len(sorted_prices)):
+    for i in range(len(sorted_data)):
         if used[i]:
             continue
-        cluster = [sorted_prices[i]]
+        cluster_items = [sorted_data[i]]
         used[i] = True
-        for j in range(i + 1, len(sorted_prices)):
-            if not used[j] and abs(sorted_prices[j] - sorted_prices[i]) <= threshold:
-                cluster.append(sorted_prices[j])
+        for j in range(i + 1, len(sorted_data)):
+            if not used[j] and abs(sorted_data[j]["price"] - sorted_data[i]["price"]) <= threshold:
+                cluster_items.append(sorted_data[j])
                 used[j] = True
+
+        prices = [item["price"] for item in cluster_items]
+        bar_indices = [item["bar_index"] for item in cluster_items]
+
         clusters.append({
-            "center": round(sum(cluster) / len(cluster), 5),
-            "touches": len(cluster),
-            "prices": cluster,
+            "center": round(sum(prices) / len(prices), 5),
+            "touches": len(cluster_items),
+            "prices": prices,
+            "last_bar_index": max(bar_indices),  # most recent touch
         })
 
     return clusters
 
 
+def _recency_score(last_bar_index: int, total_bars: int, decay_bars: float) -> float:
+    """
+    Compute a 0.0–1.0 recency score using exponential decay.
+    A level tested at the last bar scores ~1.0.
+    A level tested decay_bars bars ago scores ~0.37 (1/e).
+    A level tested 3x decay_bars ago scores ~0.05 (nearly ignored).
+    """
+    bars_ago = max(0, total_bars - 1 - last_bar_index)
+    return round(math.exp(-bars_ago / decay_bars), 4)
+
+
 def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list[dict]:
     """
-    Given a DataFrame for one timeframe, return S/R levels.
+    Given a DataFrame for one timeframe, return scored S/R levels.
+
+    Scoring uses recency (how recently the level was last tested).
+    Levels are sorted descending by score so the frontend cap (3R + 3S)
+    always picks the most recently confirmed levels.
 
     After clustering, applies two corrections:
-      1. S/R FLIP: relabel each level based on its position relative to current price.
-         - Level above current price → resistance (regardless of historical origin)
-         - Level below current price → support
+      1. S/R FLIP: relabel each level based on position relative to current price.
       2. PROXIMITY FILTER: discard levels beyond the timeframe's max pip distance.
     """
     df = df_map[timeframe]
-    threshold, min_touches, max_dist_pips = TF_CONFIG[timeframe]
-    max_dist = max_dist_pips * 0.01  # pips → price units (USDJPY: 1 pip = 0.01)
+    cfg = TF_CONFIG[timeframe]
+
+    # Determine pip size from current price — no symbol name required
+    pip = _pip_size(current_price)
+    threshold  = cfg["cluster_pips"]  * pip   # e.g. 15 pips for 4H
+    max_dist   = cfg["max_dist_pips"] * pip   # e.g. 300 pips for 4H
+    min_touches = cfg["min_touches"]
+    decay_bars  = cfg["decay_bars"]
+    total_bars  = len(df)
 
     swings = detect_swings(df)
     if not swings:
         return []
 
-    highs = [s["price"] for s in swings if s["kind"] == "high"]
-    lows  = [s["price"] for s in swings if s["kind"] == "low"]
+    # Build a time → bar_index lookup for recency calculation
+    df_times = list(df.index)
+    time_to_bar: dict = {t: i for i, t in enumerate(df_times)}
+
+    def get_bar_index(swing: dict) -> int:
+        t = swing.get("time")
+        if t in time_to_bar:
+            return time_to_bar[t]
+        # Fallback: place it at midpoint (won't score highly but won't crash)
+        return total_bars // 2
+
+    highs = [{"price": s["price"], "bar_index": get_bar_index(s)} for s in swings if s["kind"] == "high"]
+    lows  = [{"price": s["price"], "bar_index": get_bar_index(s)} for s in swings if s["kind"] == "low"]
 
     all_clusters = (
         _cluster_levels(highs, threshold) +
@@ -110,34 +186,50 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
         # S/R flip: assign label purely by position relative to current price
         kind = "resistance" if price > current_price else "support"
 
+        # Recency score (0.0 – 1.0): higher = more recently tested
+        score = _recency_score(c["last_bar_index"], total_bars, decay_bars)
+
+        # Composite score: 60% recency + 40% touch count (normalised at 5 touches)
+        touch_component = min(c["touches"] / 5.0, 1.0) * 0.4
+        final_score = round(score * 0.6 + touch_component, 4)
+
         levels.append({
             "price":     price,
             "kind":      kind,
             "timeframe": timeframe,
             "touches":   c["touches"],
+            "score":     final_score,
         })
+
+    # Sort by score descending — best levels first
+    levels.sort(key=lambda x: x["score"], reverse=True)
 
     return levels
 
 
-def deduplicate_across_timeframes(all_levels: list[dict]) -> list[dict]:
+def deduplicate_across_timeframes(all_levels: list[dict], current_price: float) -> list[dict]:
     """
     When the same price area appears on multiple timeframes, keep only the
     highest-timeframe label (4h > 1h > 15m).
-    Dedup threshold: 0.10 (10 pips) — within this range = same level.
+    Dedup threshold: 10 pips — pip-aware, works correctly for all 8 pairs.
     """
     TF_RANK = {"4h": 3, "1h": 2, "15m": 1}
-    DEDUP_THRESHOLD = 0.10
 
-    # Sort so higher timeframes come first
-    sorted_levels = sorted(all_levels, key=lambda l: -TF_RANK.get(l["timeframe"], 0))
+    # Pip-aware dedup: always 10 pips regardless of pair
+    dedup_threshold = DEDUP_PIPS * _pip_size(current_price)
+
+    # Sort so higher timeframes come first, then by score within same TF
+    sorted_levels = sorted(
+        all_levels,
+        key=lambda l: (-TF_RANK.get(l["timeframe"], 0), -l.get("score", 0))
+    )
 
     kept: list[dict] = []
     for level in sorted_levels:
         overlap = False
         for existing in kept:
             if (existing["kind"] == level["kind"] and
-                    abs(existing["price"] - level["price"]) <= DEDUP_THRESHOLD):
+                    abs(existing["price"] - level["price"]) <= dedup_threshold):
                 overlap = True
                 break
         if not overlap:
@@ -149,10 +241,10 @@ def deduplicate_across_timeframes(all_levels: list[dict]) -> list[dict]:
 def compute_mtf_sr_levels(df_map: dict) -> list[dict]:
     """
     Main entry point. Compute S/R levels for all timeframes and deduplicate.
-    Returns list of {price, kind, timeframe, touches}.
+    Returns list of {price, kind, timeframe, touches, score}.
 
-    Current price is taken from the most recent close of the 5m (or smallest
-    available) timeframe so that S/R flip and proximity filter are accurate.
+    Current price is taken from the most recent close of the smallest
+    available timeframe so that S/R flip and proximity filter are accurate.
     """
     # Derive current price from smallest available timeframe
     for tf_key in ["5m", "15m", "1h", "4h"]:
@@ -169,4 +261,5 @@ def compute_mtf_sr_levels(df_map: dict) -> list[dict]:
             levels = detect_sr_levels(df_map, tf, current_price)
             all_levels.extend(levels)
 
-    return deduplicate_across_timeframes(all_levels)
+    # Pass current_price so dedup threshold is pip-aware
+    return deduplicate_across_timeframes(all_levels, current_price)
