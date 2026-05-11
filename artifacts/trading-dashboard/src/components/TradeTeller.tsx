@@ -124,6 +124,8 @@ function s1BosCheck(
   if (!recent.length) return { count: 0, strong: false };
 
   const lastBos = recent[0];
+    const nowSec  = Math.floor(Date.now() / 1000);
+  if (nowSec - lastBos.time > 3600) return { count: 0, strong: false };
   const candle  = candles5m.find(c => c.time === lastBos.time);
   const strong  = candle ? candleBodyStrength(candle) >= 0.70 : false;
 
@@ -132,7 +134,11 @@ function s1BosCheck(
 
 function s1HasCounterChoch(chochEvents: ChochEvent[], direction: Direction): boolean {
   const counter = direction === 'long' ? 'bearish' : 'bullish';
-  const recent  = [...chochEvents].sort((a, b) => b.time - a.time).slice(0, 3);
+    const nowSec  = Math.floor(Date.now() / 1000);
+  const recent  = [...chochEvents]
+    .filter(c => nowSec - c.time <= 4 * 3600)
+    .sort((a, b) => b.time - a.time)
+    .slice(0, 3);
   return recent.some(c => c.direction === counter);
 }
 
@@ -232,6 +238,12 @@ function computeS1Signal(
     ? pullback.price - slBuffer
     : pullback.price + slBuffer;
   const slPips   = Math.round(Math.abs(entry - sl) / pip);
+  if (direction === 'long' && sl >= entry) {
+    return { state: 'waiting', score, direction, reason: 'Price below HL — wait for bounce back to pullback zone' };
+  }
+  if (direction === 'short' && sl <= entry) {
+    return { state: 'waiting', score, direction, reason: 'Price above LH — wait for fade back to pullback zone' };
+  }
 
   if (slPips < 7) {
     return {
@@ -346,13 +358,13 @@ function computeS2Signal(
   const bos5m   = data5m?.bos   ?? [];
   const choch5m = data5m?.choch ?? [];
 
+    const nowSec5m   = Math.floor(Date.now() / 1000);
   const rev5mChoch = [...choch5m]
     .sort((a, b) => b.time - a.time)
-    .find(c => c.direction === sweep.direction);
+    .find(c => c.direction === sweep.direction && nowSec5m - c.time <= 3600);
   const rev5mBos = [...bos5m]
     .sort((a, b) => b.time - a.time)
-    .find(b => b.direction === sweep.direction);
-
+    .find(b => b.direction === sweep.direction && nowSec5m - b.time <= 3600);
   let reversalScore = 0;
   if (rev5mChoch) {
     const candle = candles5m.find(c => c.time === rev5mChoch.time);
@@ -396,6 +408,12 @@ function computeS2Signal(
     ? sweep.price - slBuffer
     : sweep.price + slBuffer;
   const slPips   = Math.round(Math.abs(entry - sl) / pip);
+    if (direction === 'long' && sl >= entry) {
+    return { state: 'waiting', score: totalScore, direction, reason: 'Price below sweep — wait for bounce confirmation' };
+  }
+  if (direction === 'short' && sl <= entry) {
+    return { state: 'waiting', score: totalScore, direction, reason: 'Price above sweep — wait for fade confirmation' };
+  }
 
   if (slPips < 7) {
     return {
@@ -544,13 +562,13 @@ function computeS3Signal(
   const choch5m = data5m?.choch ?? [];
   const confDir = direction === 'long' ? 'bullish' : 'bearish';
 
+    const nowSec3     = Math.floor(Date.now() / 1000);
   const conf5mChoch = [...choch5m]
     .sort((a, b) => b.time - a.time)
-    .find(c => c.direction === confDir);
+    .find(c => c.direction === confDir && nowSec3 - c.time <= 3600);
   const conf5mBos = [...bos5m]
     .sort((a, b) => b.time - a.time)
-    .find(b => b.direction === confDir);
-
+    .find(b => b.direction === confDir && nowSec3 - b.time <= 3600);
   let confirmScore = 0;
   let confirmType  = '';
 
