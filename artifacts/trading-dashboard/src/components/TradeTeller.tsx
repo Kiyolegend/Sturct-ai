@@ -10,7 +10,7 @@ import type {
   StructureLabel,
   Zone,
 } from '@/hooks/use-trading-api';
-import { pipSize } from '@/components/TradingChart';
+import { pipSize, detectOrderBlocks, detectFVGs } from '@/components/TradingChart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -31,7 +31,7 @@ interface BiasData {
 type Direction   = 'long' | 'short';
 type SignalState = 'active' | 'waiting' | 'no-signal';
 type Confidence  = 'HIGH' | 'MED' | 'LOW';
-type Mode        = 's1' | 's2';
+type Mode        = 's1' | 's2' | 's3';
 
 interface TradeSignal {
   state:         SignalState;
@@ -274,11 +274,12 @@ function computeS1Signal(
 // Strategy logic (per documentation):
 //  1. Market must NOT be strongly trending (4H + 1H both same) → regime(15)
 //  2. Detect 1H liquidity sweep: CHOCH(25) or BOS(10) from bosChochData
-//  3. Price within 25p of sweep level
-//  4. 5M reversal confirmation in sweep direction:
+//  3. Sweep must be within last 48 hours (staleness guard)
+//  4. Price within 25p of sweep level
+//  5. 5M reversal confirmation in sweep direction:
 //       CHoCH body ≥ 50% → 25pts | BOS body ≥ 70% → 10pts
-//  5. Minimum total score: 80
-//  6. Entry = market, SL = beyond sweep ± 5p, TP = 2R
+//  6. Minimum total score: 80
+//  7. Entry = market, SL = beyond sweep ± 5p, TP = 2R
 //  Note: BOS sweep + BOS reversal max = 70 → auto-rejects (< 80 min)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -313,13 +314,23 @@ function computeS2Signal(
     return { state: 'no-signal', score: 0, reason: 'No 1H liquidity sweep detected' };
   }
 
+  // Step 3 — staleness guard: reject sweeps older than 48 hours
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (nowSec - sweep.time > 48 * 3600) {
+    return {
+      state: 'no-signal',
+      score: 0,
+      reason: 'No recent 1H sweep — last event is stale (>48h ago)',
+    };
+  }
+
   // S2 direction = same as the CHOCH/BOS direction
   // (bearish CHOCH = swept above highs → price going short now)
   const direction: Direction = sweep.direction === 'bearish' ? 'short' : 'long';
   const sweepScore           = sweep.type === 'CHOCH' ? 25 : 10;
   const pip                  = pipSize(cp);
 
-  // Step 3 — distance from sweep level
+  // Step 4 — distance from sweep level
   const distPips = Math.abs(cp - sweep.price) / pip;
   if (distPips > 25) {
     return {
@@ -331,7 +342,7 @@ function computeS2Signal(
   }
   const distScore = distPips <= 5 ? 15 : distPips <= 15 ? 10 : 5;
 
-  // Step 4 — 5M reversal confirmation
+  // Step 5 — 5M reversal confirmation
   const bos5m   = data5m?.bos   ?? [];
   const choch5m = data5m?.choch ?? [];
 
@@ -419,6 +430,208 @@ function computeS2Signal(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// S3 — ICT Order Block / FVG Zone Reaction
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Strategy logic (institutional ICT concept):
+//  1. HTF alignment: 4H + 1H both agree non-neutral → direction (15pts)
+//     4H alone clear, 1H neutral → partial alignment (8pts)
+//     Both neutral or conflicting → no signal
+//  2. 1H unmitigated OB in bias direction near price (25pts)
+//  3. 5M FVG overlapping the OB — confluence zone (10pts)
+//  4. Price inside OB (20pts) or approaching within 10p (10pts)
+//  5. 5M confirmation: CHoCH body ≥ 50% (20pts) or BOS body ≥ 60% (10pts)
+//  6. Session: London/NY (10pts)
+//  Minimum score: 75
+//  Entry = market, SL = beyond OB edge ± 5p, TP = 2R
+// ─────────────────────────────────────────────────────────────────────────────
+
+function computeS3Signal(
+  biasData:  BiasData | undefined,
+  candles4h: any[],
+  candles1h: any[],
+  candles5m: any[],
+  data5m:    TradingAnalysisResponse | undefined,
+): TradeSignal {
+  const bias4h = biasData?.bias_4h?.trend;
+  const bias1h = biasData?.bias_1h?.trend;
+  const cp     = biasData?.bias_1h?.current_price;
+
+  if (!cp) {
+    return { state: 'no-signal', score: 0, reason: 'Price data loading…' };
+  }
+
+  if (!candles1h.length) {
+    return { state: 'no-signal', score: 0, reason: '1H candles loading…' };
+  }
+
+  // Step 1 — HTF direction
+  let direction: Direction;
+  let alignScore: number;
+
+  if (bias4h && bias4h !== 'neutral' && bias1h && bias1h !== 'neutral') {
+    if (bias4h !== bias1h) {
+      return {
+        state: 'no-signal', score: 0,
+        reason: `4H ${bias4h.toUpperCase()} vs 1H ${bias1h.toUpperCase()} — conflicting, no OB trade`,
+      };
+    }
+    direction  = bias4h === 'bullish' ? 'long' : 'short';
+    alignScore = 15;
+  } else if (bias4h && bias4h !== 'neutral') {
+    direction  = bias4h === 'bullish' ? 'long' : 'short';
+    alignScore = 8;
+  } else {
+    return {
+      state: 'no-signal', score: 0,
+      reason: 'No clear 4H bias — S3 needs directional context',
+    };
+  }
+
+  const pip = pipSize(cp);
+
+  // Step 2 — 1H unmitigated OB in bias direction
+  const obs1h = detectOrderBlocks(candles1h, cp);
+  const ob    = direction === 'long'
+    ? obs1h.find(o => o.type === 'bullish')
+    : obs1h.find(o => o.type === 'bearish');
+
+  if (!ob) {
+    return {
+      state: 'waiting', score: alignScore, direction,
+      reason: `${bias4h?.toUpperCase()} bias — no unmitigated 1H ${direction === 'long' ? 'bullish' : 'bearish'} OB near price`,
+    };
+  }
+
+  const obScore = 25;
+
+  // Step 2b — 4H OB stacking: check if a 4H OB overlaps the 1H OB (confluence bonus)
+  const obs4h   = candles4h.length ? detectOrderBlocks(candles4h, cp) : [];
+  const ob4h    = direction === 'long'
+    ? obs4h.find(o => o.type === 'bullish')
+    : obs4h.find(o => o.type === 'bearish');
+
+  const ob4hOverlaps = ob4h ? (ob4h.bottom < ob.top && ob4h.top > ob.bottom) : false;
+  const ob4hScore    = ob4hOverlaps ? 15 : 0;
+
+  // Step 3 — 5M FVG overlapping the OB (confluence)
+  const fvgs5m = detectFVGs(candles5m, cp);
+  const fvg    = direction === 'long'
+    ? fvgs5m.find(f => f.type === 'bullish')
+    : fvgs5m.find(f => f.type === 'bearish');
+
+  const fvgOverlaps = fvg ? (fvg.bottom < ob.top && fvg.top > ob.bottom) : false;
+  const fvgScore    = fvgOverlaps ? 10 : 0;
+
+  // Step 4 — Price position relative to OB
+  const insideOB     = cp >= ob.bottom && cp <= ob.top;
+  const obCenter     = (ob.top + ob.bottom) / 2;
+  const distToCenter = Math.abs(cp - obCenter) / pip;
+  const zoneScore    = insideOB ? 20 : distToCenter <= 10 ? 10 : 0;
+
+  if (zoneScore === 0) {
+    const obEdge = direction === 'long' ? ob.top : ob.bottom;
+    return {
+      state: 'waiting',
+      score: alignScore + obScore + fvgScore,
+      direction,
+      reason: `OB at ${fmtPrice(obEdge, cp)} — price not in zone yet (${Math.round(distToCenter)}p from center)`,
+    };
+  }
+
+  // Step 5 — 5M confirmation in OB direction
+  const bos5m   = data5m?.bos   ?? [];
+  const choch5m = data5m?.choch ?? [];
+  const confDir = direction === 'long' ? 'bullish' : 'bearish';
+
+  const conf5mChoch = [...choch5m]
+    .sort((a, b) => b.time - a.time)
+    .find(c => c.direction === confDir);
+  const conf5mBos = [...bos5m]
+    .sort((a, b) => b.time - a.time)
+    .find(b => b.direction === confDir);
+
+  let confirmScore = 0;
+  let confirmType  = '';
+
+  if (conf5mChoch) {
+    const candle = candles5m.find(c => c.time === conf5mChoch.time);
+    if (!candle || candleBodyStrength(candle) >= 0.50) {
+      confirmScore = 20;
+      confirmType  = 'CHoCH';
+    }
+  } else if (conf5mBos) {
+    const candle = candles5m.find(c => c.time === conf5mBos.time);
+    if (!candle || candleBodyStrength(candle) >= 0.60) {
+      confirmScore = 10;
+      confirmType  = 'BOS';
+    }
+  }
+
+  const sessScore    = sessionBonus();
+  const runningScore = alignScore + obScore + ob4hScore + fvgScore + zoneScore + sessScore;
+
+  if (confirmScore === 0) {
+    return {
+      state: 'waiting',
+      score: runningScore,
+      direction,
+      reason: `${insideOB ? 'Inside' : 'Near'} OB${fvgOverlaps ? ' + FVG' : ''} — waiting 5M ${direction === 'long' ? '↑' : '↓'} confirmation`,
+    };
+  }
+
+  const totalScore = runningScore + confirmScore;
+
+  // Minimum 75 required
+  if (totalScore < 75) {
+    return {
+      state: 'waiting',
+      score: totalScore,
+      direction,
+      reason: `Score ${totalScore}/100 — min 75 required`,
+    };
+  }
+
+  // Trade placement — SL beyond OB edge
+  const slBuffer = 5 * pip;
+  const entry    = cp;
+  const sl       = direction === 'long'
+    ? ob.bottom - slBuffer
+    : ob.top    + slBuffer;
+  const slPips   = Math.round(Math.abs(entry - sl) / pip);
+
+  if (slPips < 7) {
+    return {
+      state: 'waiting', score: totalScore, direction,
+      reason: 'SL too tight — wait for price to move deeper into OB',
+    };
+  }
+
+  const riskDist = Math.abs(entry - sl);
+  const tp1      = direction === 'long'
+    ? entry + riskDist * 2
+    : entry - riskDist * 2;
+
+  const confidence: Confidence = totalScore >= 90 ? 'HIGH' : totalScore >= 80 ? 'MED' : 'LOW';
+
+  return {
+    state:       'active',
+    direction,
+    score:       totalScore,
+    entry:       round5(entry),
+    sl:          round5(sl),
+    tp1:         round5(tp1),
+    tp1Rr:       2.0,
+    tp1Label:    'OB Reaction 2R',
+    slPips,
+    confidence,
+    entrySource: `${ob4hOverlaps ? '4H+1H OB' : '1H OB'}${fvgOverlaps ? ' + FVG' : ''} → 5M ${confirmType}`,
+    priceInZone: insideOB,
+    reason:      `${insideOB ? 'Inside' : 'Near'} ${ob4hOverlaps ? '4H+1H stacked OB' : '1H OB'}${fvgOverlaps ? ' · FVG' : ''} · 5M ${confirmType} · score ${totalScore}/100`,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Score bar — visual indicator 0-100
 // ─────────────────────────────────────────────────────────────────────────────
 function ScoreBar({ score, max }: { score: number; max: number }) {
@@ -491,6 +704,7 @@ export function TradeTeller({ symbol, biasData, srLevels, bosChochData }: TradeT
   const [minimized, setMinimized] = useState(false);
   const [mode, setMode]           = useState<Mode>('s1');
 
+  const { data: data4h  } = useTradingAnalysis(symbol, '4h',  100);
   const { data: data1h  } = useTradingAnalysis(symbol, '1h',  200);
   const { data: data15m } = useTradingAnalysis(symbol, '15m', 150);
   const { data: data5m  } = useTradingAnalysis(symbol, '5m',  200);
@@ -501,12 +715,23 @@ export function TradeTeller({ symbol, biasData, srLevels, bosChochData }: TradeT
       .sort((a: any, b: any) => a.time - b.time);
   }, [data5m?.candles]);
 
+  const candles4h = useMemo(() => {
+    if (!data4h?.candles) return [];
+    return Array.from(new Map(data4h.candles.map((c: any) => [c.time, c])).values())
+      .sort((a: any, b: any) => a.time - b.time);
+  }, [data4h?.candles]);
+
+  const candles1h = useMemo(() => {
+    if (!data1h?.candles) return [];
+    return Array.from(new Map(data1h.candles.map((c: any) => [c.time, c])).values())
+      .sort((a: any, b: any) => a.time - b.time);
+  }, [data1h?.candles]);
+
   const signal = useMemo(() => {
-    if (mode === 's1') {
-      return computeS1Signal(biasData, data15m, candles5m, data5m, data1h);
-    }
-    return computeS2Signal(biasData, bosChochData, candles5m, data5m, data1h);
-  }, [mode, biasData, data15m, candles5m, data5m, data1h, bosChochData]);
+    if (mode === 's1') return computeS1Signal(biasData, data15m, candles5m, data5m, data1h);
+    if (mode === 's2') return computeS2Signal(biasData, bosChochData, candles5m, data5m, data1h);
+    return computeS3Signal(biasData, candles4h, candles1h, candles5m, data5m);
+  }, [mode, biasData, data15m, candles5m, candles4h, candles1h, data5m, data1h, bosChochData]);
 
   // ── Signal change tracking ────────────────────────────────────────────────
   const sigKey           = `${mode}-${signal.direction ?? 'n'}-${signal.state}-${signal.entry?.toFixed(5) ?? ''}`;
@@ -550,7 +775,7 @@ export function TradeTeller({ symbol, biasData, srLevels, bosChochData }: TradeT
     ? `1px solid ${dirColor}44`
     : '1px solid rgba(255,255,255,0.08)';
 
-  const scoreMax = mode === 's1' ? 100 : 100;
+  const scoreMax = 100;
 
   return (
     <div style={{
@@ -599,6 +824,7 @@ export function TradeTeller({ symbol, biasData, srLevels, bosChochData }: TradeT
           <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
             <ModeTab label="S1" sub="Pullback" active={mode === 's1'} onClick={() => setMode('s1')} />
             <ModeTab label="S2" sub="Sweep"    active={mode === 's2'} onClick={() => setMode('s2')} />
+            <ModeTab label="S3" sub="OB/FVG"   active={mode === 's3'} onClick={() => setMode('s3')} />
           </div>
 
           {/* ── NO SIGNAL ── */}
@@ -660,7 +886,7 @@ export function TradeTeller({ symbol, biasData, srLevels, bosChochData }: TradeT
                 }}>
                   <span style={{ fontSize: 9 }}>⚡</span>
                   <span style={{ fontSize: 7.5, fontWeight: 700, color: dirColor, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                    {mode === 's1' ? 'Near pullback — execute now' : 'Near sweep — execute now'}
+                    {mode === 's1' ? 'Near pullback — execute now' : mode === 's2' ? 'Near sweep — execute now' : 'Inside OB — execute now'}
                   </span>
                 </div>
               )}

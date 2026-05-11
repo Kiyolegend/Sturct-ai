@@ -1,6 +1,7 @@
 # === FILE START ===
 from fastapi import APIRouter, Query, HTTPException
 import asyncio
+import time
 from services.data_service import fetch_ohlc, candles_to_dict
 from services.zigzag_engine import detect_swings, swings_to_zigzag_lines
 from services.structure_engine import classify_structure
@@ -13,7 +14,6 @@ from services.mtf_sr_engine import compute_mtf_sr_levels
 from services.session_engine import compute_sessions
 
 router = APIRouter()
-
 
 async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
@@ -40,7 +40,6 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
         "zones": zones,
     }
 
-
 @router.get("/structure")
 async def get_structure(
     symbol: str = Query(default="USD/JPY"),
@@ -62,7 +61,6 @@ async def get_structure(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.get("/trend")
 async def get_trend(
     symbol: str = Query(default="USD/JPY"),
@@ -78,7 +76,6 @@ async def get_trend(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.get("/bos")
 async def get_bos(
     symbol: str = Query(default="USD/JPY"),
@@ -93,7 +90,6 @@ async def get_bos(
         return {"symbol": symbol, "interval": interval, "bos": bos_events}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/choch")
 async def get_choch(
@@ -111,7 +107,6 @@ async def get_choch(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.get("/zones")
 async def get_zones(
     symbol: str = Query(default="USD/JPY"),
@@ -127,7 +122,6 @@ async def get_zones(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.get("/analysis")
 async def get_full_analysis(
     symbol: str = Query(default="USD/JPY"),
@@ -141,7 +135,6 @@ async def get_full_analysis(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.get("/sessions")
 async def get_sessions(
     symbol: str = Query(default="USD/JPY"),
@@ -154,7 +147,6 @@ async def get_sessions(
         return {"symbol": symbol, "interval": interval, "sessions": sessions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/mtf-bias")
 async def get_mtf_bias(
@@ -193,11 +185,11 @@ async def get_mtf_bias(
                     break
 
             return {
-                "trend":           trend_data["trend"],
-                "confidence":      trend_data["confidence"],
-                "current_price":   current_price,
+                "trend": trend_data["trend"],
+                "confidence": trend_data["confidence"],
+                "current_price": current_price,
                 "last_high_price": last_high_price,
-                "last_low_price":  last_low_price,
+                "last_low_price": last_low_price,
             }
 
         t15m = _bias(df_15m)
@@ -207,12 +199,11 @@ async def get_mtf_bias(
         return {
             "symbol": symbol,
             "bias_15m": t15m,
-            "bias_1h":  t1h,
-            "bias_4h":  t4h,
+            "bias_1h": t1h,
+            "bias_4h": t4h,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/bos-choch")
 async def get_bos_choch(
@@ -222,6 +213,7 @@ async def get_bos_choch(
     """
     1H Break of Structure + Change of Character levels.
     Returns the last 4 BOS events and last 2 CHOCH events.
+    Only includes events from the last 48 hours (stale sweeps are excluded).
     """
     try:
         df = await fetch_ohlc(symbol=symbol, interval="1h", outputsize=outputsize)
@@ -231,8 +223,11 @@ async def get_bos_choch(
         bos_events = detect_bos(df, swings, structure_labels)
         choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"])
 
-        tagged_bos = [{"type": "BOS", **e} for e in bos_events[-4:]]
-        tagged_choch = [{"type": "CHOCH", **e} for e in choch_events[-2:]]
+        now = int(time.time())
+        max_age = 48 * 3600  # 48 hours in seconds
+
+        tagged_bos = [{"type": "BOS", **e} for e in bos_events[-4:] if now - e["time"] <= max_age]
+        tagged_choch = [{"type": "CHOCH", **e} for e in choch_events[-2:] if now - e["time"] <= max_age]
 
         return {
             "symbol": symbol,
@@ -241,7 +236,6 @@ async def get_bos_choch(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/sr-levels")
 async def get_sr_levels(
@@ -254,8 +248,8 @@ async def get_sr_levels(
     try:
         df_15m, df_1h, df_4h = await asyncio.gather(
             fetch_ohlc(symbol=symbol, interval="15m", outputsize=outputsize),
-            fetch_ohlc(symbol=symbol, interval="1h",  outputsize=outputsize),
-            fetch_ohlc(symbol=symbol, interval="4h",  outputsize=outputsize),
+            fetch_ohlc(symbol=symbol, interval="1h", outputsize=outputsize),
+            fetch_ohlc(symbol=symbol, interval="4h", outputsize=outputsize),
         )
         df_map = {"15m": df_15m, "1h": df_1h, "4h": df_4h}
         levels = compute_mtf_sr_levels(df_map)

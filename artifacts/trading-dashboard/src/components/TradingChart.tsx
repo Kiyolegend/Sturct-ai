@@ -70,38 +70,69 @@ export function pipSize(price: number): number {
 }
 
 // ── Exported: Order Block detection ──────────────────────────────────────────
+// ── Exported: Order Block detection ──────────────────────────────────────────
 export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBlockData[] {
   const n = candles.length;
   if (n < 10) return [];
-  const pip       = pipSize(currentPrice);
-  const minSize   = 5 * pip;
-  const proximity = 0.015;
+  const pip     = pipSize(currentPrice);
+  const minSize = 5 * pip;
+
+  // PRIORITY 1 — cap proximity at 60 pips so JPY pairs don't get a 200+ pip window
+  const proximity = Math.min(0.015, (60 * pip) / currentPrice);
+
   const results: (OrderBlockData & { dist: number })[] = [];
 
   for (let i = 1; i < n - 3; i++) {
     const c = candles[i];
 
+    // PRIORITY 2 — pre-compute average candle range of the last 10 bars (impulse proxy)
+    const lookback = candles.slice(Math.max(0, i - 10), i);
+    const avgRange = lookback.length
+      ? lookback.reduce((sum: number, x: any) => sum + (x.high - x.low), 0) / lookback.length
+      : 0;
+
+    // ── Bullish OB candidate: bearish candle (close < open) ───────────────
     if (c.close < c.open) {
       const slice      = candles.slice(i + 1, Math.min(i + 6, n));
       const futureHigh = Math.max(...slice.map((x: any) => x.high));
+
       if (futureHigh > c.high && c.high - c.low >= minSize) {
+        // PRIORITY 2 — displacement: the break candle must be impulsive (≥ 1.5× avg range)
+        const breakCandle = slice.reduce((best: any, x: any) =>
+          (x.high - x.low) > (best.high - best.low) ? x : best, slice[0]);
+        const hasDisplacement = avgRange > 0 && (breakCandle.high - breakCandle.low) >= 1.5 * avgRange;
+        if (!hasDisplacement) continue;
+
         const center = (c.high + c.low) / 2;
         const dist   = Math.abs(center - currentPrice) / currentPrice;
+
         if (dist <= proximity) {
-          const mitigated = candles.slice(i + 1).some((fc: any) => fc.close < c.low);
+          // PRIORITY 3 — mitigation needs a clear close beyond boundary (2-pip buffer)
+          //              prevents shallow wick sweeps from killing valid OBs
+          const mitigated = candles.slice(i + 1).some((fc: any) => fc.close < c.low - 2 * pip);
           if (!mitigated) results.push({ type: 'bullish', top: c.high, bottom: c.low, dist });
         }
       }
     }
 
+    // ── Bearish OB candidate: bullish candle (close > open) ───────────────
     if (c.close > c.open) {
       const slice     = candles.slice(i + 1, Math.min(i + 6, n));
       const futureLow = Math.min(...slice.map((x: any) => x.low));
+
       if (futureLow < c.low && c.high - c.low >= minSize) {
+        // PRIORITY 2 — displacement check (same logic, symmetric)
+        const breakCandle = slice.reduce((best: any, x: any) =>
+          (x.high - x.low) > (best.high - best.low) ? x : best, slice[0]);
+        const hasDisplacement = avgRange > 0 && (breakCandle.high - breakCandle.low) >= 1.5 * avgRange;
+        if (!hasDisplacement) continue;
+
         const center = (c.high + c.low) / 2;
         const dist   = Math.abs(center - currentPrice) / currentPrice;
+
         if (dist <= proximity) {
-          const mitigated = candles.slice(i + 1).some((fc: any) => fc.close > c.high);
+          // PRIORITY 3 — mitigation with 2-pip buffer (symmetric)
+          const mitigated = candles.slice(i + 1).some((fc: any) => fc.close > c.high + 2 * pip);
           if (!mitigated) results.push({ type: 'bearish', top: c.high, bottom: c.low, dist });
         }
       }
@@ -123,6 +154,7 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
     bottom: Math.round(bottom * 1e5) / 1e5,
   }));
 }
+
 
 // ── Exported: Fair Value Gap detection ───────────────────────────────────────
 export function detectFVGs(candles: any[], currentPrice: number): FVGData[] {
