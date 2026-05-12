@@ -107,7 +107,10 @@ function s1FindPullback(
   const target = direction === 'long' ? 'HL' : 'LH';
   const sorted = [...labels].sort((a, b) => b.time - a.time);
   const found  = sorted.find(l => l.label === target);
-  return found ? { price: found.price, time: found.time } : null;
+    if (!found) return null;
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (nowSec - found.time > 24 * 3600) return null;
+  return { price: found.price, time: found.time };
 }
 
 function s1BosCheck(
@@ -258,7 +261,7 @@ function computeS1Signal(
     : entry - riskDist * 2;
 
   const confidence: Confidence = score >= 85 ? 'HIGH' : score >= 70 ? 'MED' : 'LOW';
-  const state: SignalState     = score >= 60 ? 'active' : 'waiting';
+  const state: SignalState     = score >= 70 ? 'active' : 'waiting';
 
   return {
     state,
@@ -315,12 +318,22 @@ function computeS2Signal(
     bias4h && bias1h &&
     bias4h !== 'neutral' && bias1h !== 'neutral' &&
     bias4h === bias1h;
-  const regimeScore = stronglyTrending ? 0 : 15;
+      if (stronglyTrending) {
+    return { state: 'no-signal', score: 0, reason: `4H+1H both ${bias4h?.toUpperCase()} — trending market, S2 not valid` };
+  }
+  const regimeScore = 15;
 
   // Step 2 — detect 1H sweep (CHOCH preferred over BOS)
   const levels = bosChochData?.levels ?? [];
   const sorted = [...levels].sort((a, b) => b.time - a.time);
-  const sweep  = sorted.find(l => l.type === 'CHOCH') ?? sorted.find(l => l.type === 'BOS');
+    const recentChoch = sorted.find(l => l.type === 'CHOCH');
+  const recentBos   = sorted.find(l => l.type === 'BOS');
+  const sweep = (() => {
+    if (recentChoch && recentBos) {
+      return recentChoch.time >= recentBos.time - 12 * 3600 ? recentChoch : recentBos;
+    }
+    return recentChoch ?? recentBos;
+  })();
 
   if (!sweep) {
     return { state: 'no-signal', score: 0, reason: 'No 1H liquidity sweep detected' };
@@ -328,7 +341,7 @@ function computeS2Signal(
 
   // Step 3 — staleness guard: reject sweeps older than 48 hours
   const nowSec = Math.floor(Date.now() / 1000);
-  if (nowSec - sweep.time > 48 * 3600) {
+  if (nowSec - sweep.time > 12 * 3600) {
     return {
       state: 'no-signal',
       score: 0,
@@ -382,6 +395,18 @@ function computeS2Signal(
       score: runningScore,
       direction,
       reason: `${sweep.type} sweep found — waiting for 5M reversal ${direction === 'long' ? '↑' : '↓'}`,
+    };
+  }
+    // Minimum reversal distance: price must have moved at least 5p away from sweep
+  const reversalPips = direction === 'long'
+    ? (cp - sweep.price) / pip
+    : (sweep.price - cp) / pip;
+  if (reversalPips < 5) {
+    return {
+      state: 'waiting',
+      score: runningScore,
+      direction,
+      reason: `Reversal confirmed but price only ${Math.round(reversalPips)}p from sweep — wait for 5p clearance`,
     };
   }
 
@@ -509,7 +534,9 @@ function computeS3Signal(
   const pip = pipSize(cp);
 
   // Step 2 — 1H unmitigated OB in bias direction
-  const obs1h = detectOrderBlocks(candles1h, cp);
+  const nowSecOb = Math.floor(Date.now() / 1000);
+const obs1h = detectOrderBlocks(candles1h, cp)
+  .filter(o => nowSecOb - o.time <= 48 * 3600);
   const ob    = direction === 'long'
     ? obs1h.find(o => o.type === 'bullish')
     : obs1h.find(o => o.type === 'bearish');

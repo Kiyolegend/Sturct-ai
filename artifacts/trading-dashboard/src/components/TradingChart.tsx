@@ -40,7 +40,7 @@ interface TradingChartProps {
 }
 
 // ── Exported so TradeTeller can reuse them without duplicating logic ──────────
-export interface OrderBlockData { type: 'bullish' | 'bearish'; top: number; bottom: number; }
+export interface OrderBlockData { type: 'bullish' | 'bearish'; top: number; bottom: number; time: number; }
 export interface FVGData         { type: 'bullish' | 'bearish'; top: number; bottom: number; }
 
 const SR_COLORS = {
@@ -94,7 +94,7 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
     // ── Bullish OB candidate: bearish candle (close < open) ───────────────
     if (c.close < c.open) {
       const slice      = candles.slice(i + 1, Math.min(i + 6, n));
-      const futureHigh = Math.max(...slice.map((x: any) => x.high));
+      const futureHigh = Math.max(...slice.map((x: any) => x.close));
 
       if (futureHigh > c.high && c.high - c.low >= minSize) {
         // PRIORITY 2 — displacement: the break candle must be impulsive (≥ 1.5× avg range)
@@ -110,7 +110,7 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
           // PRIORITY 3 — mitigation needs a clear close beyond boundary (2-pip buffer)
           //              prevents shallow wick sweeps from killing valid OBs
           const mitigated = candles.slice(i + 1).some((fc: any) => fc.close < c.low - 2 * pip);
-          if (!mitigated) results.push({ type: 'bullish', top: c.high, bottom: c.low, dist });
+          if (!mitigated) results.push({ type: 'bullish', top: c.high, bottom: c.low, dist, time: c.time });
         }
       }
     }
@@ -118,7 +118,7 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
     // ── Bearish OB candidate: bullish candle (close > open) ───────────────
     if (c.close > c.open) {
       const slice     = candles.slice(i + 1, Math.min(i + 6, n));
-      const futureLow = Math.min(...slice.map((x: any) => x.low));
+      const futureLow = Math.min(...slice.map((x: any) => x.close));
 
       if (futureLow < c.low && c.high - c.low >= minSize) {
         // PRIORITY 2 — displacement check (same logic, symmetric)
@@ -133,7 +133,7 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
         if (dist <= proximity) {
           // PRIORITY 3 — mitigation with 2-pip buffer (symmetric)
           const mitigated = candles.slice(i + 1).some((fc: any) => fc.close > c.high + 2 * pip);
-          if (!mitigated) results.push({ type: 'bearish', top: c.high, bottom: c.low, dist });
+          if (!mitigated) results.push({ type: 'bearish', top: c.high, bottom: c.low, dist, time: c.time });
         }
       }
     }
@@ -148,11 +148,12 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
     .sort((a, b) => a.dist - b.dist)
     .slice(0, 1);
 
-  return [...bull, ...bear].map(({ type, top, bottom }) => ({
-    type,
-    top:    Math.round(top    * 1e5) / 1e5,
-    bottom: Math.round(bottom * 1e5) / 1e5,
-  }));
+  return [...bull, ...bear].map(({ type, top, bottom, time }) => ({
+  type,
+  top:    Math.round(top    * 1e5) / 1e5,
+  bottom: Math.round(bottom * 1e5) / 1e5,
+  time,
+}));
 }
 
 
