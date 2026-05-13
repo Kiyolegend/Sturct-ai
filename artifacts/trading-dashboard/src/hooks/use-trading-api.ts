@@ -260,3 +260,31 @@ export function useTradingAnalysis(symbol: string = "USD/JPY", interval: string 
     retryDelay: patientRetryDelay,
   });
 }
+// ── Alerts (multi-pair signal badge system) ───────────────────────────────────
+
+export type AlertState = "active" | "waiting" | "no-signal";
+
+export interface PairAlerts {
+  s1: AlertState;
+  s2: AlertState;
+  s3: AlertState;
+}
+
+export interface AlertsResponse {
+  alerts: Record<string, PairAlerts>;
+}
+
+export function useAlerts() {
+  return useQuery<AlertsResponse, Error>({
+    queryKey: ["alerts"],
+    queryFn: async () => {
+      const res = await fetch("/trading-api/alerts");
+      if (!res.ok) throw new Error(`Alerts API error: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: 60 * 1000,  // refresh every 60 seconds
+    retry: PATIENT_RETRY,
+    retryDelay: patientRetryDelay,
+    staleTime: 55 * 1000,
+  });
+}

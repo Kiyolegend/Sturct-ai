@@ -261,3 +261,203 @@ async def get_sr_levels(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 # === FILE END ===
+# ── Per-pair alert computation ────────────────────────────────────────────────
+
+ALERT_SYMBOLS = [
+    "USD/JPY", "EUR/USD", "GBP/USD", "EUR/JPY",
+    "GBP/JPY", "AUD/USD", "USD/CAD", "USD/CHF",
+]
+
+
+def _pip_size(price: float) -> float:
+    return 0.01 if price > 10 else 0.0001
+
+
+def _detect_obs_py(candles: list, current_price: float) -> list:
+    n = len(candles)
+    if n < 10:
+        return []
+    pip       = _pip_size(current_price)
+    min_size  = 5 * pip
+    proximity = min(0.015, (60 * pip) / current_price)
+    results   = []
+    for i in range(1, n - 3):
+        c        = candles[i]
+        lookback = candles[max(0, i - 10):i]
+        avg_range = (
+            sum(x["high"] - x["low"] for x in lookback) / len(lookback)
+            if lookback else 0
+        )
+        if c["close"] < c["open"]:
+            sl = candles[i + 1: min(i + 6, n)]
+            if not sl:
+                continue
+            if max(x["close"] for x in sl) > c["high"] and c["high"] - c["low"] >= min_size:
+                brk = max(sl, key=lambda x: x["high"] - x["low"])
+                if avg_range > 0 and (brk["high"] - brk["low"]) >= 1.5 * avg_range:
+                    dist = abs((c["high"] + c["low"]) / 2 - current_price) / current_price
+                    if dist <= proximity:
+                        mitigated = any(f["close"] < c["low"] - 2 * pip for f in candles[i + 1:])
+                        if not mitigated:
+                            results.append({"type": "bullish", "top": c["high"], "bottom": c["low"], "dist": dist, "time": c["time"]})
+        if c["close"] > c["open"]:
+            sl = candles[i + 1: min(i + 6, n)]
+            if not sl:
+                continue
+            if min(x["close"] for x in sl) < c["low"] and c["high"] - c["low"] >= min_size:
+                brk = max(sl, key=lambda x: x["high"] - x["low"])
+                if avg_range > 0 and (brk["high"] - brk["low"]) >= 1.5 * avg_range:
+                    dist = abs((c["high"] + c["low"]) / 2 - current_price) / current_price
+                    if dist <= proximity:
+                        mitigated = any(f["close"] > c["high"] + 2 * pip for f in candles[i + 1:])
+                        if not mitigated:
+                            results.append({"type": "bearish", "top": c["high"], "bottom": c["low"], "dist": dist, "time": c["time"]})
+    bull = sorted([o for o in results if o["type"] == "bullish" and (o["top"] + o["bottom"]) / 2 <= current_price], key=lambda x: x["dist"])[:1]
+    bear = sorted([o for o in results if o["type"] == "bearish" and (o["top"] + o["bottom"]) / 2 >= current_price], key=lambda x: x["dist"])[:1]
+    return bull + bear
+
+
+def _detect_fvgs_py(candles: list, current_price: float) -> list:
+    n = len(candles)
+    if n < 3:
+        return []
+    pip       = _pip_size(current_price)
+    min_gap   = 3 * pip
+    proximity = 0.01
+    results   = []
+    for i in range(1, n - 1):
+        prev = candles[i - 1]
+        nxt  = candles[i + 1]
+        if nxt["low"] > prev["high"] and nxt["low"] - prev["high"] >= min_gap:
+            center = (nxt["low"] + prev["high"]) / 2
+            dist   = abs(center - current_price) / current_price
+            if dist <= proximity:
+                mitigated = any(c["low"] <= prev["high"] for c in candles[i + 1:])
+                if not mitigated:
+                    results.append({"type": "bullish", "top": nxt["low"], "bottom": prev["high"], "dist": dist})
+        if prev["low"] > nxt["high"] and prev["low"] - nxt["high"] >= min_gap:
+            center = (prev["low"] + nxt["high"]) / 2
+            dist   = abs(center - current_price) / current_price
+            if dist <= proximity:
+                mitigated = any(c["high"] >= prev["low"] for c in candles[i + 1:])
+                if not mitigated:
+                    results.append({"type": "bearish", "top": prev["low"], "bottom": nxt["high"], "dist": dist})
+    bull = sorted([f for f in results if f["type"] == "bullish" and (f["top"] + f["bottom"]) / 2 <= current_price], key=lambda x: x["dist"])[:1]
+    bear = sorted([f for f in results if f["type"] == "bearish" and (f["top"] + f["bottom"]) / 2 >= current_price], key=lambda x: x["dist"])[:1]
+    return bull + bear
+
+
+async def _compute_pair_alerts(symbol: str) -> dict:
+    try:
+        df_5m, df_15m, df_1h, df_4h = await asyncio.gather(
+            fetch_ohlc(symbol, "5m",  200),
+            fetch_ohlc(symbol, "15m", 150),
+            fetch_ohlc(symbol, "1h",  150),
+            fetch_ohlc(symbol, "4h",  150),
+        )
+    except Exception:
+        return {"s1": "no-signal", "s2": "no-signal", "s3": "no-signal"}
+
+    now = int(time.time())
+
+    def _trend(df):
+        swings = detect_swings(df)
+        labels = classify_structure(swings)
+        return detect_trend(labels)["trend"], swings, labels
+
+    bias_4h, swings_4h, labels_4h    = _trend(df_4h)
+    bias_1h, swings_1h, labels_1h    = _trend(df_1h)
+    bias_15m, swings_15m, labels_15m = _trend(df_15m)
+    bias_5m, swings_5m,  labels_5m  = _trend(df_5m)
+
+    # ── S1: MTF Pullback ──────────────────────────────────────────────────────
+    # Grey ONLY when 4H and 1H are both neutral — alignment literally impossible
+    if bias_4h == "neutral" and bias_1h == "neutral":
+        s1_state = "no-signal"
+    elif bias_4h != "neutral" and bias_1h != "neutral" and bias_4h == bias_1h:
+        # Aligned — check for active conditions
+        dir_str = bias_4h
+        bos_5m  = detect_bos(df_5m, swings_5m, labels_5m)
+        recent_bos = [b for b in bos_5m if b["direction"] == dir_str and now - b["time"] <= 3600]
+        target_label   = "HL" if dir_str == "bullish" else "LH"
+        pullback_labels = [l for l in labels_15m if l["label"] == target_label and now - l["time"] <= 8 * 3600]
+        if recent_bos and pullback_labels:
+            s1_state = "active"
+        else:
+            s1_state = "waiting"
+    else:
+        # 4H or 1H partially aligned / one neutral — setup could still form
+        s1_state = "waiting"
+
+    # ── S2: Liquidity Sweep Reversal ──────────────────────────────────────────
+    # Grey ONLY when 4H + 1H both strongly trending same direction — reversal impossible
+    strongly_trending = bias_4h != "neutral" and bias_1h != "neutral" and bias_4h == bias_1h
+    if strongly_trending:
+        s2_state = "no-signal"
+    else:
+        # Market is mixed or neutral — S2 can develop, show at least amber
+        choch_1h = detect_choch(df_1h, swings_1h, labels_1h, bias_1h)
+        bos_1h   = detect_bos(df_1h, swings_1h, labels_1h)
+        recent_sweep = (
+            [c for c in choch_1h if now - c["time"] <= 3 * 3600] +
+            [b for b in bos_1h   if now - b["time"] <= 3 * 3600]
+        )
+        if recent_sweep:
+            sweep_dir = recent_sweep[0]["direction"]
+            if bias_4h == "neutral" or bias_4h == sweep_dir:
+                choch_5m  = detect_choch(df_5m, swings_5m, labels_5m, bias_5m)
+                bos_5m_ev = detect_bos(df_5m, swings_5m, labels_5m)
+                recent_rev = (
+                    [c for c in choch_5m  if c["direction"] == sweep_dir and now - c["time"] <= 1200] +
+                    [b for b in bos_5m_ev if b["direction"] == sweep_dir and now - b["time"] <= 1200]
+                )
+                s2_state = "active" if recent_rev else "waiting"
+            else:
+                s2_state = "waiting"  # sweep conflicts with 4H but still possible
+        else:
+            s2_state = "waiting"  # no recent sweep yet but market not strongly trending
+
+    # ── S3: OB / FVG Reaction ─────────────────────────────────────────────────
+    # Grey ONLY when 4H neutral — no directional context for an OB trade
+    if bias_4h == "neutral":
+        s3_state = "no-signal"
+    else:
+        dir_str         = bias_4h
+        cp              = float(df_1h.iloc[-1]["close"])
+        candles_1h_list = candles_to_dict(df_1h)
+        candles_5m_list = candles_to_dict(df_5m)
+        obs_1h          = _detect_obs_py(candles_1h_list, cp)
+        ob              = next((o for o in obs_1h if o["type"] == dir_str), None)
+        if ob:
+            fvgs_5m    = _detect_fvgs_py(candles_5m_list, cp)
+            fvg        = next((f for f in fvgs_5m if f["type"] == dir_str), None)
+            inside_ob  = ob["bottom"] <= cp <= ob["top"]
+            near_ob    = abs((ob["top"] + ob["bottom"]) / 2 - cp) / cp <= 0.003
+            bos_5m_s3  = detect_bos(df_5m, swings_5m, labels_5m)
+            confirm_5m = [b for b in bos_5m_s3 if b["direction"] == dir_str and now - b["time"] <= 3600]
+            if (inside_ob or near_ob) and confirm_5m:
+                s3_state = "active"
+            else:
+                s3_state = "waiting"  # OB exists, price not there yet
+        else:
+            # No OB near price — but 4H has bias, so flag as waiting
+            # (OB might form or exist just outside proximity window)
+            s3_state = "no-signal"
+
+    return {"s1": s1_state, "s2": s2_state, "s3": s3_state}
+@router.get("/alerts")
+async def get_alerts():
+    try:
+        results = await asyncio.gather(
+            *[_compute_pair_alerts(sym) for sym in ALERT_SYMBOLS],
+            return_exceptions=True,
+        )
+        alerts = {}
+        for sym, result in zip(ALERT_SYMBOLS, results):
+            if isinstance(result, Exception):
+                alerts[sym] = {"s1": "no-signal", "s2": "no-signal", "s3": "no-signal"}
+            else:
+                alerts[sym] = result
+        return {"alerts": alerts}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
