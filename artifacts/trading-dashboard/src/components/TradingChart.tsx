@@ -163,7 +163,7 @@ export function detectFVGs(candles: any[], currentPrice: number): FVGData[] {
   if (n < 3) return [];
   const pip       = pipSize(currentPrice);
   const minGap    = 3 * pip;
-  const proximity = 0.01;
+  const proximity = Math.min(0.01, (100 * pip) / currentPrice);
   const results: (FVGData & { dist: number })[] = [];
 
   for (let i = 1; i < n - 1; i++) {
@@ -176,7 +176,7 @@ export function detectFVGs(candles: any[], currentPrice: number): FVGData[] {
       const center = (bTop + bBottom) / 2;
       const dist   = Math.abs(center - currentPrice) / currentPrice;
       if (dist <= proximity) {
-        const mitigated = candles.slice(i + 1).some((c: any) => c.low <= bBottom);
+        const mitigated = candles.slice(i + 1).some((c: any) => c.low <= bTop);
         if (!mitigated) results.push({ type: 'bullish', top: bTop, bottom: bBottom, dist });
       }
     }
@@ -187,7 +187,7 @@ export function detectFVGs(candles: any[], currentPrice: number): FVGData[] {
       const center = (dTop + dBottom) / 2;
       const dist   = Math.abs(center - currentPrice) / currentPrice;
       if (dist <= proximity) {
-        const mitigated = candles.slice(i + 1).some((c: any) => c.high >= dTop);
+        const mitigated = candles.slice(i + 1).some((c: any) => c.high >= dBottom);
         if (!mitigated) results.push({ type: 'bearish', top: dTop, bottom: dBottom, dist });
       }
     }
