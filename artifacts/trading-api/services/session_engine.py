@@ -20,13 +20,20 @@ Both complete (past) and the current in-progress session are returned.
 """
 
 import pandas as pd
+from zoneinfo import ZoneInfo          
+from datetime import datetime as _dt   
+
 
 # (session_name, start_hour_utc_inclusive, end_hour_utc_exclusive)
-SESSIONS = [
-    ("asian",  0,  9),   # Tokyo: 00:00 – 09:00 UTC
-    ("london", 8,  17),  # London: 08:00 – 17:00 UTC  (overlaps Asian 08-09)
-    ("ny",     13, 22),  # New York: 13:00 – 22:00 UTC (overlaps London 13-17)
-]
+def _live_sessions():
+    """Return session UTC hours adjusted for live DST offsets."""
+    lo = int(_dt.now(ZoneInfo("Europe/London")).utcoffset().total_seconds() // 3600)
+    ny = int(_dt.now(ZoneInfo("America/New_York")).utcoffset().total_seconds() // 3600)
+    return [
+        ("asian",  0,       9      ),
+        ("london", 8  - lo, 17 - lo),
+        ("ny",     8  - ny, 17 - ny),
+    ]
 
 
 def compute_sessions(df: pd.DataFrame, max_per_session: int = 5) -> list[dict]:
@@ -45,7 +52,7 @@ def compute_sessions(df: pd.DataFrame, max_per_session: int = 5) -> list[dict]:
 
     all_sessions: list[dict] = []
 
-    for session_name, start_h, end_h in SESSIONS:
+    for session_name, start_h, end_h in _live_sessions():
         mask = (times.dt.hour >= start_h) & (times.dt.hour < end_h)
         session_df = df[mask].copy()
         session_times = times[mask]
@@ -73,7 +80,7 @@ def compute_sessions(df: pd.DataFrame, max_per_session: int = 5) -> list[dict]:
     all_sessions.sort(key=lambda x: x["start_time"])
 
     # Keep most recent max_per_session per session type
-    per_type: dict[str, list] = {s[0]: [] for s in SESSIONS}
+    per_type: dict[str, list] = {"asian": [], "london": [], "ny": []}
     for row in reversed(all_sessions):
         stype = row["session"]
         if len(per_type[stype]) < max_per_session:
