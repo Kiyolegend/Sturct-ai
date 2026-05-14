@@ -19,6 +19,8 @@ import datetime
 import requests
 import MetaTrader5 as mt5
 import os
+import threading as _threading
+
 
 # ================================
 # CONFIG
@@ -44,7 +46,7 @@ SYMBOLS = [
 
 # Settings
 CANDLE_COUNT = 500
-PUSH_INTERVAL = 30  # seconds
+PUSH_INTERVAL = 5  # seconds
 
 TIMEFRAME_MAP = {
     "5m": mt5.TIMEFRAME_M5,
@@ -157,13 +159,20 @@ def push_symbol(sym):
 
 
 def push_all():
-    total = 0
+    results = [0] * len(SYMBOLS)
 
-    for sym in SYMBOLS:
+    def _push_one(i, sym):
         print(f"\n[{sym['mt5_name']}]")
-        total += push_symbol(sym)
+        results[i] = push_symbol(sym)
 
-    return total
+    threads = [_threading.Thread(target=_push_one, args=(i, sym))
+               for i, sym in enumerate(SYMBOLS)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    return sum(results)
 
 # ================================
 # RUN LOOP

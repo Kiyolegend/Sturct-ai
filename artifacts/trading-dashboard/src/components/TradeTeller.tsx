@@ -128,7 +128,7 @@ function s1BosCheck(
 
   const lastBos = recent[0];
     const nowSec  = Math.floor(Date.now() / 1000);
-  if (nowSec - lastBos.time > 3600) return { count: 0, strong: false };
+  if (nowSec - lastBos.time > 2 *  3600) return { count: 0, strong: false };
   const candle  = candles5m.find(c => c.time === lastBos.time);
   const strong  = candle ? candleBodyStrength(candle) >= 0.70 : false;
 
@@ -341,7 +341,7 @@ function computeS2Signal(
 
   // Step 3 — staleness guard: reject sweeps older than 48 hours
   const nowSec = Math.floor(Date.now() / 1000);
-  if (nowSec - sweep.time > 12 * 3600) {
+  if (nowSec - sweep.time > 48 * 3600) {
     return {
       state: 'no-signal',
       score: 0,
@@ -820,7 +820,7 @@ export function TradeTeller({ symbol, biasData, srLevels, bosChochData }: TradeT
     ? `1px solid ${dirColor}44`
     : '1px solid rgba(255,255,255,0.08)';
 
-  const scoreMax = 100;
+  const scoreMax = mode === 's3' ? 115 : 100;
 
   return (
     <div style={{
