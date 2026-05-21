@@ -232,8 +232,8 @@ async def get_bos_choch(
         tagged_choch = [{"type": "CHOCH", **e} for e in choch_events[-2:] if now - e["time"] <= max_age]
 
         # Deduplicate: if a level appears in both lists, CHOCH wins (it's more specific)
-        choch_prices = {round(c["price"], 3) for c in tagged_choch}
-        deduped_bos = [b for b in tagged_bos if round(b["price"], 3) not in choch_prices]
+        choch_prices = {round(c["price"], 5) for c in tagged_choch}
+        deduped_bos = [b for b in tagged_bos if round(b["price"], 5) not in choch_prices]
 
         return {
             "symbol": symbol,

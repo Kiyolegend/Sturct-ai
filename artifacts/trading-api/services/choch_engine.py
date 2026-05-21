@@ -30,45 +30,42 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
     times_arr = [int(pd.Timestamp(t).timestamp()) for t in df["time"].values]
 
     choch_events = []
-    triggered: set[float] = set()
+    
 
-    for label_item in structure_labels:
-        label = label_item["label"]
-        level = label_item["price"]
-        swing_idx = label_item["index"]
+        # Find only the MOST RECENT HL and MOST RECENT LH
+    last_hl = next((l for l in reversed(structure_labels) if l["label"] == "HL"), None)
+    last_lh = next((l for l in reversed(structure_labels) if l["label"] == "LH"), None)
 
-        if level in triggered:
-            continue
+    # Bearish CHOCH: close breaks BELOW the most recent HL (only in bullish/neutral trend)
+    if last_hl and trend in ("bullish", "neutral"):
+        level = last_hl["price"]
+        swing_idx = last_hl["index"]
+        for i in range(swing_idx + 1, len(df)):
+            if closes[i] < level:
+                choch_events.append({
+                    "time": times_arr[i],
+                    "price": round(level, 5),
+                    "direction": "bearish",
+                    "label": "CHOCH",
+                    "broken_label": "HL",
+                })
+                break
 
-        # Bearish CHOCH: close breaks BELOW a HL
-        # Only relevant in a bullish or neutral trend — in bearish the structure
-        # is already broken so HL violations are ordinary BOS, not CHOCH.
-        if label == "HL" and trend in ("bullish", "neutral"):
-            for i in range(swing_idx + 1, len(df)):
-                if closes[i] < level:
-                    choch_events.append({
-                        "time": times_arr[i],
-                        "price": round(level, 5),
-                        "direction": "bearish",
-                        "label": "CHOCH",
-                        "broken_label": "HL",
-                    })
-                    triggered.add(level)
-                    break
-
-        # Bullish CHOCH: close breaks ABOVE a LH
-        # Only relevant in a bearish or neutral trend.
-        elif label == "LH" and trend in ("bearish", "neutral"):
-            for i in range(swing_idx + 1, len(df)):
-                if closes[i] > level:
-                    choch_events.append({
-                        "time": times_arr[i],
-                        "price": round(level, 5),
-                        "direction": "bullish",
-                        "label": "CHOCH",
-                        "broken_label": "LH",
-                    })
-                    triggered.add(level)
-                    break
+    # Bullish CHOCH: close breaks ABOVE the most recent LH (only in bearish/neutral trend)
+    if last_lh and trend in ("bearish", "neutral"):
+        level = last_lh["price"]
+        swing_idx = last_lh["index"]
+        for i in range(swing_idx + 1, len(df)):
+            if closes[i] > level:
+                choch_events.append({
+                    "time": times_arr[i],
+                    "price": round(level, 5),
+                    "direction": "bullish",
+                    "label": "CHOCH",
+                    "broken_label": "LH",
+                })
+                break
 
     return choch_events
+
+    
