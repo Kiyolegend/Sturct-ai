@@ -21,7 +21,7 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     structure_labels = classify_structure(swings)
     trend_data = detect_trend(structure_labels)
     trend = trend_data["trend"]
-    bos_events = detect_bos(df, swings, structure_labels)
+    bos_events = detect_bos(df, swings, structure_labels, trend)
     choch_events = detect_choch(df, swings, structure_labels, trend)
     trendlines = compute_trendlines(structure_labels)
     zigzag_lines = swings_to_zigzag_lines(swings)
@@ -220,7 +220,9 @@ async def get_bos_choch(
         swings = detect_swings(df)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
-        bos_events = detect_bos(df, swings, structure_labels)
+        bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"])
+
+
         choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"])
 
         now = int(time.time())
@@ -229,11 +231,15 @@ async def get_bos_choch(
         tagged_bos = [{"type": "BOS", **e} for e in bos_events[-4:] if now - e["time"] <= max_age]
         tagged_choch = [{"type": "CHOCH", **e} for e in choch_events[-2:] if now - e["time"] <= max_age]
 
+        # Deduplicate: if a level appears in both lists, CHOCH wins (it's more specific)
+        choch_prices = {round(c["price"], 3) for c in tagged_choch}
+        deduped_bos = [b for b in tagged_bos if round(b["price"], 3) not in choch_prices]
+
         return {
             "symbol": symbol,
             "timeframe": "1h",
-            "levels": tagged_bos + tagged_choch,
-        }
+            "levels": deduped_bos + tagged_choch,
+}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -377,7 +383,9 @@ async def _compute_pair_alerts(symbol: str) -> dict:
     elif bias_4h != "neutral" and bias_1h != "neutral" and bias_4h == bias_1h:
         # Aligned — check for active conditions
         dir_str = bias_4h
-        bos_5m  = detect_bos(df_5m, swings_5m, labels_5m)
+        bos_5m  = detect_bos(df_5m, swings_5m, labels_5m, dir_str)
+
+
         recent_bos = [b for b in bos_5m if b["direction"] == dir_str and now - b["time"] <= 3600]
         target_label   = "HL" if dir_str == "bullish" else "LH"
         pullback_labels = [l for l in labels_15m if l["label"] == target_label and now - l["time"] <= 8 * 3600]
@@ -433,7 +441,9 @@ async def _compute_pair_alerts(symbol: str) -> dict:
             fvg        = next((f for f in fvgs_5m if f["type"] == dir_str), None)
             inside_ob  = ob["bottom"] <= cp <= ob["top"]
             near_ob    = abs((ob["top"] + ob["bottom"]) / 2 - cp) / cp <= 0.003
-            bos_5m_s3  = detect_bos(df_5m, swings_5m, labels_5m)
+            bos_5m_s3  = detect_bos(df_5m, swings_5m, labels_5m, dir_str)
+
+
             confirm_5m = [b for b in bos_5m_s3 if b["direction"] == dir_str and now - b["time"] <= 3600]
             if (inside_ob or near_ob) and confirm_5m:
                 s3_state = "active"

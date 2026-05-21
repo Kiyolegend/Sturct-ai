@@ -13,10 +13,15 @@ import pandas as pd
 from .zigzag_engine import SwingPoint
 
 
-def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict]) -> list[dict]:
+def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict], trend: str = "neutral") -> list[dict]:
     """
     Detect Break of Structure events.
     Returns list of BOS events: {time, price, direction, level_broken}
+
+    trend: "bullish" | "bearish" | "neutral"
+      - bullish → only emit bullish BOS (bearish breaks are CHoCH, not BOS)
+      - bearish → only emit bearish BOS (bullish breaks are CHoCH, not BOS)
+      - neutral → emit both directions (default, backward-compatible)
     """
     if len(swings) < 2 or len(df) == 0:
         return []
@@ -45,25 +50,27 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
 
             # Bullish BOS: close above a swing HIGH (HH or LH)
             if label in ("HH", "LH") and close > level:
-                bos_events.append({
-                    "time": candle_time,
-                    "price": round(level, 5),
-                    "direction": "bullish",
-                    "label": "BOS ↑",
-                    "level_broken": round(level, 5),
-                })
+                if trend in ("bullish", "neutral"):
+                    bos_events.append({
+                        "time": candle_time,
+                        "price": round(level, 5),
+                        "direction": "bullish",
+                        "label": "BOS ↑",
+                        "level_broken": round(level, 5),
+                    })
                 broken_levels.add(level)
                 break
 
             # Bearish BOS: close below a swing LOW (LL or HL)
             if label in ("LL", "HL") and close < level:
-                bos_events.append({
-                    "time": candle_time,
-                    "price": round(level, 5),
-                    "direction": "bearish",
-                    "label": "BOS ↓",
-                    "level_broken": round(level, 5),
-                })
+                if trend in ("bearish", "neutral"):
+                    bos_events.append({
+                        "time": candle_time,
+                        "price": round(level, 5),
+                        "direction": "bearish",
+                        "label": "BOS ↓",
+                        "level_broken": round(level, 5),
+                    })
                 broken_levels.add(level)
                 break
 
