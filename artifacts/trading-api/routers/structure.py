@@ -86,7 +86,8 @@ async def get_bos(
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
         swings = detect_swings(df)
         structure_labels = classify_structure(swings)
-        bos_events = detect_bos(df, swings, structure_labels)
+        trend_data = detect_trend(structure_labels)
+        bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"])
         return {"symbol": symbol, "interval": interval, "bos": bos_events}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -405,16 +406,16 @@ async def _compute_pair_alerts(symbol: str) -> dict:
     else:
         # Market is mixed or neutral — S2 can develop, show at least amber
         choch_1h = detect_choch(df_1h, swings_1h, labels_1h, bias_1h)
-        bos_1h   = detect_bos(df_1h, swings_1h, labels_1h)
+        bos_1h   = detect_bos(df_1h, swings_1h, labels_1h, bias_1h)
         recent_sweep = (
             [c for c in choch_1h if now - c["time"] <= 3 * 3600] +
             [b for b in bos_1h   if now - b["time"] <= 3 * 3600]
         )
         if recent_sweep:
-            sweep_dir = recent_sweep[0]["direction"]
+            sweep_dir = recent_sweep[-1]["direction"]
             if bias_4h == "neutral" or bias_4h == sweep_dir:
                 choch_5m  = detect_choch(df_5m, swings_5m, labels_5m, bias_5m)
-                bos_5m_ev = detect_bos(df_5m, swings_5m, labels_5m)
+                bos_5m_ev = detect_bos(df_5m, swings_5m, labels_5m, bias_5m)
                 recent_rev = (
                     [c for c in choch_5m  if c["direction"] == sweep_dir and now - c["time"] <= 1200] +
                     [b for b in bos_5m_ev if b["direction"] == sweep_dir and now - b["time"] <= 1200]

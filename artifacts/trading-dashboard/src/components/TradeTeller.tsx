@@ -424,13 +424,13 @@ function computeS2Signal(
 
   if (rev5mChoch) {
     const candle = candles5m.find(c => c.time === rev5mChoch.time);
-    if (!candle || candleBodyStrength(candle) >= 0.50) {
+    if (candle && candleBodyStrength(candle) >= 0.50) {
       reversalScore  = 25;
       isChochConfirm = true;
     }
   } else if (rev5mBos) {
     const candle = candles5m.find(c => c.time === rev5mBos.time);
-    if (!candle || candleBodyStrength(candle) >= 0.70) {
+    if (candle && candleBodyStrength(candle) >= 0.70) {
       reversalScore = 10;
     }
   }

@@ -93,7 +93,7 @@ def detect_zones(swings: list[SwingPoint], timeframe: str = "1h", current_price:
 
     zones = []
     for cluster in clusters:
-        half_w = zone_width + (cluster["touches"] * pip * 0.01)
+        half_w = zone_width + (cluster["touches"] * pip * 0.1)
         strength = min(base_strength + cluster["touches"], 5)
         zones.append({
             "top": round(cluster["center"] + half_w, 5),

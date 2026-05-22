@@ -49,7 +49,7 @@ def detect_swings(df: pd.DataFrame) -> list[SwingPoint]:
             })
 
         # Swing Low: current low is the minimum in the window
-        elif lows[i] == window_lows.min() and list(window_lows).count(lows[i]) == 1:
+        if lows[i] == window_lows.min() and list(window_lows).count(lows[i]) == 1:
             raw_pivots.append({
                 "index": i,
                 "time": int(pd.Timestamp(times[i]).timestamp()),
