@@ -332,35 +332,47 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData }
     }
 
     if (toggles.zigzag && data.swings.length > 0) {
+      const uniqueSwings = Array.from(new Map(data.swings.map(s => [s.time, s])).values()
+      ).sort((a, b) => a.time - b.time);
       zigzagSeriesRef.current.setData(
-        [...data.swings].sort((a, b) => a.time - b.time).map(s => ({ time: s.time as Time, value: s.price })) as any
+        uniqueSwings.map(s => ({ time: s.time as Time, value: s.price })) as any
       );
     } else {
-      zigzagSeriesRef.current.setData([]);
-    }
+      
 
     trendlineSeriesRefs.current.forEach(s => { try { chartRef.current?.removeSeries(s); } catch {} });
     trendlineSeriesRefs.current = [];
 
     const addTrendlines = (lines: typeof data.trendlines.bullish, color: string) => {
       lines.forEach(line => {
+        if (line.from_time === line.to_time) return;
         const s = chartRef.current!.addSeries(LineSeries, {
           color, lineWidth: 1, lineStyle: LineStyle.Solid,
           crosshairMarkerVisible: false, lastValueVisible: false, priceLineVisible: false,
         });
-        s.setData([
-          { time: line.from_time as Time, value: line.from_price },
-          { time: line.to_time as Time, value: line.to_price },
-        ] as any);
-        trendlineSeriesRefs.current.push(s);
+        try {
+          s.setData([
+            { time: line.from_time as Time, value: line.from_price },
+            { time: line.to_time as Time, value: line.to_price },
+             ] as any);
+             trendlineSeriesRefs.current.push(s);
+        } catch {
+          chartRef.current?.removeSeries(s);
+        }
       });
-    };
+    };           
+                
     addTrendlines(data.trendlines.bullish, 'rgba(38,166,154,0.65)');
     addTrendlines(data.trendlines.bearish, 'rgba(239,83,80,0.65)');
 
     if (markersPluginRef.current) {
       if (toggles.labels) {
-        const markers: SeriesMarker<Time>[] = data.structure_labels.map(label => ({
+        const seenTimes = new Set<number>();
+        const markers: SeriesMarker<Time>[] = data.structure_labels.filter(label => {
+          if (seenTimes.has(label.time as number)) return false;
+          seenTimes.add(label.time as number);
+          return true;
+        }).map(label => ({
           time: label.time as Time,
           position: label.kind === 'high' ? 'aboveBar' : 'belowBar',
           color: label.kind === 'high' ? '#ef5350' : '#26a69a',

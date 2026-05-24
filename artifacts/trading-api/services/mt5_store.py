@@ -33,6 +33,8 @@ _last_contact: float = 0.0
 def store_candles(symbol: str, interval: str, df: pd.DataFrame) -> None:
     global _last_contact
     key = f"{symbol}_{interval}"
+    df = df.drop_duplicates(subset=["time"]).sort_values("time").reset_index(drop=True)
+
     _store[key] = MT5Frame(df=df.copy(), pushed_at=time.time())
     _last_contact = time.time()
 

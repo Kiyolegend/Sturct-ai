@@ -204,7 +204,8 @@ def run():
             if not connect_mt5():
                 time.sleep(30)
                 continue
-
+        
+        t0 = time.time()
         success = push_all()
         expected = len(SYMBOLS) * len(TIMEFRAME_MAP)
 
@@ -219,7 +220,8 @@ def run():
             consecutive_errors = 0
             print(f"Done: {success}/{expected} successful")
 
-        time.sleep(PUSH_INTERVAL)
+        elapsed = time.time() - t0
+        time.sleep(max(0, PUSH_INTERVAL - elapsed))
 
 
 # ================================

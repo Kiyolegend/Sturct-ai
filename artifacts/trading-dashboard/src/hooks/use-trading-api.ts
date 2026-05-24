@@ -95,6 +95,7 @@ export interface SRLevel {
   kind: "support" | "resistance";
   timeframe: "15m" | "1h" | "4h";
   touches: number;
+  score?: number;
 }
 
 export interface SRLevelsResponse {

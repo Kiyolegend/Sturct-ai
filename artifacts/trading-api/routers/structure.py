@@ -58,8 +58,10 @@ async def get_structure(
             "zigzag_lines": zigzag_lines,
             "structure_labels": structure_labels,
         }
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e) )
 
 @router.get("/trend")
 async def get_trend(
@@ -73,6 +75,8 @@ async def get_trend(
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
         return {"symbol": symbol, "interval": interval, **trend_data}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -89,6 +93,8 @@ async def get_bos(
         trend_data = detect_trend(structure_labels)
         bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"])
         return {"symbol": symbol, "interval": interval, "bos": bos_events}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -105,6 +111,8 @@ async def get_choch(
         trend_data = detect_trend(structure_labels)
         choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"])
         return {"symbol": symbol, "interval": interval, "choch": choch_events}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -120,6 +128,8 @@ async def get_zones(
         current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
         zones = detect_zones(swings, interval, current_price)
         return {"symbol": symbol, "interval": interval, "zones": zones}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -133,6 +143,8 @@ async def get_full_analysis(
     try:
         result = await _get_full_analysis(symbol, interval, outputsize)
         return {"symbol": symbol, "interval": interval, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -146,6 +158,8 @@ async def get_sessions(
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
         sessions = compute_sessions(df, max_per_session=5)
         return {"symbol": symbol, "interval": interval, "sessions": sessions}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -203,6 +217,8 @@ async def get_mtf_bias(
             "bias_1h": t1h,
             "bias_4h": t4h,
         }
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -241,6 +257,8 @@ async def get_bos_choch(
             "timeframe": "1h",
             "levels": deduped_bos + tagged_choch,
 }
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -265,6 +283,8 @@ async def get_sr_levels(
             "count": len(levels),
             "levels": levels,
         }
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 # === FILE END ===
@@ -362,7 +382,8 @@ async def _compute_pair_alerts(symbol: str) -> dict:
             fetch_ohlc(symbol, "1h",  150),
             fetch_ohlc(symbol, "4h",  150),
         )
-    except Exception:
+    except Exception as e:
+        print(f"  [WARN] alerts fetch failed for {symbol}: {e}")
         return {"s1": "no-signal", "s2": "no-signal", "s3": "no-signal"}
 
     now = int(time.time())
@@ -406,7 +427,7 @@ async def _compute_pair_alerts(symbol: str) -> dict:
     else:
         # Market is mixed or neutral — S2 can develop, show at least amber
         choch_1h = detect_choch(df_1h, swings_1h, labels_1h, bias_1h)
-        bos_1h   = detect_bos(df_1h, swings_1h, labels_1h, bias_1h)
+        bos_1h   = detect_bos(df_1h, swings_1h, labels_1h, "neutral")
         recent_sweep = (
             [c for c in choch_1h if now - c["time"] <= 3 * 3600] +
             [b for b in bos_1h   if now - b["time"] <= 3 * 3600]
@@ -416,9 +437,10 @@ async def _compute_pair_alerts(symbol: str) -> dict:
             if bias_4h == "neutral" or bias_4h == sweep_dir:
                 choch_5m  = detect_choch(df_5m, swings_5m, labels_5m, bias_5m)
                 bos_5m_ev = detect_bos(df_5m, swings_5m, labels_5m, bias_5m)
+                reversal_dir = "bullish" if sweep_dir == "bearish" else "bearish"
                 recent_rev = (
-                    [c for c in choch_5m  if c["direction"] == sweep_dir and now - c["time"] <= 1200] +
-                    [b for b in bos_5m_ev if b["direction"] == sweep_dir and now - b["time"] <= 1200]
+                    [c for c in choch_5m  if c["direction"] == reversal_dir and now - c["time"] <= 1200] +
+                    [b for b in bos_5m_ev if b["direction"] == reversal_dir and now - b["time"] <= 1200]
                 )
                 s2_state = "active" if recent_rev else "waiting"
             else:
@@ -470,5 +492,7 @@ async def get_alerts():
             else:
                 alerts[sym] = result
         return {"alerts": alerts}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
