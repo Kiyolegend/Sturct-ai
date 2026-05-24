@@ -217,7 +217,7 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData }
   const trendlineSeriesRefs = useRef<ISeriesApi<'Line'>[]>([]);
   const srPriceLinesRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>[]>([]);
   const bosChochLinesRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>[]>([]);
-  const currentPriceLineRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']> | null>(null);
+  
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
 
   const [layoutTick, setLayoutTick] = useState(0);
@@ -295,7 +295,12 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData }
     window.addEventListener('resize', handleResize);
     handleResize();
 
-    return () => { window.removeEventListener('resize', handleResize); chart.remove(); };
+    return () => { window.removeEventListener('resize', handleResize); 
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(tick);
+      chart.remove();
+    }
+
+
   }, []);
 
   // ── Effect 2: Candles, zigzag, trendlines, structure markers ──────────────
@@ -319,17 +324,7 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData }
       });
     }
 
-    if (currentPriceLineRef.current) {
-      try { candleSeriesRef.current.removePriceLine(currentPriceLineRef.current); } catch {}
-      currentPriceLineRef.current = null;
-    }
-    if (uniqueCandles.length > 0) {
-      const latest = uniqueCandles[uniqueCandles.length - 1].close;
-      currentPriceLineRef.current = candleSeriesRef.current.createPriceLine({
-        price: latest, color: 'rgba(255,255,255,0.6)', lineWidth: 1,
-        lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '',
-      });
-    }
+    
 
     if (toggles.zigzag && data.swings.length > 0) {
       const uniqueSwings = Array.from(new Map(data.swings.map(s => [s.time, s])).values()
@@ -338,6 +333,8 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData }
         uniqueSwings.map(s => ({ time: s.time as Time, value: s.price })) as any
       );
     } else {
+      zigzagSeriesRef.current.setData([]);
+      }
       
 
     trendlineSeriesRefs.current.forEach(s => { try { chartRef.current?.removeSeries(s); } catch {} });
