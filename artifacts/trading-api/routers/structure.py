@@ -242,7 +242,7 @@ async def get_bos_choch(
 
         choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"])
 
-        now = int(time.time())
+        now = int(df.iloc[-1]["time"])
         max_age = 48 * 3600  # 48 hours in seconds
 
         tagged_bos = [{"type": "BOS", **e} for e in bos_events[-4:] if now - e["time"] <= max_age]
@@ -386,7 +386,9 @@ async def _compute_pair_alerts(symbol: str) -> dict:
         print(f"  [WARN] alerts fetch failed for {symbol}: {e}")
         return {"s1": "no-signal", "s2": "no-signal", "s3": "no-signal"}
 
-    now = int(time.time())
+    now = int(df_5m.iloc[-1]["time"])
+
+
 
     def _trend(df):
         swings = detect_swings(df)
