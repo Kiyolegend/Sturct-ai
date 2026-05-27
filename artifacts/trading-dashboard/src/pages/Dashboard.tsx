@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { TopBar, type ToggleState } from "@/components/TopBar";
 import { TradingChart } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
@@ -34,6 +34,22 @@ export function Dashboard() {
   const { data: biasData }     = useMTFBias(symbol);
   const { data: sessionsData } = useSessions(symbol, timeframe);
   const { data: bosChochData } = useBosChoch(symbol);
+
+  useEffect(() => {
+    const ws = new WebSocket(`ws://${window.location.host}/:8001/trading-api/ws`);
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "candle" && msg.symbol === symbol) {
+          refetch();
+        }
+      } catch {}
+    };
+    ws.onerror = () => ws.close();
+    return () => ws.close();
+  }, [symbol, refetch]);
+
+
 
   const isMarketClosed = useMemo(() => {
     if (!data?.candles || data.candles.length === 0) return false;

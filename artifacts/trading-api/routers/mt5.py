@@ -10,6 +10,10 @@ from pydantic import BaseModel
 import pandas as pd
 import os
 import time
+import asyncio
+from ws_manager import broadcast
+
+
 
 from services.mt5_store import store_candles, status as mt5_status, VALID_INTERVALS
 
@@ -66,6 +70,7 @@ async def mt5_push(
     df = df.sort_values("time").reset_index(drop=True)
 
     store_candles(payload.symbol, payload.interval, df)
+    asyncio.create_task(broadcast({"type": "candle", "symbol": payload.symbol, "interval": payload.interval}))
 
     return {
         "ok": True,

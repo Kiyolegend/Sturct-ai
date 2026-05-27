@@ -8,6 +8,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import json
+from ws_manager import active_connections, broadcast
 
 from routers.data import router as data_router
 from routers.structure import router as structure_router
@@ -39,8 +40,8 @@ async def health():
     return {"status": "ok", "service": "trading-market-structure-api"}
 
 
-# ── WebSocket — live price streaming ──────────────────────────────────────────
-active_connections: list[WebSocket] = []
+
+
 
 
 @app.websocket(f"{PREFIX}/ws")
