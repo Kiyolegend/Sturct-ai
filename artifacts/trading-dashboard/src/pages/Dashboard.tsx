@@ -3,6 +3,7 @@ import { TopBar, type ToggleState } from "@/components/TopBar";
 import { TradingChart } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 import { TradeTeller } from "@/components/TradeTeller";
+import { TradePanel } from "@/components/TradePanel";
 import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
 
@@ -35,6 +36,7 @@ export function Dashboard() {
   const { data: sessionsData } = useSessions(symbol, timeframe);
   const { data: bosChochData } = useBosChoch(symbol);
   const [wsConnected, setWsConnected] = useState(false);
+  const [clickedPrice, setClickedPrice] = useState<number | null>(null);
 
     useEffect(() => {
     const ws = new WebSocket(`ws://localhost:8001/trading-api/ws`);
@@ -88,6 +90,13 @@ export function Dashboard() {
             srLevels={srData?.levels}
             bosChochData={bosChochData}
           />
+          <TradePanel
+            symbol={Symbol}
+            currentPrice={data?.candles?.at(-1)?.close ?? 0}
+            clickedPrice={clickedPrice}
+            onClickedPriceConsumed={() => setClickedPrice(null)}
+          />  
+
         </HeatmapSidebar>
 
         <main className="flex-1 relative h-full">
@@ -124,6 +133,7 @@ export function Dashboard() {
                 sessions={sessionsData?.sessions}
                 toggles={toggles}
                 bosChochData={bosChochData}
+                onPriceClick={setClickedPrice}
               />
               <div className={`absolute bottom-6 right-6 px-3 py-1.5 backdrop-blur-md border rounded-full flex items-center space-x-2 shadow-lg z-50 ${wsConnected ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
                 <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />

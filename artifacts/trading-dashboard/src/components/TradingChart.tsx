@@ -37,6 +37,7 @@ interface TradingChartProps {
   sessions?: SessionBox[];
   toggles: ToggleState;
   bosChochData?: BosChochResponse;
+  onPriceClick?: (price: number) => void;
 }
 
 // ── Exported so TradeTeller can reuse them without duplicating logic ──────────
@@ -219,6 +220,8 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData }
   const bosChochLinesRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>[]>([]);
   
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const onPriceClickRef = useRef(onPriceClick);
+  useEffect(() => { onPriceClickRef.current = onPriceClick; }, [onPriceClick]);
 
   const [layoutTick, setLayoutTick] = useState(0);
   const tick = useCallback(() => setLayoutTick(t => t + 1), []);
@@ -286,6 +289,18 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData }
     zigzagSeriesRef.current = zzSeries;
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(tick);
+
+      chart.subscribeClick((param) => {
+        if (!param.point || !candleSeriesRef.current || !onPriceClickRef.current) return;
+        const price = candleSeriesRef.current.coordinateToPrice(param.point.y);
+        if (price !== null) onPriceClickRef.current(Math.round(price * 1e5) / 1e5);
+    });
+
+
+
+
+
+
 
     const handleResize = () => {
       if (!containerRef.current) return;
