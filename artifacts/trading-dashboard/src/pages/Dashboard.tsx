@@ -34,9 +34,12 @@ export function Dashboard() {
   const { data: biasData }     = useMTFBias(symbol);
   const { data: sessionsData } = useSessions(symbol, timeframe);
   const { data: bosChochData } = useBosChoch(symbol);
+  const [wsConnected, setWsConnected] = useState(false);
 
-  useEffect(() => {
-    const ws = new WebSocket(`ws://${window.location.host}/:8001/trading-api/ws`);
+    useEffect(() => {
+    const ws = new WebSocket(`ws://localhost:8001/trading-api/ws`);
+    ws.onopen  = () => setWsConnected(true);
+    ws.onclose = () => setWsConnected(false);
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
@@ -122,6 +125,17 @@ export function Dashboard() {
                 toggles={toggles}
                 bosChochData={bosChochData}
               />
+              <div className={`absolute bottom-6 right-6 px-3 py-1.5 backdrop-blur-md border rounded-full flex items-center space-x-2 shadow-lg z-50 ${wsConnected ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+                <span className={`text-[10px] font-mono uppercase tracking-wider ${wsConnected ? 'text-green-400' : 'text-red-400'}`}>
+                  {wsConnected ? 'LIVE' : 'OFFLINE'}
+                </span>
+               </div>    
+
+
+
+
+
 
               {isRefetching && (
                 <div className="absolute bottom-6 right-16 px-3 py-1.5 bg-[#0f1520]/80 backdrop-blur-md border border-white/10 rounded-full flex items-center space-x-2 shadow-lg z-50">

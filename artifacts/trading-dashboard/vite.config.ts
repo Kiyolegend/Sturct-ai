@@ -35,6 +35,7 @@ export default defineConfig({
       "/trading-api": {
         target: "http://localhost:8001",
         changeOrigin: true,
+        ws: true,
       },
     },
   },
@@ -46,6 +47,7 @@ export default defineConfig({
       "/trading-api": {
         target: "http://localhost:8001",
         changeOrigin: true,
+        ws: true,
       },
     },
   },
