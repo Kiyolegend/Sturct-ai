@@ -210,7 +210,7 @@ export function detectFVGs(candles: any[], currentPrice: number): FVGData[] {
   }));
 }
 
-export function TradingChart({ data, srLevels, sessions, toggles, bosChochData }: TradingChartProps) {
+export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick  }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -290,12 +290,20 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData }
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(tick);
 
-      chart.subscribeClick((param) => {
-        if (!param.point || !candleSeriesRef.current || !onPriceClickRef.current) return;
-        const price = candleSeriesRef.current.coordinateToPrice(param.point.y);
-        if (price !== null) onPriceClickRef.current(Math.round(price * 1e5) / 1e5);
-    });
-
+          const handleChartClick = (e: MouseEvent) => {
+  if (!candleSeriesRef.current || !onPriceClickRef.current || !containerRef.current) return;
+  const rect = containerRef.current.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  try {
+    const price = (candleSeriesRef.current.priceScale() as any).coordinateToPrice(y);
+    if (price !== null && price !== undefined) {
+      onPriceClickRef.current(Math.round(price * 1e5) / 1e5);
+    }
+  } catch {}
+};
+containerRef.current?.addEventListener('click', handleChartClick);
+    
+    
 
 
 
@@ -312,6 +320,7 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData }
 
     return () => { window.removeEventListener('resize', handleResize); 
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(tick);
+      containerRef.current?.removeEventListener('click', handleChartClick);
       chart.remove();
     }
 

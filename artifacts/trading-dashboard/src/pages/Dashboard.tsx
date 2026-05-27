@@ -91,7 +91,7 @@ export function Dashboard() {
             bosChochData={bosChochData}
           />
           <TradePanel
-            symbol={Symbol}
+            symbol={symbol}
             currentPrice={data?.candles?.at(-1)?.close ?? 0}
             clickedPrice={clickedPrice}
             onClickedPriceConsumed={() => setClickedPrice(null)}
