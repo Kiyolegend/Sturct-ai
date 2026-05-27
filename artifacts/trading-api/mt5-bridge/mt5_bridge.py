@@ -47,9 +47,9 @@ SYMBOLS = [
 # Settings
 CANDLE_COUNT = {
     "5m":  300,
-    "15m": 200,
-    "1h":  100,
-    "4h":  50,
+    "15m": 300,
+    "1h":  250,
+    "4h":  250,
 }
 PUSH_INTERVAL = 5  # seconds
 
@@ -244,9 +244,10 @@ def _execute_order(order: dict):
         "price":        price,
         "sl":           sl,
         "tp":           tp,
+        "deviation":    5,
         "comment":      order.get("comment", "STRUCT.ai"),
         "type_time":    mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC,
+        "type_filling": mt5.ORDER_FILLING_RETURN,
     }
     result = mt5.order_send(req)
     if result and result.retcode == mt5.TRADE_RETCODE_DONE:
@@ -276,7 +277,7 @@ def _execute_close(order: dict):
         "position":     ticket,
         "price":        price,
         "comment":      "STRUCT.ai close",
-        "type_filling": mt5.ORDER_FILLING_IOC,
+        "type_filling": mt5.ORDER_FILLING_RETURN,
     }
     result = mt5.order_send(req)
     if result and result.retcode == mt5.TRADE_RETCODE_DONE:

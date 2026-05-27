@@ -45,7 +45,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     const p = orderType === "LIMIT" ? parseFloat(limitPrice) : currentPrice;
     setSL(defaultSL(p, direction).toFixed(5));
     setTP(defaultTP(p, direction).toFixed(5));
-  }, [direction, symbol]);
+  }, [direction, symbol, currentPrice > 0 ? "loaded" : ""]);
 
 
   useEffect(() => {
