@@ -37,6 +37,11 @@ export function Dashboard() {
   const { data: bosChochData } = useBosChoch(symbol);
   const [wsConnected, setWsConnected] = useState(false);
   const [clickedPrice, setClickedPrice] = useState<number | null>(null);
+  const [slLine, setSlLine] = useState<number | null>(null);
+  const [tpLine, setTpLine] = useState<number | null>(null);
+
+
+
 
     useEffect(() => {
     const ws = new WebSocket(`ws://localhost:8001/trading-api/ws`);
@@ -95,6 +100,9 @@ export function Dashboard() {
             currentPrice={data?.candles?.at(-1)?.close ?? 0}
             clickedPrice={clickedPrice}
             onClickedPriceConsumed={() => setClickedPrice(null)}
+            onSLChange={setSlLine}
+            onTPChange={setTpLine}
+
           />  
 
         </HeatmapSidebar>
@@ -134,6 +142,8 @@ export function Dashboard() {
                 toggles={toggles}
                 bosChochData={bosChochData}
                 onPriceClick={setClickedPrice}
+                slLine={slLine}
+                tpLine={tpLine}
               />
               <div className={`absolute bottom-6 right-6 px-3 py-1.5 backdrop-blur-md border rounded-full flex items-center space-x-2 shadow-lg z-50 ${wsConnected ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
                 <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />

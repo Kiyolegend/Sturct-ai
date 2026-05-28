@@ -38,6 +38,9 @@ interface TradingChartProps {
   toggles: ToggleState;
   bosChochData?: BosChochResponse;
   onPriceClick?: (price: number) => void;
+  slLine?: number | null;
+  tpLine?: number | null;
+
 }
 
 // ── Exported so TradeTeller can reuse them without duplicating logic ──────────
@@ -210,7 +213,7 @@ export function detectFVGs(candles: any[], currentPrice: number): FVGData[] {
   }));
 }
 
-export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick  }: TradingChartProps) {
+export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine  }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -218,6 +221,7 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, 
   const trendlineSeriesRefs = useRef<ISeriesApi<'Line'>[]>([]);
   const srPriceLinesRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>[]>([]);
   const bosChochLinesRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>[]>([]);
+  const slTpLinesRef = useRef<ReturnType<ISeriesApi<'Candlestick'>['createPriceLine']>[]>([]);
   
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const onPriceClickRef = useRef(onPriceClick);
@@ -295,7 +299,7 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, 
   const rect = containerRef.current.getBoundingClientRect();
   const y = e.clientY - rect.top;
   try {
-    const price = (candleSeriesRef.current.priceScale() as any).coordinateToPrice(y);
+    const price = candleSeriesRef.current.coordinateToPrice(y);
     if (price !== null && price !== undefined) {
       onPriceClickRef.current(Math.round(price * 1e5) / 1e5);
     }
@@ -498,6 +502,37 @@ containerRef.current?.addEventListener('click', handleChartClick);
       bosChochLinesRef.current.push(line);
     });
   }, [bosChochData, toggles.bos]);
+
+   // ── Effect 5: Live SL / TP price lines ────────────────────────────────────
+  useEffect(() => {
+    if (!candleSeriesRef.current) return;
+    slTpLinesRef.current.forEach(line => {
+      try { candleSeriesRef.current?.removePriceLine(line); } catch {}
+    });
+    slTpLinesRef.current = [];
+    if (slLine != null) {
+      const line = candleSeriesRef.current.createPriceLine({
+        price: slLine,
+        color: '#ef5350',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: 'SL',
+      });
+      slTpLinesRef.current.push(line);
+    }
+    if (tpLine != null) {
+      const line = candleSeriesRef.current.createPriceLine({
+        price: tpLine,
+        color: '#26a69a',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: 'TP',
+      });
+      slTpLinesRef.current.push(line);
+    }
+  }, [slLine, tpLine]);
 
   // ── Effect 5: HTML overlays ────────────────────────────────────────────────
   const overlayElements = (() => {

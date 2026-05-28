@@ -11,6 +11,8 @@ interface TradePanelProps {
   currentPrice:             number;
   clickedPrice?:            number | null;
   onClickedPriceConsumed?:  () => void;
+  onSLChange?:  (v: number | null) => void;
+  onTPChange?:  (v: number | null) => void;
 }
 
 type Direction  = "BUY" | "SELL";
@@ -22,23 +24,24 @@ interface Position {
   price_open: number; price_current: number; sl: number; tp: number; profit: number;
 }
 
-export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceConsumed }: TradePanelProps) {
+export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceConsumed, onSLChange, onTPChange }: TradePanelProps) {
   const pip          = PIP(currentPrice);
   const defaultSL    = (price: number, dir: Direction) =>
     dir === "BUY" ? +(price - 20 * pip).toFixed(5) : +(price + 20 * pip).toFixed(5);
   const defaultTP    = (price: number, dir: Direction) =>
     dir === "BUY" ? +(price + 40 * pip).toFixed(5) : +(price - 40 * pip).toFixed(5);
 
-  const [direction,  setDirection]  = useState<Direction>("BUY");
-  const [orderType,  setOrderType]  = useState<OrderType>("MARKET");
-  const [limitPrice, setLimitPrice] = useState(currentPrice.toFixed(5));
-  const [sl,         setSL]         = useState(() => defaultSL(currentPrice, "BUY").toFixed(5));
-  const [tp,         setTP]         = useState(() => defaultTP(currentPrice, "BUY").toFixed(5));
-  const [lots,       setLots]       = useState("0.02");
-  const [stage,      setStage]      = useState<Stage>("form");
-  const [resultMsg,  setResultMsg]  = useState("");
-  const [resultOk,   setResultOk]   = useState(false);
-  const [positions,  setPositions]  = useState<Position[]>([]);
+  const [direction,        setDirection]        = useState<Direction>("BUY");
+  const [orderType,        setOrderType]        = useState<OrderType>("MARKET");
+  const [limitPrice,       setLimitPrice]       = useState(currentPrice.toFixed(5));
+  const [sl,               setSL]               = useState(() => defaultSL(currentPrice, "BUY").toFixed(5));
+  const [tp,               setTP]               = useState(() => defaultTP(currentPrice, "BUY").toFixed(5));
+  const [lots,             setLots]             = useState("0.02");
+  const [stage,            setStage]            = useState<Stage>("form");
+  const [resultMsg,        setResultMsg]        = useState("");
+  const [resultOk,         setResultOk]         = useState(false);
+  const [positions,        setPositions]        = useState<Position[]>([]);
+  const [chartClickTarget, setChartClickTarget] = useState<'entry' | 'sl' | 'tp' | null>(null);
 
   // Auto-update SL/TP when direction or symbol changes
   useEffect(() => {
@@ -47,15 +50,49 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     setTP(defaultTP(p, direction).toFixed(5));
   }, [direction, symbol, currentPrice > 0 ? "loaded" : ""]);
 
-
+  // Chart click routing — SL, TP, Entry, or default (switch to LIMIT)
   useEffect(() => {
     if (!clickedPrice) return;
-    setOrderType("LIMIT");
-    setLimitPrice(clickedPrice.toFixed(5));
-    setSL(defaultSL(clickedPrice, direction).toFixed(5));
-    setTP(defaultTP(clickedPrice, direction).toFixed(5));
+    if (chartClickTarget === 'sl') {
+      setSL(clickedPrice.toFixed(5));
+    } else if (chartClickTarget === 'tp') {
+      setTP(clickedPrice.toFixed(5));
+    } else if (chartClickTarget === 'entry') {
+      setLimitPrice(clickedPrice.toFixed(5));
+      setSL(defaultSL(clickedPrice, direction).toFixed(5));
+      setTP(defaultTP(clickedPrice, direction).toFixed(5));
+    } else {
+      setOrderType("LIMIT");
+      setLimitPrice(clickedPrice.toFixed(5));
+      setSL(defaultSL(clickedPrice, direction).toFixed(5));
+      setTP(defaultTP(clickedPrice, direction).toFixed(5));
+    }
+    setChartClickTarget(null);
     onClickedPriceConsumed?.();
   }, [clickedPrice]);
+  useEffect(() => {
+    const v = parseFloat(sl);
+    onSLChange?.(isNaN(v) ? null : v);
+  }, [sl]);
+  // Emit TP to parent
+  useEffect(() => {
+    const v = parseFloat(tp);
+    onTPChange?.(isNaN(v) ? null : v);
+  }, [tp]);
+  // Clear lines on sending/result, restore on form
+  useEffect(() => {
+    if (stage === 'sending' || stage === 'result') {
+      onSLChange?.(null);
+      onTPChange?.(null);
+    } else if (stage === 'form') {
+      const sv = parseFloat(sl);
+      const tv = parseFloat(tp);
+      onSLChange?.(isNaN(sv) ? null : sv);
+      onTPChange?.(isNaN(tv) ? null : tv);
+    }
+  }, [stage]);
+
+
 
 
   // Poll open positions
@@ -125,6 +162,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     setLimitPrice(currentPrice.toFixed(5));
     setSL(defaultSL(currentPrice, direction).toFixed(5));
     setTP(defaultTP(currentPrice, direction).toFixed(5));
+    setChartClickTarget(null);
   };
 
   const closePosition = (ticket: number) => {
@@ -195,29 +233,58 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
             </button>
           </div>
 
-          {/* LIMIT PRICE */}
+          {/* LIMIT PRICE — click to target, then click chart to set */}
           {orderType === "LIMIT" && (
             <div className="flex items-center gap-2">
               <span className="text-white/40 w-16">Entry</span>
-              <input type="number" step={pip} value={limitPrice}
+              <input
+                type="number"
+                step={pip}
+                value={limitPrice}
                 onChange={e => setLimitPrice(e.target.value)}
-                className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-white/30" />
+                onClick={() => setChartClickTarget('entry')}
+                className={`flex-1 bg-white/5 border rounded px-2 py-1 text-white focus:outline-none transition-colors ${
+                  chartClickTarget === 'entry'
+                    ? 'border-orange-400 ring-1 ring-orange-400/30'
+                    : 'border-white/10 focus:border-white/30'
+                }`}
+              />
             </div>
           )}
 
-          {/* SL / TP */}
+          {/* SL — click to target, then click chart to set */}
           <div className="flex items-center gap-2">
             <span className="text-red-400/70 w-16">SL</span>
-            <input type="number" step={pip} value={sl}
+            <input
+              type="number"
+              step={pip}
+              value={sl}
               onChange={e => setSL(e.target.value)}
-              className="flex-1 bg-white/5 border border-red-500/20 rounded px-2 py-1 text-white focus:outline-none focus:border-red-500/40" />
+              onClick={() => setChartClickTarget('sl')}
+              className={`flex-1 bg-white/5 border rounded px-2 py-1 text-white focus:outline-none transition-colors ${
+                chartClickTarget === 'sl'
+                  ? 'border-orange-400 ring-1 ring-orange-400/30'
+                  : 'border-red-500/20 focus:border-red-500/40'
+              }`}
+            />
             <span className="text-white/30">{slPips.toFixed(1)}p</span>
           </div>
+
+          {/* TP — click to target, then click chart to set */}
           <div className="flex items-center gap-2">
             <span className="text-emerald-400/70 w-16">TP</span>
-            <input type="number" step={pip} value={tp}
+            <input
+              type="number"
+              step={pip}
+              value={tp}
               onChange={e => setTP(e.target.value)}
-              className="flex-1 bg-white/5 border border-emerald-500/20 rounded px-2 py-1 text-white focus:outline-none focus:border-emerald-500/40" />
+              onClick={() => setChartClickTarget('tp')}
+              className={`flex-1 bg-white/5 border rounded px-2 py-1 text-white focus:outline-none transition-colors ${
+                chartClickTarget === 'tp'
+                  ? 'border-orange-400 ring-1 ring-orange-400/30'
+                  : 'border-emerald-500/20 focus:border-emerald-500/40'
+              }`}
+            />
             <span className="text-white/30">{tpPips.toFixed(1)}p</span>
           </div>
 
@@ -235,6 +302,13 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
             <span>R:R {(rewardUSD / (riskUSD || 1)).toFixed(1)}</span>
             <span>+${rewardUSD.toFixed(2)} potential</span>
           </div>
+
+          {/* Chart click target hint */}
+          {chartClickTarget && (
+            <div className="text-[10px] text-orange-400/80 text-center py-0.5 bg-orange-400/5 rounded border border-orange-400/20">
+              Click chart to set {chartClickTarget === 'sl' ? 'Stop Loss' : chartClickTarget === 'tp' ? 'Take Profit' : 'Entry'} price
+            </div>
+          )}
 
           {/* SUBMIT */}
           <button onClick={() => setStage("confirm")}
