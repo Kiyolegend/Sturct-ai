@@ -194,6 +194,18 @@ def _api_to_mt5(api_symbol: str) -> str | None:
 # ================================
 
 ORDERS_URL    = f"{API_BASE_URL}/trading-api/trade/pending"
+
+
+def _get_filling_mode(mt5_sym: str):
+    info = mt5.symbol_info(mt5_sym)
+    if info:
+        fm = info.filling_mode
+        if fm & 2:
+            return mt5.ORDER_FILLING_IOC
+        if fm & 1:
+            return mt5.ORDER_FILLING_FOK
+    return mt5.ORDER_FILLING_IOC
+
 RESULT_URL    = f"{API_BASE_URL}/trading-api/trade/result"
 POSITIONS_URL = f"{API_BASE_URL}/trading-api/trade/positions/sync"
 
@@ -247,7 +259,7 @@ def _execute_order(order: dict):
         "deviation":    5,
         "comment":      order.get("comment", "STRUCT.ai"),
         "type_time":    mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_RETURN,
+        "type_filling": _get_filling_mode(mt5_sym),
     }
     result = mt5.order_send(req)
     if result and result.retcode == mt5.TRADE_RETCODE_DONE:
@@ -277,7 +289,7 @@ def _execute_close(order: dict):
         "position":     ticket,
         "price":        price,
         "comment":      "STRUCT.ai close",
-        "type_filling": mt5.ORDER_FILLING_RETURN,
+        "type_filling": _get_filling_mode(pos.symbol),
     }
     result = mt5.order_send(req)
     if result and result.retcode == mt5.TRADE_RETCODE_DONE:
@@ -354,7 +366,8 @@ def run():
             if not connect_mt5():
                 time.sleep(30)
                 continue
-
+            
+        check_pending_orders() 
         t0      = time.time()
         success = push_all()
         expected = len(SYMBOLS) * len(TIMEFRAME_MAP)

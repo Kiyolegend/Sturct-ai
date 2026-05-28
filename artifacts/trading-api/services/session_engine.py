@@ -17,7 +17,13 @@ For each session found in the candle data, returns:
 
 The high/low is computed from the actual candle wicks within the session hours.
 Both complete (past) and the current in-progress session are returned.
+NOTE: DST offsets are computed at function call time via _live_sessions() and
+applied uniformly to all candles in the DataFrame. For candle data that spans
+a DST clock change, session attribution may be off by ±1 hour near the boundary.
+Negligible for live scalping but relevant for historical backtesting.
 """
+
+
 
 import pandas as pd
 from zoneinfo import ZoneInfo          
