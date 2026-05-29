@@ -57,6 +57,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
                         "direction": "bullish",
                         "label": "BOS ↑",
                         "level_broken": round(level, 5),
+                        "wick_extreme":  round(float(df["high"].values[i]), 5),
                     })
                 broken_levels.add(level)
                 break
@@ -70,6 +71,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
                         "direction": "bearish",
                         "label": "BOS ↓",
                         "level_broken": round(level, 5),
+                        "wick_extreme":  round(float(df["low"].values[i]), 5),
                     })
                 broken_levels.add(level)
                 break

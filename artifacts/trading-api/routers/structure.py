@@ -350,7 +350,7 @@ def _detect_fvgs_py(candles: list, current_price: float) -> list:
         return []
     pip       = _pip_size(current_price)
     min_gap   = 3 * pip
-    proximity = 0.01
+    proximity =  min(0.01, (100 * pip) / current_price)
     results   = []
     for i in range(1, n - 1):
         prev = candles[i - 1]
@@ -359,14 +359,14 @@ def _detect_fvgs_py(candles: list, current_price: float) -> list:
             center = (nxt["low"] + prev["high"]) / 2
             dist   = abs(center - current_price) / current_price
             if dist <= proximity:
-                mitigated = any(c["low"] <= prev["high"] for c in candles[i + 1:])
+                mitigated = any(c["low"] <= prev["high"] for c in candles[i + 2:])
                 if not mitigated:
                     results.append({"type": "bullish", "top": nxt["low"], "bottom": prev["high"], "dist": dist})
         if prev["low"] > nxt["high"] and prev["low"] - nxt["high"] >= min_gap:
             center = (prev["low"] + nxt["high"]) / 2
             dist   = abs(center - current_price) / current_price
             if dist <= proximity:
-                mitigated = any(c["high"] >= prev["low"] for c in candles[i + 1:])
+                mitigated = any(c["high"] >= prev["low"] for c in candles[i + 2:])
                 if not mitigated:
                     results.append({"type": "bearish", "top": prev["low"], "bottom": nxt["high"], "dist": dist})
     bull = sorted([f for f in results if f["type"] == "bullish" and (f["top"] + f["bottom"]) / 2 <= current_price], key=lambda x: x["dist"])[:1]

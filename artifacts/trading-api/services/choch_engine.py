@@ -48,6 +48,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
                     "direction": "bearish",
                     "label": "CHOCH",
                     "broken_label": "HL",
+                    "wick_extreme":  round(float(df["low"].values[i]), 5),
                 })
                 break
 
@@ -63,6 +64,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
                     "direction": "bullish",
                     "label": "CHOCH",
                     "broken_label": "LH",
+                    "wick_extreme":  round(float(df["high"].values[i]), 5),
                 })
                 break
 

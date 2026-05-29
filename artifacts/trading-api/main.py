@@ -14,6 +14,7 @@ from routers.data import router as data_router
 from routers.structure import router as structure_router
 from routers.mt5 import router as mt5_router
 from routers.trading import router as trading_router
+from routers.news import router as news_router
 
 app = FastAPI(
     title="Trading Market Structure API",
@@ -35,6 +36,7 @@ app.include_router(data_router, prefix=PREFIX)
 app.include_router(structure_router, prefix=PREFIX)
 app.include_router(trading_router, prefix=PREFIX)
 app.include_router(mt5_router, prefix=PREFIX)
+app.include_router(news_router, prefix=PREFIX)
 
 
 @app.get(f"{PREFIX}/health")

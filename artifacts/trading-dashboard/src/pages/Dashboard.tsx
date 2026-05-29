@@ -4,6 +4,7 @@ import { TradingChart } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 import { TradeTeller } from "@/components/TradeTeller";
 import { TradePanel } from "@/components/TradePanel";
+import { NewsPanel } from "@/components/NewsPanel";
 import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
 
@@ -104,6 +105,7 @@ export function Dashboard() {
             onTPChange={setTpLine}
 
           />  
+          <NewsPanel />
 
         </HeatmapSidebar>
 

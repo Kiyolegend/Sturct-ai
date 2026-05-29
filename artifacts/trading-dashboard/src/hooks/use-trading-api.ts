@@ -289,3 +289,44 @@ export function useAlerts() {
     staleTime: 55 * 1000,
   });
 }
+
+// ── News Impact ───────────────────────────────────────────────────────────────
+
+export type NewsStatus = "BLOCKED" | "CAUTION" | "CLEAR";
+
+export interface PairNewsInfo {
+  status:             NewsStatus;
+  impact_level:       number;
+  confidence_penalty: number;
+  reason:             string;
+  blocked:            boolean;
+}
+
+export interface UpcomingEvent {
+  pair:          string;
+  event_name:    string;
+  name?:         string;
+  impact_level:  number;
+  minutes_away:  number | null;
+  window_active: boolean;
+}
+
+export interface NewsStatusResponse {
+  service_ok: boolean;
+  per_pair:   Record<string, PairNewsInfo>;
+  upcoming:   UpcomingEvent[];
+}
+
+export function useNewsStatus() {
+  return useQuery<NewsStatusResponse, Error>({
+    queryKey: ["news-status"],
+    queryFn: async () => {
+      const res = await fetch("/trading-api/news-status");
+      if (!res.ok) throw new Error(`News status error: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: 60 * 1000,
+    retry: 1,
+    staleTime: 55 * 1000,
+  });
+}

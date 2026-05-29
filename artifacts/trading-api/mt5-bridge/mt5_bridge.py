@@ -37,10 +37,7 @@ SYMBOLS = [
     {"mt5_name": "USDJPYm", "api_symbol": "USD/JPY"},
     {"mt5_name": "EURUSDm", "api_symbol": "EUR/USD"},
     {"mt5_name": "GBPUSDm", "api_symbol": "GBP/USD"},
-    {"mt5_name": "EURJPYm", "api_symbol": "EUR/JPY"},
-    {"mt5_name": "GBPJPYm", "api_symbol": "GBP/JPY"},
     {"mt5_name": "AUDUSDm", "api_symbol": "AUD/USD"},
-    {"mt5_name": "USDCADm", "api_symbol": "USD/CAD"},
     {"mt5_name": "USDCHFm", "api_symbol": "USD/CHF"},
 ]
 
@@ -48,8 +45,8 @@ SYMBOLS = [
 CANDLE_COUNT = {
     "5m":  300,
     "15m": 300,
-    "1h":  250,
-    "4h":  250,
+    "1h":  300,
+    "4h":  300,
 }
 PUSH_INTERVAL = 5  # seconds
 
