@@ -96,7 +96,8 @@ def _cluster_levels(swing_data: list[dict], threshold: float) -> list[dict]:
         cluster_items = [sorted_data[i]]
         used[i] = True
         for j in range(i + 1, len(sorted_data)):
-            if not used[j] and abs(sorted_data[j]["price"] - sorted_data[i]["price"]) <= threshold:
+            cluster_mean = sum(item["price"] for item in cluster_items) / len(cluster_items)
+            if not used[j] and abs(sorted_data[j]["price"] - cluster_mean) <= threshold:
                 cluster_items.append(sorted_data[j])
                 used[j] = True
 

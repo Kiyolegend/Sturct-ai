@@ -25,7 +25,7 @@ export interface ZigZagLine {
 export interface StructureLabel {
   time: number;
   price: number;
-  label: "HH" | "HL" | "LH" | "LL";
+  label: "HH" | "HL" | "LH" | "LL" | "EQH" | "EQL";
   kind: "high" | "low";
   index: number;
 }
