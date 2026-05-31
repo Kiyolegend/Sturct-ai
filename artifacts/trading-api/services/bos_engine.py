@@ -37,7 +37,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
     for label_item in structure_labels:
         level = label_item["price"]
         label = label_item["label"]
-        swing_time = label_item["time"]
+        
         swing_idx = label_item["index"]
 
         if level in broken_levels:

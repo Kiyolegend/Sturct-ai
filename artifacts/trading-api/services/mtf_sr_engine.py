@@ -236,7 +236,7 @@ def compute_mtf_sr_levels(df_map: dict) -> list[dict]:
     available timeframe so that S/R flip and proximity filter are accurate.
     """
     # Derive current price from smallest available timeframe
-    for tf_key in ["5m", "15m", "1h", "4h"]:
+    for tf_key in [ "15m", "1h", "4h"]:
         if tf_key in df_map and len(df_map[tf_key]) > 0:
             current_price = float(df_map[tf_key]["close"].iloc[-1])
             break
