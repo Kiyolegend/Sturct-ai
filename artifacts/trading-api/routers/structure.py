@@ -324,7 +324,8 @@ def _detect_obs_py(candles: list, current_price: float) -> list:
                 if avg_range > 0 and (brk["high"] - brk["low"]) >= 1.5 * avg_range:
                     dist = abs((c["high"] + c["low"]) / 2 - current_price) / current_price
                     if dist <= proximity:
-                        mitigated = any(f["close"] < c["low"] - 2 * pip for f in candles[i + 1:])
+                        ob_mid = (c["open"] + c["close"]) / 2
+                        mitigated = any(f["close"] < ob_mid for f in candles[i + 1:])
                         if not mitigated:
                             results.append({"type": "bullish", "top": c["high"], "bottom": c["low"], "dist": dist, "time": c["time"]})
         if c["close"] > c["open"]:
@@ -336,7 +337,8 @@ def _detect_obs_py(candles: list, current_price: float) -> list:
                 if avg_range > 0 and (brk["high"] - brk["low"]) >= 1.5 * avg_range:
                     dist = abs((c["high"] + c["low"]) / 2 - current_price) / current_price
                     if dist <= proximity:
-                        mitigated = any(f["close"] > c["high"] + 2 * pip for f in candles[i + 1:])
+                        ob_mid = (c["open"] + c["close"]) / 2
+                        mitigated = any(f["close"] > ob_mid for f in candles[i + 1:])
                         if not mitigated:
                             results.append({"type": "bearish", "top": c["high"], "bottom": c["low"], "dist": dist, "time": c["time"]})
     bull = sorted([o for o in results if o["type"] == "bullish" and (o["top"] + o["bottom"]) / 2 <= current_price], key=lambda x: x["dist"])[:1]
@@ -359,14 +361,14 @@ def _detect_fvgs_py(candles: list, current_price: float) -> list:
             center = (nxt["low"] + prev["high"]) / 2
             dist   = abs(center - current_price) / current_price
             if dist <= proximity:
-                mitigated = any(c["low"] <= prev["high"] for c in candles[i + 2:])
+                mitigated = any(c["close"] <= prev["high"] for c in candles[i + 2:])
                 if not mitigated:
                     results.append({"type": "bullish", "top": nxt["low"], "bottom": prev["high"], "dist": dist})
         if prev["low"] > nxt["high"] and prev["low"] - nxt["high"] >= min_gap:
             center = (prev["low"] + nxt["high"]) / 2
             dist   = abs(center - current_price) / current_price
             if dist <= proximity:
-                mitigated = any(c["high"] >= prev["low"] for c in candles[i + 2:])
+                mitigated = any(c["close"] >= prev["low"] for c in candles[i + 2:])
                 if not mitigated:
                     results.append({"type": "bearish", "top": prev["low"], "bottom": nxt["high"], "dist": dist})
     bull = sorted([f for f in results if f["type"] == "bullish" and (f["top"] + f["bottom"]) / 2 <= current_price], key=lambda x: x["dist"])[:1]
