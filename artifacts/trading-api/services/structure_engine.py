@@ -14,10 +14,13 @@ Requires at least 2 prior swings of the same kind to assign a label.
 from .zigzag_engine import SwingPoint
 
 
-LABEL_HH = "HH"
-LABEL_HL = "HL"
-LABEL_LH = "LH"
-LABEL_LL = "LL"
+LABEL_HH  = "HH"
+LABEL_HL  = "HL"
+LABEL_LH  = "LH"
+LABEL_LL  = "LL"
+LABEL_EQH = "EQH"
+LABEL_EQL = "EQL"
+
 
 
 def classify_structure(swings: list[SwingPoint]) -> list[dict]:
@@ -36,12 +39,22 @@ def classify_structure(swings: list[SwingPoint]) -> list[dict]:
 
         if swing["kind"] == "high":
             if prev_high is not None:
-                label = LABEL_HH if swing["price"] > prev_high else LABEL_LH
+                if swing["price"] > prev_high:
+                    label = LABEL_HH
+                elif swing["price"] == prev_high:
+                    label = LABEL_EQH
+                else:
+                    label = LABEL_LH        
             prev_high = swing["price"]
 
         else:  # "low"
             if prev_low is not None:
-                label = LABEL_HL if swing["price"] > prev_low else LABEL_LL
+                if swing["price"] > prev_low:
+                    label = LABEL_HL
+                elif swing["price"] == prev_low:
+                    label = LABEL_EQL
+                else:
+                    label = LABEL_LL
             prev_low = swing["price"]
 
         if label:

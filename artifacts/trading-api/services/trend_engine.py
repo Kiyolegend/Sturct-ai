@@ -56,11 +56,11 @@ def detect_trend(structure_labels: list[dict]) -> dict:
         item = structure_labels[i]
         lbl = item["label"]
 
-        if lbl in ("HH", "LH") and last_high_label is None:
+        if lbl in ("HH", "LH", "EQH") and last_high_label is None:
             last_high_label = lbl
             last_high_pos = i
 
-        if lbl in ("HL", "LL") and last_low_label is None:
+        if lbl in ("HL", "LL", "EQL") and last_low_label is None:
             last_low_label = lbl
             last_low_pos = i
 

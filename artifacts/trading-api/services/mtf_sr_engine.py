@@ -147,7 +147,7 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
     decay_bars  = cfg["decay_bars"]
     total_bars  = len(df)
 
-    swings = detect_swings(df)
+    swings = detect_swings(df, fractal_n=3 if timeframe in ("1h", "4h") else 5)
     if not swings:
         return []
 

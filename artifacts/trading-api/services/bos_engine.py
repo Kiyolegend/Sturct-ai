@@ -49,7 +49,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
             close = closes[i]
 
             # Bullish BOS: close above a swing HIGH (HH or LH)
-            if label in ("HH", "LH") and close > level:
+            if label in ("HH", "LH", "EQH") and close > level:
                 if trend in ("bullish", "neutral"):
                     bos_events.append({
                         "time": candle_time,
@@ -63,7 +63,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
                 break
 
             # Bearish BOS: close below a swing LOW (LL or HL)
-            if label in ("LL", "HL") and close < level:
+            if label in ("LL", "HL", "EQL") and close < level:
                 if trend in ("bearish", "neutral"):
                     bos_events.append({
                         "time": candle_time,

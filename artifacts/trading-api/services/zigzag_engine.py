@@ -23,12 +23,12 @@ class SwingPoint(TypedDict):
     kind: str  # "high" or "low"
 
 
-def detect_swings(df: pd.DataFrame) -> list[SwingPoint]:
+def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoint]:
     """
     Detect swing highs and lows using fractal logic.
     Returns a strictly alternating list of swing points.
     """
-    n = FRACTAL_N
+    n = fractal_n
     highs = df["high"].values
     lows = df["low"].values
     times = df["time"].values
@@ -40,7 +40,7 @@ def detect_swings(df: pd.DataFrame) -> list[SwingPoint]:
         window_lows = lows[i - n: i + n + 1]
 
         # Swing High: current high is the maximum in the window
-        if highs[i] == window_highs.max() and list(window_highs).count(highs[i]) == 1:
+        if highs[i] == window_highs.max():
             raw_pivots.append({
                 "index": i,
                 "time": int(pd.Timestamp(times[i]).timestamp()),
@@ -49,7 +49,7 @@ def detect_swings(df: pd.DataFrame) -> list[SwingPoint]:
             })
 
         # Swing Low: current low is the minimum in the window
-        if lows[i] == window_lows.min() and list(window_lows).count(lows[i]) == 1:
+        if lows[i] == window_lows.min():
             raw_pivots.append({
                 "index": i,
                 "time": int(pd.Timestamp(times[i]).timestamp()),
