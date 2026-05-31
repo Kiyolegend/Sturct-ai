@@ -29,6 +29,7 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     zones = detect_zones(swings, interval, current_price)
     candles = candles_to_dict(df)
     return {
+        "current_price": current_price,
         "candles": candles,
         "swings": swings,
         "zigzag_lines": zigzag_lines,

@@ -23,7 +23,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
 
     Returns list: {time, price, direction, label, broken_label}
     """
-    if len(structure_labels) < 2 or len(df) == 0:
+    if len(swings) < 3 or len(structure_labels) < 2 or len(df) == 0:
         return []
 
     closes = df["close"].values

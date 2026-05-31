@@ -157,14 +157,8 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
         # swing["index"] is the bar position already stored by detect_swings()
         return int(swing.get("index", total_bars // 2))
 
-    highs = [{"price": s["price"], "bar_index": get_bar_index(s)} for s in swings if s["kind"] == "high"]
-    lows  = [{"price": s["price"], "bar_index": get_bar_index(s)} for s in swings if s["kind"] == "low"]
-
-    all_clusters = (
-        _cluster_levels(highs, threshold) +
-        _cluster_levels(lows, threshold)
-    )
-
+    all_swing_data = [{"price": s["price"], "bar_index": get_bar_index(s)} for s in swings]
+    all_clusters = _cluster_levels(all_swing_data, threshold)
     levels: list[dict] = []
 
     for c in all_clusters:
