@@ -297,7 +297,7 @@ ALERT_SYMBOLS = [
 
 
 def _pip_size(price: float) -> float:
-    return 0.01 if price > 10 else 0.0001
+    return 0.01 if price > 50 else 0.0001
 
 
 def _detect_obs_py(candles: list, current_price: float) -> list:

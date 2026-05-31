@@ -74,10 +74,14 @@ def detect_zones(swings: list[SwingPoint], timeframe: str = "1h", current_price:
         cluster_times = [times[i]]
 
         for j in range(i + 1, len(levels)):
-            if not used[j] and abs(levels[j] - levels[i]) <= cluster_threshold:
-                cluster_prices.append(levels[j])
-                cluster_times.append(times[j])
-                used[j] = True
+            if not used[j]:
+                cluster_mean = sum(cluster_prices) / len(cluster_prices)
+                if abs(levels[j] - cluster_mean) <= cluster_threshold:
+                    cluster_prices.append(levels[j])
+                    cluster_times.append(times[j])
+                    used[j] = True
+                
+                
 
         used[i] = True
 

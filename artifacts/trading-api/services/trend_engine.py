@@ -96,6 +96,10 @@ def detect_trend(structure_labels: list[dict]) -> dict:
         trend = "neutral"
         confidence = 50
 
+    if total < 6:  
+        confidence = min(confidence, 50)
+             
+
     return {
         "trend": trend,
         "confidence": confidence,
