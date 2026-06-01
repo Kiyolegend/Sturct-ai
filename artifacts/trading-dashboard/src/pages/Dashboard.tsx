@@ -3,6 +3,8 @@ import { TopBar, type ToggleState } from "@/components/TopBar";
 import { TradingChart } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 import { MarketNarrative } from "@/components/MarketNarrative";
+import { PairSweep } from "@/components/PairSweep";
+import { ConditionAlert } from "@/components/ConditionAlert";
 import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
 import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch } from "@/hooks/use-trading-api";
@@ -93,6 +95,9 @@ export function Dashboard() {
       <div className="flex-1 flex flex-row min-h-0">
         {/* Left sidebar — pairs heatmap + narrative panel below */}
         <HeatmapSidebar activeSymbol={symbol} onSelectSymbol={setSymbol}>
+
+          {/* ── Pair environment sweep ── */}
+          <PairSweep activeSymbol={symbol} onSelectSymbol={setSymbol} />
 
           {/* ── Market Narrative (replaces TradeTeller) ── */}
           <MarketNarrative
@@ -190,6 +195,7 @@ export function Dashboard() {
           )}
         </main>
       </div>
+      <ConditionAlert />
     </div>
   );
 }

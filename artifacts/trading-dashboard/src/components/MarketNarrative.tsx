@@ -20,6 +20,8 @@ import { ChevronUp, Minus, RefreshCw, AlertTriangle } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+
+
 interface Condition {
   label: string;
   met: boolean;
@@ -430,6 +432,7 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
               {/* Session context */}
               <div style={{ marginBottom: 8 }}>
                 <SectionLabel>Session Context</SectionLabel>
+                <SessionCountdown />
                 {n.session.map((line, i) => (
                   <div key={i} style={{ fontSize: 7.5, color: "#374151", lineHeight: 1.65 }}>
                     {line}
@@ -526,6 +529,56 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
         @keyframes spin  { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: .75; } }
       `}</style>
+    </div>
+  );
+}
+
+
+function SessionCountdown() {
+  const [now, setNow] = React.useState(() => new Date());
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  // Session times in UTC hours
+  const sessions = [
+    { name: "London", open: 8,  close: 17 },
+    { name: "NY",     open: 13, close: 22 },
+    { name: "Asian",  open: 0,  close: 9  },
+  ];
+  const utcH   = now.getUTCHours();
+  const utcMin = now.getUTCMinutes();
+  const totalMin = utcH * 60 + utcMin;
+  let statusLine = "";
+  let nextLine   = "";
+  for (const s of sessions) {
+    const openMin  = s.open  * 60;
+    const closeMin = s.close * 60;
+    if (totalMin >= openMin && totalMin < closeMin) {
+      const elapsed = totalMin - openMin;
+      const remaining = closeMin - totalMin;
+      statusLine = `${s.name} session active — ${elapsed}m since open`;
+      nextLine   = `closes in ${Math.floor(remaining / 60)}h ${remaining % 60}m`;
+      break;
+    }
+  }
+  if (!statusLine) {
+    // Find next session
+    const nexts = sessions.map(s => {
+      let diff = s.open * 60 - totalMin;
+      if (diff <= 0) diff += 24 * 60;
+      return { name: s.name, diff };
+    }).sort((a, b) => a.diff - b.diff);
+    const n = nexts[0];
+    nextLine = `${n.name} opens in ${Math.floor(n.diff / 60)}h ${n.diff % 60}m`;
+    statusLine = "No prime session active";
+  }
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ fontSize: 7.5, color: "#374151", lineHeight: 1.65 }}>{statusLine}</div>
+      {nextLine && (
+        <div style={{ fontSize: 7, color: "#1f2937", lineHeight: 1.5 }}>{nextLine}</div>
+      )}
     </div>
   );
 }

@@ -330,3 +330,43 @@ export function useNewsStatus() {
     staleTime: 55 * 1000,
   });
 }
+
+// ── Pair Sweep ────────────────────────────────────────────────────────────────
+export type EnvRating = "Favorable" | "Mixed" | "Unfavorable";
+export interface PairEnvironment {
+  scalp:         EnvRating;
+  scalp_reason:  string;
+  limit:         EnvRating;
+  limit_reason:  string;
+  level_warning: string | null;
+  price?:        number;
+  error?:        string;
+}
+export interface EnvShift {
+  symbol:    string;
+  type:      "scalp" | "limit";
+  from:      EnvRating;
+  to:        EnvRating;
+  reason:    string;
+  timestamp: number;
+}
+export interface PairSweepResponse {
+  pairs:     Record<string, PairEnvironment>;
+  shifts:    EnvShift[];
+  timestamp: number;
+}
+export function usePairSweep(intervalMs = 20000) {
+  return useQuery<PairSweepResponse, Error>({
+    queryKey: ["pair-sweep"],
+    queryFn: async () => {
+      const res = await fetch("/trading-api/pair-sweep");
+      if (!res.ok) throw new Error(`Pair sweep error: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: intervalMs,
+    retry: 1,
+    staleTime: 15_000,
+  });
+}
+
+

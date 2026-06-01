@@ -514,3 +514,135 @@ def generate_narrative(
         },
         "generated_at": int(time.time()),
     }
+
+    # ── Environment Evaluator ─────────────────────────────────────────────────────
+def build_environment(
+    current_price: float,
+    pip_size: float,
+    bias_4h: str,
+    bias_1h: str,
+    bias_15m: str,
+    bos_5m: list,
+    choch_15m: list,
+    sr_levels: list,
+    sessions: list,
+    news_blocked: bool,
+    news_reason: str,
+) -> dict:
+    """
+    Returns Scalp and Limit environment ratings for one symbol.
+    Ratings: "Favorable" | "Mixed" | "Unfavorable"
+    No trade signals — only describes market conditions.
+    """
+    import time as _time
+    now = _time.time()
+    # ── Helpers ───────────────────────────────────────────────────────────────
+    def recent_choch(hours: float = 4) -> bool:
+        cutoff = now - hours * 3600
+        return any(c.get("time", 0) >= cutoff for c in choch_15m)
+    def recent_bos(hours: float = 1) -> bool:
+        cutoff = now - hours * 3600
+        return any(b.get("time", 0) >= cutoff for b in bos_5m)
+    def aligned_tfs() -> int:
+        """How many of the 3 TFs agree on direction."""
+        directions = [bias_4h, bias_1h, bias_15m]
+        bull = directions.count("bullish")
+        bear = directions.count("bearish")
+        return max(bull, bear)
+    # ── Nearest S/R level distance in pips ────────────────────────────────────
+    nearest_pips: float | None = None
+    nearest_label: str = ""
+    level_warning: str | None = None
+    if sr_levels and current_price:
+        distances = []
+        for lvl in sr_levels:
+            price = lvl.get("price", 0)
+            if price:
+                dist_pips = abs(current_price - price) / pip_size
+                distances.append((dist_pips, lvl))
+        if distances:
+            distances.sort(key=lambda x: x[0])
+            nearest_pips, nearest_lvl = distances[0]
+            tf_label = nearest_lvl.get("timeframe", "").upper()
+            kind     = nearest_lvl.get("kind", "level")
+            side     = "resistance" if nearest_lvl.get("price", 0) > current_price else "support"
+            nearest_label = f"{tf_label} {side}"
+            if nearest_pips <= 10:
+                level_warning = f"Price {nearest_pips:.0f} pips from {nearest_label}"
+    # ── Session quality ────────────────────────────────────────────────────────
+    active = [s.lower() for s in sessions]
+    prime_session  = any(s in active for s in ("london", "new york", "ny"))
+    dead_session   = not active  # no recognised session active
+    # ── SCALP environment ─────────────────────────────────────────────────────
+    scalp_issues:   list[str] = []
+    scalp_positives: list[str] = []
+    if news_blocked:
+        scalp_issues.append(f"news block active — {news_reason}")
+    if dead_session:
+        scalp_issues.append("no active trading session")
+    alignment = aligned_tfs()
+    if alignment >= 2 and recent_bos():
+        scalp_positives.append("directional structure with active BOS")
+    elif alignment >= 2:
+        scalp_positives.append("multi-TF bias aligned")
+    else:
+        scalp_issues.append("no clear multi-TF alignment")
+    if prime_session:
+        scalp_positives.append("prime session active")
+    # Fresh CHoCH = structure is transitioning; mixed for scalp (not blocked)
+    fresh_choch = recent_choch(hours=2)
+    if fresh_choch:
+        scalp_issues.append("fresh CHoCH — structure transitioning")
+    if level_warning:
+        scalp_issues.append("price near key level — reduced follow-through risk")
+    if len(scalp_issues) == 0:
+        scalp_rating = "Favorable"
+        scalp_reason = "; ".join(scalp_positives) or "conditions clear"
+    elif len(scalp_issues) == 1 and len(scalp_positives) >= 1:
+        scalp_rating = "Mixed"
+        scalp_reason = scalp_issues[0]
+    else:
+        scalp_rating = "Unfavorable"
+        scalp_reason = scalp_issues[0]
+    # ── LIMIT environment ─────────────────────────────────────────────────────
+    limit_issues:    list[str] = []
+    limit_positives: list[str] = []
+    if news_blocked:
+        limit_issues.append(f"news block — {news_reason}")
+    # Strong momentum = limit orders get blown through
+    if alignment == 3 and recent_bos(hours=0.5):
+        limit_issues.append("strong expansion momentum — limits may be blown through")
+    elif alignment >= 2:
+        limit_positives.append("clear directional bias present")
+    # Distance logic
+    if nearest_pips is None:
+        limit_issues.append("no meaningful S/R level nearby")
+    elif nearest_pips <= 5:
+        limit_positives.append(f"significant level {nearest_pips:.0f} pips away")
+    elif nearest_pips <= 20:
+        limit_positives.append(f"level {nearest_pips:.0f} pips away")
+    else:
+        limit_issues.append(f"nearest level {nearest_pips:.0f} pips away — too distant")
+    # CHoCH: fresh = mixed for limits (level may not hold), not unfavorable
+    if fresh_choch and alignment < 2:
+        limit_issues.append("conflicting structure during CHoCH — level reliability reduced")
+    elif fresh_choch:
+        limit_issues.append("fresh CHoCH — potential reversal zone but unconfirmed")
+    if len(limit_issues) == 0:
+        limit_rating = "Favorable"
+        limit_reason = "; ".join(limit_positives) or "conditions clear"
+    elif len(limit_issues) == 1 and len(limit_positives) >= 1:
+        limit_rating = "Mixed"
+        limit_reason = limit_issues[0]
+    else:
+        limit_rating = "Unfavorable"
+        limit_reason = limit_issues[0]
+    return {
+        "scalp":         scalp_rating,
+        "scalp_reason":  scalp_reason,
+        "limit":         limit_rating,
+        "limit_reason":  limit_reason,
+        "level_warning": level_warning,
+    }
+
+
