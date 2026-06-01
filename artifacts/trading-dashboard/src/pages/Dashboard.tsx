@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { TopBar, type ToggleState } from "@/components/TopBar";
 import { TradingChart } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
-import { TradeTeller } from "@/components/TradeTeller";
+import { MarketNarrative } from "@/components/MarketNarrative";
 import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
 import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch } from "@/hooks/use-trading-api";
@@ -17,7 +17,7 @@ const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
 
 export function Dashboard() {
   const [timeframe, setTimeframe] = useState("5m");
-  const [symbol, setSymbol] = useState("USD/JPY");
+  const [symbol,    setSymbol]    = useState("USD/JPY");
   const [toggles, setToggles] = useState<ToggleState>({
     zigzag:   true,
     labels:   true,
@@ -36,38 +36,41 @@ export function Dashboard() {
   const { data: biasData }     = useMTFBias(symbol);
   const { data: sessionsData } = useSessions(symbol, timeframe);
   const { data: bosChochData } = useBosChoch(symbol);
-  const [wsConnected, setWsConnected] = useState(false);
-  const [clickedPrice, setClickedPrice] = useState<number | null>(null);
-  const [slLine, setSlLine] = useState<number | null>(null);
-  const [tpLine, setTpLine] = useState<number | null>(null);
 
+  const [wsConnected,    setWsConnected]    = useState(false);
+  const [clickedPrice,   setClickedPrice]   = useState<number | null>(null);
+  const [slLine,         setSlLine]         = useState<number | null>(null);
+  const [tpLine,         setTpLine]         = useState<number | null>(null);
+  // Incremented each time a candle arrives for the active symbol — triggers
+  // MarketNarrative to re-fetch immediately (debounced inside the component)
+  const [narrativeTick,  setNarrativeTick]  = useState(0);
 
+  const symbolRef = useRef(symbol);
+  useEffect(() => { symbolRef.current = symbol; }, [symbol]);
 
-
-    useEffect(() => {
+  useEffect(() => {
     const ws = new WebSocket(`ws://localhost:8001/trading-api/ws`);
     ws.onopen  = () => setWsConnected(true);
     ws.onclose = () => setWsConnected(false);
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        if (msg.type === "candle" && msg.symbol === symbol) {
+        if (msg.type === "candle" && msg.symbol === symbolRef.current) {
           refetch();
+          // Signal MarketNarrative to queue a re-fetch
+          setNarrativeTick(t => t + 1);
         }
       } catch {}
     };
     ws.onerror = () => ws.close();
     return () => ws.close();
-  }, [symbol, refetch]);
-
-
+  }, [refetch]);
 
   const isMarketClosed = useMemo(() => {
     if (!data?.candles || data.candles.length === 0) return false;
     const lastCandle = data.candles[data.candles.length - 1];
-    const threshold = MARKET_CLOSED_THRESHOLDS[timeframe] ?? 600;
-    const nowSec = Math.floor(Date.now() / 1000);
-    return (nowSec - lastCandle.time) > threshold;
+    const threshold  = MARKET_CLOSED_THRESHOLDS[timeframe] ?? 600;
+    return (Math.floor(Date.now() / 1000) - lastCandle.time) > threshold;
   }, [data, timeframe]);
 
   const displaySymbol = symbol.replace("/", "");
@@ -88,14 +91,15 @@ export function Dashboard() {
       />
 
       <div className="flex-1 flex flex-row min-h-0">
-        {/* Left sidebar: pairs heatmap + trade teller below */}
+        {/* Left sidebar — pairs heatmap + narrative panel below */}
         <HeatmapSidebar activeSymbol={symbol} onSelectSymbol={setSymbol}>
-          <TradeTeller
+
+          {/* ── Market Narrative (replaces TradeTeller) ── */}
+          <MarketNarrative
             symbol={symbol}
-            biasData={biasData}
-            srLevels={srData?.levels}
-            bosChochData={bosChochData}
+            refreshTrigger={narrativeTick}
           />
+
           <TradePanel
             symbol={symbol}
             currentPrice={data?.candles?.at(-1)?.close ?? 0}
@@ -103,8 +107,8 @@ export function Dashboard() {
             onClickedPriceConsumed={() => setClickedPrice(null)}
             onSLChange={setSlLine}
             onTPChange={setTpLine}
+          />
 
-          />  
           <NewsPanel />
 
         </HeatmapSidebar>
@@ -113,8 +117,12 @@ export function Dashboard() {
           {isLoading && !data ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0e17]/80 backdrop-blur-sm z-50">
               <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-              <p className="text-muted-foreground font-medium tracking-wide animate-pulse">Initializing Trading Engine...</p>
-              <p className="text-xs text-muted-foreground/60 mt-2">Loading {timeframe} market structure data for {displaySymbol}</p>
+              <p className="text-muted-foreground font-medium tracking-wide animate-pulse">
+                Initializing Trading Engine...
+              </p>
+              <p className="text-xs text-muted-foreground/60 mt-2">
+                Loading {timeframe} market structure data for {displaySymbol}
+              </p>
             </div>
           ) : error ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0e17] z-50 p-6 text-center">
@@ -147,17 +155,14 @@ export function Dashboard() {
                 slLine={slLine}
                 tpLine={tpLine}
               />
-              <div className={`absolute bottom-6 right-6 px-3 py-1.5 backdrop-blur-md border rounded-full flex items-center space-x-2 shadow-lg z-50 ${wsConnected ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-                <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-                <span className={`text-[10px] font-mono uppercase tracking-wider ${wsConnected ? 'text-green-400' : 'text-red-400'}`}>
-                  {wsConnected ? 'LIVE' : 'OFFLINE'}
+
+              {/* Live / Offline indicator */}
+              <div className={`absolute bottom-6 right-6 px-3 py-1.5 backdrop-blur-md border rounded-full flex items-center space-x-2 shadow-lg z-50 ${wsConnected ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30"}`}>
+                <div className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
+                <span className={`text-[10px] font-mono uppercase tracking-wider ${wsConnected ? "text-green-400" : "text-red-400"}`}>
+                  {wsConnected ? "LIVE" : "OFFLINE"}
                 </span>
-               </div>    
-
-
-
-
-
+              </div>
 
               {isRefetching && (
                 <div className="absolute bottom-6 right-16 px-3 py-1.5 bg-[#0f1520]/80 backdrop-blur-md border border-white/10 rounded-full flex items-center space-x-2 shadow-lg z-50">
@@ -169,12 +174,16 @@ export function Dashboard() {
               {isMarketClosed && (
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-[#0f1520]/90 backdrop-blur-md border border-yellow-500/20 rounded-full flex items-center space-x-2 shadow-lg z-40 pointer-events-none">
                   <Moon className="w-3 h-3 text-yellow-400" />
-                  <span className="text-[10px] text-yellow-400 font-mono uppercase tracking-wider">Market closed · Last available data</span>
+                  <span className="text-[10px] text-yellow-400 font-mono uppercase tracking-wider">
+                    Market closed · Last available data
+                  </span>
                 </div>
               )}
 
               <div className="absolute bottom-6 left-6 opacity-30 pointer-events-none select-none z-20 mix-blend-screen">
-                <h1 className="text-4xl font-bold tracking-tighter">STRUCT<span className="text-primary">.ai</span></h1>
+                <h1 className="text-4xl font-bold tracking-tighter">
+                  STRUCT<span className="text-primary">.ai</span>
+                </h1>
                 <p className="text-xs font-mono mt-1 ml-1 text-white/50">PROFESSIONAL TRADING TERMINAL</p>
               </div>
             </>
