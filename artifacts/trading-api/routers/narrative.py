@@ -12,7 +12,7 @@ import time
 import requests
 import threading
 from collections import deque
-from services.narrative_engine import build_environment
+
 
 
 from fastapi import APIRouter, HTTPException, Query
@@ -27,7 +27,7 @@ from services.choch_engine import detect_choch
 from services.zones_engine import detect_zones
 from services.mtf_sr_engine import compute_mtf_sr_levels
 from services.session_engine import compute_sessions
-from services.narrative_engine import generate_narrative
+from services.narrative_engine import generate_narrative, build_environment
 
 router = APIRouter()
 

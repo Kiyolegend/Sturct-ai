@@ -5,7 +5,7 @@
  */
 
 import React from "react";
-import { usePairSweep, type EnvRating } from "@/hooks/use-trading-api";
+import { usePairSweep, type EnvRating, type PairEnvironment } from "@/hooks/use-trading-api";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 interface Props {
@@ -54,6 +54,11 @@ function RatingPill({ rating, reason }: { rating: EnvRating; reason: string }) {
 }
 
 const PAIRS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"];
+function scorePair(env: PairEnvironment | undefined): number {
+  if (!env || env.error) return -1;
+  const pts: Record<EnvRating, number> = { Favorable: 2, Mixed: 1, Unfavorable: 0 };
+  return pts[env.scalp] + pts[env.limit];
+}
 
 export function PairSweep({ activeSymbol, onSelectSymbol }: Props) {
   const { data, isLoading, error, dataUpdatedAt } = usePairSweep(20_000);
@@ -61,6 +66,25 @@ export function PairSweep({ activeSymbol, onSelectSymbol }: Props) {
   const lastUpdated = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
+    
+  const bestPair = (() => {
+    if (!data?.pairs) return null;
+    let best: string | null = null;
+    let bestScore = 2;
+    for (const pair of PAIRS) {
+      const env   = data.pairs[pair];
+      const score = scorePair(env);
+      if (score > bestScore) {
+        bestScore = score;
+        best      = pair;
+      } else if (score === bestScore && best !== null) {
+        if (env?.level_warning && !data.pairs[best]?.level_warning) {
+          best = pair;
+        }
+      }
+    }
+    return best;
+  })();
 
   return (
     <div style={{
@@ -133,22 +157,40 @@ export function PairSweep({ activeSymbol, onSelectSymbol }: Props) {
           >
             {/* Pair name */}
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <span style={{
-                fontSize:      8,
-                fontWeight:    700,
-                fontFamily:    "monospace",
-                color:         isActive ? "#e2e8f0" : "#6b7280",
-                letterSpacing: "0.04em",
-              }}>
-                {pair.replace("/", "")}
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{
+                  fontSize:      8,
+                  fontWeight:    700,
+                  fontFamily:    "monospace",
+                  color:         isActive ? "#e2e8f0" : "#6b7280",
+                  letterSpacing: "0.04em",
+                }}>
+                  {pair.replace("/", "")}
+                </span>
+                {pair === bestPair && (
+                  <span style={{
+                   fontSize:      5.5,
+                   fontWeight:    700,
+                   color:         "#26a69a",
+                   background:    "rgba(38,166,154,0.12)",
+                   border:        "1px solid rgba(38,166,154,0.3)",
+                   borderRadius:  2,
+                   padding:       "1px 3px",
+                   letterSpacing: "0.08em",
+                  }}>
+                    BEST
+                  </span> 
+                )}
+              </div>
               {/* Level warning inline */}
               {env?.level_warning && (
                 <span style={{ fontSize: 6, color: "#f59e0b", lineHeight: 1.3 }}>
                   ⚠ {env.level_warning}
                 </span>
               )}
-            </div>
+            </div>    
+   
+  
 
             {/* Scalp pill */}
             <div style={{ display: "flex", justifyContent: "center" }}>
