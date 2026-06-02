@@ -4,7 +4,7 @@ import { AlertTriangle, X, CheckCircle, Loader2 } from "lucide-react";
 const API = "http://localhost:8001/trading-api";
 const PIP = (price: number) => price > 10 ? 0.01 : 0.0001;
 const RISK_PER_PIP = (lots: number, price: number) =>
-  price > 10 ? lots * 1000 * 0.01 : lots * 100000 * 0.0001;
+  price > 10 ? (lots * 100000 * 0.01) / price : lots * 100000 * 0.0001;
 
 interface TradePanelProps {
   symbol:                   string;

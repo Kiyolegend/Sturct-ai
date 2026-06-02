@@ -571,7 +571,7 @@ def build_environment(
                 level_warning = f"Price {nearest_pips:.0f} pips from {nearest_label}"
     # ── Session quality ────────────────────────────────────────────────────────
     active = [s.lower() for s in sessions]
-    prime_session  = any(s in active for s in ("london", "new york", "ny"))
+    prime_session  = any(s in active for s in ("london",  "ny"))
     dead_session   = not active  # no recognised session active
     # ── SCALP environment ─────────────────────────────────────────────────────
     scalp_issues:   list[str] = []
