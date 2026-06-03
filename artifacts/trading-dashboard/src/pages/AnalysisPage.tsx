@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { RefreshCw, AlertTriangle } from "lucide-react";
-import { usePairSweep, type EnvRating, type PairEnvironment } from "@/hooks/use-trading-api";
+import { FrameworkPanel } from "@/components/FrameworkPanel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -112,113 +112,7 @@ function sessionStatus(brokerTime?: number) {
 
 // ── Environment panel ─────────────────────────────────────────────────────────
 
-function EnvironmentPanel({ activeSymbol, onSelect }: { activeSymbol: string; onSelect: (s: string) => void }) {
-  const { data, isLoading, error, dataUpdatedAt } = usePairSweep(20_000);
-  const updated = dataUpdatedAt
-    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
-    : null;
 
-  function RatingPill({ rating, reason }: { rating: EnvRating; reason: string }) {
-    return (
-      <div title={reason} style={{
-        background: RATING_BG[rating], border: `1px solid ${RATING_COLOR[rating]}55`,
-        borderRadius: 5, padding: "4px 10px", fontSize: 12, fontWeight: 700,
-        color: RATING_COLOR[rating], letterSpacing: "0.04em", whiteSpace: "nowrap",
-      }}>
-        {rating.toUpperCase()}
-      </div>
-    );
-  }
-
-  return (
-    <div style={{
-      background: "rgba(10,14,23,0.97)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      borderRadius: 10, padding: "18px 20px",
-    }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: "#475569", textTransform: "uppercase" }}>
-          Market Environment
-        </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {isLoading && <RefreshCw size={12} style={{ color: "#475569", animation: "spin 1s linear infinite" }} />}
-          {updated && !isLoading && <span style={{ fontSize: 10, color: "#374151" }}>{updated}</span>}
-        </div>
-      </div>
-
-      {/* Column headers */}
-      <div style={{
-        display: "grid", gridTemplateColumns: "1fr 110px 110px", gap: 6,
-        paddingBottom: 8, marginBottom: 4, borderBottom: "1px solid rgba(255,255,255,0.06)",
-      }}>
-        <span style={{ fontSize: 10, color: "#374151", letterSpacing: "0.1em" }}>PAIR</span>
-        <span style={{ fontSize: 10, color: "#374151", letterSpacing: "0.1em", textAlign: "center" }}>SCALP</span>
-        <span style={{ fontSize: 10, color: "#374151", letterSpacing: "0.1em", textAlign: "center" }}>LIMIT</span>
-      </div>
-
-      {error && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0", color: "#ef5350", fontSize: 12 }}>
-          <AlertTriangle size={12} /> Sweep unavailable
-        </div>
-      )}
-
-      {PAIRS.map(pair => {
-        const env = data?.pairs?.[pair] as PairEnvironment | undefined;
-        const isActive = pair === activeSymbol;
-        return (
-          <div key={pair} onClick={() => onSelect(pair)} style={{
-            display: "grid", gridTemplateColumns: "1fr 110px 110px", gap: 6,
-            alignItems: "center", padding: "8px 10px", marginBottom: 4,
-            borderRadius: 6, cursor: "pointer",
-            background: isActive ? "rgba(255,255,255,0.05)" : "transparent",
-            border: isActive ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
-            transition: "background 0.15s",
-          }}>
-            <div>
-              <span style={{
-                fontSize: 14, fontWeight: 700, fontFamily: "monospace",
-                color: isActive ? "#e2e8f0" : "#6b7280", letterSpacing: "0.04em",
-              }}>
-                {pair.replace("/", "")}
-              </span>
-              {env?.level_warning && (
-                <div style={{ fontSize: 10, color: "#f59e0b", marginTop: 2 }}>⚠ {env.level_warning}</div>
-              )}
-            </div>
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              {env && !env.error ? <RatingPill rating={env.scalp} reason={env.scalp_reason} /> : <span style={{ fontSize: 12, color: "#374151" }}>—</span>}
-            </div>
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              {env && !env.error ? <RatingPill rating={env.limit} reason={env.limit_reason} /> : <span style={{ fontSize: 12, color: "#374151" }}>—</span>}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Reason tooltips */}
-      {data?.pairs?.[activeSymbol] && !data.pairs[activeSymbol].error && (
-        <div style={{
-          marginTop: 12, padding: "10px 12px",
-          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)",
-          borderRadius: 6,
-        }}>
-          <div style={{ fontSize: 10, color: "#374151", marginBottom: 4, letterSpacing: "0.08em" }}>
-            {activeSymbol.replace("/", "")} DETAIL
-          </div>
-          <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.6, marginBottom: 4 }}>
-            <strong style={{ color: RATING_COLOR[data.pairs[activeSymbol].scalp] }}>Scalp:</strong>{" "}
-            {data.pairs[activeSymbol].scalp_reason}
-          </div>
-          <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.6 }}>
-            <strong style={{ color: RATING_COLOR[data.pairs[activeSymbol].limit] }}>Limit:</strong>{" "}
-            {data.pairs[activeSymbol].limit_reason}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Narrative panel ───────────────────────────────────────────────────────────
 
@@ -549,7 +443,7 @@ export function AnalysisPage() {
         <NarrativePanel symbol={symbol} />
 
         {/* Right: Environment */}
-        <EnvironmentPanel activeSymbol={symbol} onSelect={setSymbol} />
+        <FrameworkPanel symbol={symbol} />
       </div>
     </div>
   );
