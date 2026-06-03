@@ -222,7 +222,16 @@ def _report(order_id, ticket, status, message, fill_price=None):
 
 def _execute_order(order: dict):
     order_id = order["order_id"]
+
+    # Discard MARKET orders that sat in queue too long — price may have moved
+    age = time.time() - order.get("queued_at", 0)
+    if order.get("order_type") == "MARKET" and age > 10:
+        print(f"  [TRADE] STALE market order discarded ({age:.1f}s old): {order['symbol']}")
+        _report(order_id, None, "CANCELLED", f"Market order stale ({age:.1f}s) — resubmit")
+        return
+
     mt5_sym  = _api_to_mt5(order["symbol"])
+    
     if not mt5_sym:
         _report(order_id, None, "ERROR", f"Unknown symbol: {order['symbol']}")
         return

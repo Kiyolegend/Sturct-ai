@@ -257,6 +257,7 @@ export function useTradingAnalysis(symbol: string = "USD/JPY", interval: string 
       return res.json();
     },
     refetchInterval: 60000,
+    staleTime: 55_000,
     retry: PATIENT_RETRY,
     retryDelay: patientRetryDelay,
   });

@@ -2,8 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { TopBar, type ToggleState } from "@/components/TopBar";
 import { TradingChart } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
-import { MarketNarrative } from "@/components/MarketNarrative";
-import { PairSweep } from "@/components/PairSweep";
+
+
 import { ConditionAlert } from "@/components/ConditionAlert";
 import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
@@ -43,9 +43,7 @@ export function Dashboard() {
   const [clickedPrice,   setClickedPrice]   = useState<number | null>(null);
   const [slLine,         setSlLine]         = useState<number | null>(null);
   const [tpLine,         setTpLine]         = useState<number | null>(null);
-  // Incremented each time a candle arrives for the active symbol — triggers
-  // MarketNarrative to re-fetch immediately (debounced inside the component)
-  const [narrativeTick,  setNarrativeTick]  = useState(0);
+  
 
   const symbolRef = useRef(symbol);
   useEffect(() => { symbolRef.current = symbol; }, [symbol]);
@@ -59,8 +57,7 @@ export function Dashboard() {
         const msg = JSON.parse(event.data);
         if (msg.type === "candle" && msg.symbol === symbolRef.current) {
           refetch();
-          // Signal MarketNarrative to queue a re-fetch
-          setNarrativeTick(t => t + 1);
+          
         }
       } catch {}
     };
@@ -96,14 +93,7 @@ export function Dashboard() {
         {/* Left sidebar — pairs heatmap + narrative panel below */}
         <HeatmapSidebar activeSymbol={symbol} onSelectSymbol={setSymbol}>
 
-          {/* ── Pair environment sweep ── */}
-          <PairSweep activeSymbol={symbol} onSelectSymbol={setSymbol} />
-
-          {/* ── Market Narrative (replaces TradeTeller) ── */}
-          <MarketNarrative
-            symbol={symbol}
-            refreshTrigger={narrativeTick}
-          />
+          
 
           <TradePanel
             symbol={symbol}

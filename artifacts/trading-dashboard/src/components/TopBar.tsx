@@ -303,7 +303,17 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
       </div>
 
       {/* RIGHT: Bias + API + Bridge */}
+            {/* RIGHT: Analysis link + Bias + API + Bridge */}
       <div className="flex items-center space-x-2">
+        <a
+          href="/analysis"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 transition-colors"
+        >
+          ⊞ Analysis
+        </a>
+
         <div className="hidden lg:flex items-center gap-1">
           <BiasBadge label="15M" trend={bias15m} />
           <BiasBadge label="1H"  trend={bias1h}  />
