@@ -173,16 +173,20 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   };
 
   const closePosition = (ticket: number) => {
+    if (!confirm(`Close position #${ticket}? This cannot be undone.`)) return;
     fetch(`${API}/trade/close`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ ticket }),
-    });
+      body:    JSON.stringify({ ticket }),}).catch(() => alert("Close request failed — check MT5 manually"));
   };
 
   const isBuy = direction === "BUY";
   const btnBuy  = `px-4 py-2 rounded font-bold text-sm transition-all ${isBuy  ? "bg-emerald-500 text-white" : "bg-white/5 text-white/40 hover:bg-white/10"}`;
   const btnSell = `px-4 py-2 rounded font-bold text-sm transition-all ${!isBuy ? "bg-red-500 text-white"     : "bg-white/5 text-white/40 hover:bg-white/10"}`;
+  
+  const slInvalid = isNaN(parseFloat(sl)) || (isBuy ? parseFloat(sl) >= entryPrice : parseFloat(sl) <= entryPrice);
+  const tpInvalid = isNaN(parseFloat(tp)) || (isBuy ? parseFloat(tp) <= entryPrice : parseFloat(tp) >= entryPrice);
+  const canSubmit  = !slInvalid && !tpInvalid && parseFloat(lots) > 0 && parseFloat(lots) <= 1;
 
   return (
     <div className="flex flex-col gap-2 p-3 bg-[#0f1520] border-t border-white/5 text-xs">
@@ -339,13 +343,11 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
             </div>
           )}
 
-          const slInvalid = isNaN(parseFloat(sl)) || (isBuy ? parseFloat(sl) >= entryPrice : parseFloat(sl) <= entryPrice);
-          const tpInvalid = isNaN(parseFloat(tp)) || (isBuy ? parseFloat(tp) <= entryPrice : parseFloat(tp) >= entryPrice);
-          const canSubmit  = !slInvalid && !tpInvalid && parseFloat(lots) > 0 && parseFloat(lots) <= 1;
-
+          
           {/* SUBMIT */}
           <button onClick={() => setStage("confirm")}
-            className={`w-full py-2 rounded font-bold text-sm ${isBuy ? "bg-emerald-500 hover:bg-emerald-400" : "bg-red-500 hover:bg-red-400"} text-white`}>
+            disabled={!canSubmit}
+            className={`w-full py-2 rounded font-bold text-sm ${isBuy ? "bg-emerald-500 hover:bg-emerald-400" : "bg-red-500 hover:bg-red-400"} text-white ${!canSubmit ? "opacity-40 cursor-not-allowed" : ""}`}>
             {isBuy ? "▲ BUY" : "▼ SELL"} {symbol}
           </button>
         </div>
