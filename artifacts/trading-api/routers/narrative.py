@@ -33,12 +33,6 @@ router = APIRouter()
 
 NEWS_SERVICE_URL = os.environ.get("NEWS_SERVICE_URL", "http://localhost:5003")
 
-PIP_SIZES: dict[str, float] = {
-    "USD/JPY": 0.01,  "EUR/JPY": 0.01,  "GBP/JPY": 0.01,
-    "EUR/USD": 0.0001, "GBP/USD": 0.0001, "AUD/USD": 0.0001,
-    "USD/CAD": 0.0001, "USD/CHF": 0.0001,
-}
-
 # ── In-memory environment history (for shift detection) ──────────────────────
 # Stores last 30 snapshots per symbol: {"USD/JPY": deque([{...}, {...}], maxlen=30)}
 _env_history: dict[str, deque] = {}
@@ -93,8 +87,6 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
     Returns a full plain-English market narrative for the selected symbol.
     Updates automatically when symbol changes on the dashboard.
     """
-    pip_size = PIP_SIZES.get(symbol, 0.0001)
-
     # ── Fetch all 4 timeframes in parallel ───────────────────────────────────
     results = await asyncio.gather(
         _analyse_timeframe(symbol, "4h",  100),
@@ -110,6 +102,7 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
     )
     if not current_price:
         raise HTTPException(status_code=503, detail=f"No data available for {symbol}")
+    pip_size = 0.01 if current_price > 50 else 0.0001
 
     # ── Extract analysis fields ───────────────────────────────────────────────
     bias_4h  = (r4h.get("trend")  or {}).get("trend",  "neutral")
@@ -189,7 +182,6 @@ async def get_pair_sweep():
     Also detects environment shifts vs the previous snapshot.
     """
     async def _evaluate_one(symbol: str) -> tuple[str, dict]:
-        pip_size = PIP_SIZES.get(symbol, 0.0001)
         try:
             results = await asyncio.gather(
                 _analyse_timeframe(symbol, "4h",  80),
@@ -204,6 +196,7 @@ async def get_pair_sweep():
             )
             if not current_price:
                 return symbol, {"error": "no data"}
+            pip_size = 0.01 if current_price > 50 else 0.0001
             bias_4h  = (r4h.get("trend")  or {}).get("trend",  "neutral")
             bias_1h  = (r1h.get("trend")  or {}).get("trend",  "neutral")
             bias_15m = (r15m.get("trend") or {}).get("trend",  "neutral")
@@ -312,5 +305,3 @@ async def get_environment_history(symbol: str = Query(default="USD/JPY")):
     with _env_lock:
         history = list(_env_history.get(symbol, []))
     return {"symbol": symbol, "history": history}
-
-
