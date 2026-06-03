@@ -7,7 +7,7 @@ const API = "/trading-api";
 const PIP = (price: number) => price > 50 ? 0.01 : 0.0001;
 const DEC = (price: number) => price > 50 ? 3 : 5;
 const RISK_PER_PIP = (lots: number, price: number) =>
-  price > 10 ? (lots * 100000 * 0.01) / price : lots * 100000 * 0.0001;
+  price > 50 ? (lots * 100000 * 0.01) / price : lots * 100000 * 0.0001;
 
 interface TradePanelProps {
   symbol:                   string;
@@ -338,6 +338,10 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
               ⚠ TP must be BELOW entry for a SELL
             </div>
           )}
+
+          const slInvalid = isNaN(parseFloat(sl)) || (isBuy ? parseFloat(sl) >= entryPrice : parseFloat(sl) <= entryPrice);
+          const tpInvalid = isNaN(parseFloat(tp)) || (isBuy ? parseFloat(tp) <= entryPrice : parseFloat(tp) >= entryPrice);
+          const canSubmit  = !slInvalid && !tpInvalid && parseFloat(lots) > 0 && parseFloat(lots) <= 1;
 
           {/* SUBMIT */}
           <button onClick={() => setStage("confirm")}

@@ -335,7 +335,7 @@ def _trade_readiness(
     htf_met = True
 
     # 2. 15M pullback / pause structure
-    recent_choch = [c for c in choch_15m if now - c.get("time", 0) <= 24 * 3600]
+    recent_choch = [c for c in choch_15m if now - c.get("time", 0) <= 4 * 3600]
     pullback_met = (
         (direction == "long"  and (bias15m in ("neutral", "bearish") or any(c.get("direction") == "bearish" for c in recent_choch))) or
         (direction == "short" and (bias15m in ("neutral", "bullish") or any(c.get("direction") == "bullish" for c in recent_choch)))

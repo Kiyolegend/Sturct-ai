@@ -544,6 +544,14 @@ function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
     }), 30_000);
     return () => clearInterval(t);
   }, [brokerTime]);
+  
+  // ✅ ADD THIS NEW BLOCK HERE — resyncs clock whenever fresh broker time arrives:
+  React.useEffect(() => {
+    if (brokerTime) setNow(new Date(brokerTime * 1000));
+  }, [brokerTime]);
+  
+
+
   const midMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15));
   const lonOff = (() => { try { const m = midMonth.toLocaleString("en", { timeZone: "Europe/London",    timeZoneName: "shortOffset" }).match(/([+-])(\d+)/); return m ? (m[1] === "+" ? 1 : -1) * parseInt(m[2]) : 0;  } catch { return 0;  } })();
   const nyOff  = (() => { try { const m = midMonth.toLocaleString("en", { timeZone: "America/New_York", timeZoneName: "shortOffset" }).match(/([+-])(\d+)/); return m ? (m[1] === "+" ? 1 : -1) * parseInt(m[2]) : -5; } catch { return -5; } })();

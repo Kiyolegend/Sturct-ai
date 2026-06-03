@@ -27,7 +27,7 @@ import threading as _threading
 # ================================
 
 # Backend API base URL
-API_BASE_URL = "http://localhost:8001"
+API_BASE_URL = os.getenv("MT5_API_URL", "http://localhost:8001")
 
 # Secret key (optional)
 MT5_SECRET = os.getenv("MT5_BRIDGE_SECRET", "")

@@ -102,7 +102,7 @@ export function FrameworkPanel({ symbol }: Props) {
     const lo = mtf?.bias_4h.last_low_price  as number | undefined;
     if (!hi || !lo || !price || !hasDir) return null;
     const legSize = hi - lo;
-    if (legSize < 10 * pip) return null;
+    if (legSize <= 0) return null;
     // pct: 0% = price at the swing extreme (no retrace), 100% = fully retraced
     // negative = impulse extending beyond last swing
     const rawPct = isBull
@@ -321,7 +321,7 @@ export function FrameworkPanel({ symbol }: Props) {
 
   const ready = mode === "scalp" ? scalp_ready : limit_ready;
 
-  const fmt  = (p: number) => p >= 50 ? p.toFixed(3) : p.toFixed(5);
+  const fmt  = (p: number) => p > 50 ? p.toFixed(3) : p.toFixed(5);
   const pips = (a: number, b: number) => Math.round(Math.abs(a - b) / pip);
   const ago  = (t: number) => Math.round((Date.now() / 1000 - t) / 60);
 
