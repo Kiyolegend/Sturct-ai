@@ -87,7 +87,7 @@ export function FrameworkPanel({ symbol }: Props) {
   // price: used for all SL/TP/entry calculations (MTF bias, 5min refresh)
   // livePrice: used for drift/invalidation checks (data5m, 60s refresh — more current)
   const price     = mtf?.bias_4h.current_price ?? 0;
-  const livePrice = (data5m as any)?.current_price ?? price;
+  const livePrice = data5m?.current_price ?? price;
   const pip       = pipSize(price);
 
   const strength = strengthInfo(conf4h);
@@ -96,6 +96,36 @@ export function FrameworkPanel({ symbol }: Props) {
   const dir      = bias4h;
   const hasDir   = bias4h !== "neutral";
   const dirColor = isBull ? "#26a69a" : "#ef5350";
+
+  const retraceInfo = useMemo(() => {
+    const hi = mtf?.bias_4h.last_high_price as number | undefined;
+    const lo = mtf?.bias_4h.last_low_price  as number | undefined;
+    if (!hi || !lo || !price || !hasDir) return null;
+    const legSize = hi - lo;
+    if (legSize < 10 * pip) return null;
+    // pct: 0% = price at the swing extreme (no retrace), 100% = fully retraced
+    // negative = impulse extending beyond last swing
+    const rawPct = isBull
+      ? ((hi - price) / legSize) * 100
+      : ((price - lo) / legSize) * 100;
+    const pct = Math.round(rawPct);
+    if (pct < 0) {
+      const ext = Math.abs(pct);
+      return {
+        text:  `Impulse +${ext}% beyond last swing`,
+        color: ext > 30 ? "#f59e0b" : "#94a3b8",
+        kind:  "impulse" as const,
+      };
+    }
+    let text: string; let color: string;
+    if      (pct < 20) { text = `Pullback ${pct}% — early, just started`;     color = "#94a3b8"; }
+    else if (pct < 38) { text = `Pullback ${pct}% — shallow, 38% zone`;       color = "#4ade80"; }
+    else if (pct < 55) { text = `Pullback ${pct}% — mid-zone ★ 50–61% ideal`; color = "#26a69a"; }
+    else if (pct < 72) { text = `Pullback ${pct}% — deep, 78% zone`;          color = "#4ade80"; }
+    else if (pct < 90) { text = `Pullback ${pct}% — very deep, near full`;    color = "#f59e0b"; }
+    else               { text = `Pullback ${pct}% — extreme, trend risk`;     color = "#ef5350"; }
+    return { text, color, kind: "pullback" as const };
+  }, [mtf, price, isBull, hasDir, pip]);
 
   const newsBlocked = useMemo(() => {
     if (!news?.per_pair) return false;
@@ -166,10 +196,10 @@ export function FrameworkPanel({ symbol }: Props) {
   }, [data5m, dir]);
 
   const sl5m = useMemo(() => {
-    if (!data5m?.structure?.length || !hasDir) return null;
+    if (!data5m?.structure_labels?.length || !hasDir) return null;
     const labels = isBull
-      ? data5m.structure.filter((s: any) => s.label === "HL" || s.label === "LL")
-      : data5m.structure.filter((s: any) => s.label === "LH" || s.label === "HH");
+      ? data5m.structure_labels.filter((s: any) => s.label === "HL" || s.label === "LL")
+      : data5m.structure_labels.filter((s: any) => s.label === "LH" || s.label === "HH");
     if (!labels.length) return null;
     return (labels[labels.length - 1]?.price as number) ?? null;
   }, [data5m, isBull, hasDir]);
@@ -216,14 +246,14 @@ export function FrameworkPanel({ symbol }: Props) {
         : (sl5m  ? sl5m  + 3 * pip : slHigh ? slHigh + 3 * pip : entryP + 20 * pip);
       if (isBull  && slP >= entryP) slP = entryP - 20 * pip;
       if (!isBull && slP <= entryP) slP = entryP + 20 * pip;
-      const zoneCheck = ob1h ?? fvg1h;
+      const zoneCheck = ob1h ?? fvg1h ?? zone1h;
       if (zoneCheck) {
         if (isBull  && slP > zoneCheck.bottom) slP = zoneCheck.bottom - 3 * pip;
         if (!isBull && slP < zoneCheck.top)    slP = zoneCheck.top    + 3 * pip;
       }
     }
 
-    const levels = srData?.levels ?? [];
+    const levels = (srData?.levels ?? []).filter((l: any) => l.timeframe !== "15m");
     const tpLevel = isBull
       ? levels.filter((l: any) => l.kind === "resistance" && l.price > entryP).sort((a: any, b: any) => a.price - b.price)[0]
       : levels.filter((l: any) => l.kind === "support"    && l.price < entryP).sort((a: any, b: any) => b.price - a.price)[0];
@@ -280,7 +310,7 @@ export function FrameworkPanel({ symbol }: Props) {
 
   // ── READY FLAGS ───────────────────────────────────────────────────────────────
   const scalp_signal_ok = !scalp_chasing && !scalp_tp_hit;
-  const scalp_ready = hasDir && phase.good && (ob1h !== null || fvg1h !== null) &&
+  const scalp_ready = hasDir && phase.good && (ob1h !== null || fvg1h !== null || zone1h !== null) &&
     (choch15m !== null || bos15m !== null) && bos5m !== null && scalp_signal_ok && !newsBlocked && (setup?.rr ?? 0) >= 2.5;
 
   const limit_ready = hasDir && phase.good && (ob1h !== null || fvg1h !== null || zone1h !== null) &&
@@ -356,6 +386,11 @@ export function FrameworkPanel({ symbol }: Props) {
                   </span>
                 </div>
                 <div style={{ fontSize: 7, color: phase.color, marginTop: 2 }}>{phase.label}</div>
+                {retraceInfo && (
+                  <div style={{ fontSize: 6.5, color: retraceInfo.color, marginTop: 1 }}>
+                    {retraceInfo.text}
+                  </div>
+                )}
                 {strength.caution && (
                   <div style={{ fontSize: 6.5, color: "#f59e0b", marginTop: 2 }}>
                     ⚠ Extended — reduce position size
@@ -439,6 +474,11 @@ export function FrameworkPanel({ symbol }: Props) {
                   </span>
                 </div>
                 <div style={{ fontSize: 7, color: phase.color, marginTop: 2 }}>{phase.label}</div>
+                {retraceInfo && (
+                  <div style={{ fontSize: 6.5, color: retraceInfo.color, marginTop: 1 }}>
+                    {retraceInfo.text}
+                  </div>
+                )}
                 <div style={{ fontSize: 6.5, color: "#374151", marginTop: 3 }}>
                   {isBull ? "→ Find where pullback ends" : "→ Find where bounce ends"}
                 </div>
