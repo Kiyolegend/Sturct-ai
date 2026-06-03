@@ -73,7 +73,7 @@ function cc(label: string) { return CONDITION_COLORS[label] ?? "#64748b"; }
 function qc(q: "High" | "Medium" | "Low") {
   return q === "High" ? "#4ade80" : q === "Medium" ? "#fbbf24" : "#475569";
 }
-function fmt(p: number, ref: number) { return p.toFixed(ref >= 10 ? 3 : 5); }
+function fmt(p: number, ref: number) { return p.toFixed(ref >= 50 ? 3 : 5); }
 
 // ── Session countdown (same DST logic as MarketNarrative) ─────────────────────
 
@@ -242,7 +242,7 @@ function NarrativePanel({ symbol }: { symbol: string }) {
 
           {/* Session */}
           <Section label="Session Context">
-            <div style={{ fontSize: 13, color: "#4ade80", lineHeight: 1.7, marginBottom: 4 }}>{sessionLine}</div>
+            <div style={{ fontSize: 13, color:sessionLine.startsWith("No prime") ? "#f59e0b" : "#4ade80", lineHeight: 1.7, marginBottom: 4 }}>{sessionLine}</div>
             {n.session.map((line, i) => (
               <div key={i} style={{ fontSize: 13, color: "#475569", lineHeight: 1.7 }}>{line}</div>
             ))}

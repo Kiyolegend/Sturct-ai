@@ -278,12 +278,19 @@ export interface PairNewsInfo {
 }
 
 export interface UpcomingEvent {
-  pair:          string;
-  event_name:    string;
-  name?:         string;
-  impact_level:  number;
-  minutes_away:  number | null;
-  window_active: boolean;
+  event:              string;
+  country:            string;
+  impact_level:       number;
+  scheduled_utc:      string;
+  minutes_away:       number | null;
+  confidence_penalty: number;
+  block_window:       string;
+  affects_pairs:      string[];
+  window_active?:     boolean;
+  actual?:            string;
+  estimate?:          string;
+  prev?:              string;
+  unit?:              string;
 }
 
 export interface NewsStatusResponse {

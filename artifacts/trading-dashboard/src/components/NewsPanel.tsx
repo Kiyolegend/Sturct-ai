@@ -98,11 +98,11 @@ export function NewsPanel() {
               <Clock className="w-2.5 h-2.5 text-muted-foreground/50 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-[9px] text-white/70 truncate leading-tight">
-                  {ev.event_name ?? ev.name ?? "Event"}
+                  {ev.event ?? "Event"}
                 </p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-[8px] font-mono text-muted-foreground/50">
-                    {ev.pair}
+                    {ev.affects_pairs?.join(", ") ?? ""}
                   </span>
                   {ev.minutes_away != null && (
                     <span className={`text-[8px] font-mono ${impactColor(ev.impact_level ?? 0)}`}>

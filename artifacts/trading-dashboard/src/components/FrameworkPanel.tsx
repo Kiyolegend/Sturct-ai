@@ -159,17 +159,19 @@ export function FrameworkPanel({ symbol }: Props) {
 
   const zone1h = useMemo(() => {
     if (!data1h?.zones?.length || !price || !hasDir) return null;
+    const maxDist = 80 * pip;
     return data1h.zones
       .filter((z: any) => {
         const center = (z.top + z.bottom) / 2;
-        return isBull ? center < price : center > price;
+        const inDir = isBull ? center < price : center > price;
+        return inDir && Math.abs(center - price) <= maxDist;
       })
       .sort((a: any, b: any) => {
         const da = Math.abs((a.top + a.bottom) / 2 - price);
         const db = Math.abs((b.top + b.bottom) / 2 - price);
         return da - db;
       })[0] ?? null;
-  }, [data1h, price, isBull, hasDir]);
+  }, [data1h, price, isBull, hasDir, pip]);
 
   const choch15m = useMemo(() => {
     if (!data15m?.choch) return null;
@@ -198,8 +200,9 @@ export function FrameworkPanel({ symbol }: Props) {
   const sl5m = useMemo(() => {
     if (!data5m?.structure_labels?.length || !hasDir) return null;
     const labels = isBull
-      ? data5m.structure_labels.filter((s: any) => s.label === "HL" || s.label === "LL")
-      : data5m.structure_labels.filter((s: any) => s.label === "LH" || s.label === "HH");
+      ? data5m.structure_labels.filter((s: any) => s.label === "HL" || s.label === "EQL" || s.label === "LL")
+      : data5m.structure_labels.filter((s: any) => s.label === "LH" || s.label === "EQH" || s.label === "HH");
+
     if (!labels.length) return null;
     return (labels[labels.length - 1]?.price as number) ?? null;
   }, [data5m, isBull, hasDir]);
@@ -318,7 +321,7 @@ export function FrameworkPanel({ symbol }: Props) {
 
   const ready = mode === "scalp" ? scalp_ready : limit_ready;
 
-  const fmt  = (p: number) => p >= 10 ? p.toFixed(3) : p.toFixed(5);
+  const fmt  = (p: number) => p >= 50 ? p.toFixed(3) : p.toFixed(5);
   const pips = (a: number, b: number) => Math.round(Math.abs(a - b) / pip);
   const ago  = (t: number) => Math.round((Date.now() / 1000 - t) / 60);
 

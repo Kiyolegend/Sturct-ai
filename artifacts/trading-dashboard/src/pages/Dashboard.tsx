@@ -7,6 +7,7 @@ import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 
 import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
+import { MarketNarrative } from "@/components/MarketNarrative";
 
 import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
@@ -109,6 +110,7 @@ export function Dashboard() {
           />
 
           <NewsPanel />
+          <MarketNarrative symbol={symbol} refreshTrigger={narrativeRefresh} />
 
         </HeatmapSidebar>
 
