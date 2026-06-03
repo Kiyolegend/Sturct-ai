@@ -62,6 +62,7 @@ interface Narrative {
   };
   news: { blocked: boolean; reason: string };
   generated_at: number;
+  broker_time?: number;
 }
 
 // ── Colour maps ───────────────────────────────────────────────────────────────
@@ -432,7 +433,7 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
               {/* Session context */}
               <div style={{ marginBottom: 8 }}>
                 <SectionLabel>Session Context</SectionLabel>
-                <SessionCountdown />
+                <SessionCountdown brokerTime={n.broker_time} />
                 {n.session.map((line, i) => (
                   <div key={i} style={{ fontSize: 7.5, color: "#374151", lineHeight: 1.65 }}>
                     {line}
@@ -534,17 +535,19 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
 }
 
 
-function SessionCountdown() {
-  const [now, setNow] = React.useState(() => new Date());
+function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
+    const [now, setNow] = React.useState(() => brokerTime ? new Date(brokerTime * 1000) : new Date());
   React.useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30_000);
+    const t = setInterval(() => setNow(brokerTime ? new Date(brokerTime * 1000) : new Date()), 30_000);
     return () => clearInterval(t);
-  }, []);
-  // Session times in UTC hours
+  }, [brokerTime]);
+  const midMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15));
+  const lonOff = (() => { try { const m = midMonth.toLocaleString("en", { timeZone: "Europe/London",    timeZoneName: "shortOffset" }).match(/([+-])(\d+)/); return m ? (m[1] === "+" ? 1 : -1) * parseInt(m[2]) : 0;  } catch { return 0;  } })();
+  const nyOff  = (() => { try { const m = midMonth.toLocaleString("en", { timeZone: "America/New_York", timeZoneName: "shortOffset" }).match(/([+-])(\d+)/); return m ? (m[1] === "+" ? 1 : -1) * parseInt(m[2]) : -5; } catch { return -5; } })();
   const sessions = [
-    { name: "London", open: 8,  close: 17 },
-    { name: "NY",     open: 13, close: 22 },
-    { name: "Asian",  open: 0,  close: 9  },
+    { name: "London", open: 8  + lonOff, close: 17 + lonOff },
+    { name: "NY",     open: 13 + nyOff,  close: 22 + nyOff  },
+    { name: "Asian",  open: 0,            close: 9            },
   ];
   const utcH   = now.getUTCHours();
   const utcMin = now.getUTCMinutes();

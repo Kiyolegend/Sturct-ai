@@ -18,13 +18,14 @@ def _classify_condition(
     bias4h: str, bias1h: str, bias15m: str,
     bos_5m: list, choch_15m: list,
     near_resistance: bool, near_support: bool,
+    broker_ts: float = 0,
 ) -> tuple[str, str]:
     """
     Returns (condition_label, one-sentence explanation).
     Labels match the set requested: Bullish Trend, Bullish Pullback, Bearish Trend,
     Bearish Pullback, Consolidation, Expansion, Distribution, Accumulation, Range.
     """
-    now = time.time()
+    now = broker_ts or time.time()
 
     def recent_choch(direction: str, hours: float = 6) -> bool:
         cutoff = now - hours * 3600
@@ -138,9 +139,10 @@ def _classify_condition(
 def _structure_summary(
     bias4h: str, bias1h: str, bias15m: str,
     choch_15m: list, bos_5m: list,
+    broker_ts: float = 0,
 ) -> list[str]:
     """Returns 3-5 factual sentences describing the current market structure."""
-    now = time.time()
+    now = broker_ts or time.time()
     lines: list[str] = []
 
     def fmt(b: str) -> str:
@@ -282,11 +284,12 @@ def _trade_readiness(
     sr_levels: list, zones: list,
     current_price: float, pip_size: float,
     news_blocked: bool,
+    broker_ts: float = 0
 ) -> dict:
     """
     Evaluates 5 conditions and returns a readiness object with plain-English summary.
     """
-    now = time.time()
+    now = broker_ts or time.time()
     s_lower = [x.lower() for x in (sessions or [])]
     in_session = any(x in s_lower for x in ["london", "ny", "new york"])
 
@@ -468,8 +471,11 @@ def generate_narrative(
     sessions:      list[str],
     news_blocked:  bool,
     news_reason:   str,
+    broker_ts:     float = 0,
 ) -> dict:
     pip_size = pip_size or 0.0001
+    now = broker_ts or time.time()
+
 
     # Near-level flags for condition classifier
     threshold = 20 * pip_size
@@ -485,16 +491,16 @@ def generate_narrative(
     )
 
     condition, condition_detail = _classify_condition(
-        bias_4h, bias_1h, bias_15m, bos_5m, choch_15m, near_res, near_sup,
+        bias_4h, bias_1h, bias_15m, bos_5m, choch_15m, near_res, near_sup, broker_ts=now,
     )
 
-    structure  = _structure_summary(bias_4h, bias_1h, bias_15m, choch_15m, bos_5m)
+    structure  = _structure_summary(bias_4h, bias_1h, bias_15m, choch_15m, bos_5m,  broker_ts=now,)
     key_levels = _key_levels(sr_levels, zones, current_price, pip_size)
     session    = _session_context(sessions)
     readiness  = _trade_readiness(
         condition, bias_4h, bias_1h, bias_15m,
         choch_15m, bos_5m, sessions,
-        sr_levels, zones, current_price, pip_size, news_blocked,
+        sr_levels, zones, current_price, pip_size, news_blocked, broker_ts=now,
     )
     confidence = _confidence(readiness, bias_4h, bias_1h, bias_15m)
 
@@ -512,7 +518,8 @@ def generate_narrative(
             "blocked": news_blocked,
             "reason":  news_reason,
         },
-        "generated_at": int(time.time()),
+        "broker_time":  int(now),
+        "generated_at": int(now), 
     }
 
     # ── Environment Evaluator ─────────────────────────────────────────────────────
@@ -528,14 +535,16 @@ def build_environment(
     sessions: list,
     news_blocked: bool,
     news_reason: str,
+    broker_ts: float = 0,
+
 ) -> dict:
     """
     Returns Scalp and Limit environment ratings for one symbol.
     Ratings: "Favorable" | "Mixed" | "Unfavorable"
     No trade signals — only describes market conditions.
     """
-    import time as _time
-    now = _time.time()
+    
+    now = broker_ts or time.time()
     # ── Helpers ───────────────────────────────────────────────────────────────
     def recent_choch(hours: float = 4) -> bool:
         cutoff = now - hours * 3600
