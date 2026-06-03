@@ -137,16 +137,22 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
         pass
 
     # ── Active sessions from 1H data ──────────────────────────────────────────
+        # ── Broker time from last MT5 candle (avoids corrupted PC clock) ──────────
+    try:
+        _df = r5m.get("df") or r15m.get("df") or r1h.get("df")
+        broker_ts = int(_df.iloc[-1]["time"].timestamp()) if _df is not None and len(_df) > 0 else int(time.time())
+    except Exception:
+        broker_ts = int(time.time())
     active_sessions: list[str] = []
     try:
         df_1h = r1h.get("df")
         if df_1h is not None and len(df_1h) > 0:
             all_sess = compute_sessions(df_1h)
-            now_ts   = int(time.time())
+            
             active_sessions = [
                 s["session"]
                 for s in all_sess
-                if s.get("start_time", 0) <= now_ts <= s.get("end_time", 0) + 3600
+                if s.get("start_time", 0) <= broker_ts <= s.get("end_time", 0) + 300
             ]
     except Exception:
         pass
@@ -171,6 +177,7 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
         sessions=active_sessions,
         news_blocked=news_blocked,
         news_reason=news_reason,
+        broker_ts=float(broker_ts),
     )
 
     return narrative
