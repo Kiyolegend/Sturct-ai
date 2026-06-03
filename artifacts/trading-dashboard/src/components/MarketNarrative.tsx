@@ -88,7 +88,7 @@ function qualityColor(q: "High" | "Medium" | "Low") {
   return q === "High" ? "#4ade80" : q === "Medium" ? "#fbbf24" : "#475569";
 }
 function fmtPrice(p: number, ref: number) {
-  return p.toFixed(ref >= 10 ? 3 : 5);
+  return p.toFixed(ref > 50 ? 3 : 5);
 }
 function secAgo(ts: number) {
   const s = Math.floor(Date.now() / 1000) - ts;
@@ -538,7 +538,10 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
 function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
     const [now, setNow] = React.useState(() => brokerTime ? new Date(brokerTime * 1000) : new Date());
   React.useEffect(() => {
-    const t = setInterval(() => setNow(brokerTime ? new Date(brokerTime * 1000) : new Date()), 30_000);
+    const t = setInterval(() => setNow(prev => {
+      if (!brokerTime) return new Date();
+      return new Date(prev.getTime() + 30_000);
+    }), 30_000);
     return () => clearInterval(t);
   }, [brokerTime]);
   const midMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15));

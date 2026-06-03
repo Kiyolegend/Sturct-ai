@@ -42,6 +42,7 @@ export function Dashboard() {
 
   const [wsConnected,    setWsConnected]    = useState(false);
   const [clickedPrice,   setClickedPrice]   = useState<number | null>(null);
+  const [narrativeRefresh, setNarrativeRefresh] = useState(0);
   const [slLine,         setSlLine]         = useState<number | null>(null);
   const [tpLine,         setTpLine]         = useState<number | null>(null);
   
@@ -50,7 +51,8 @@ export function Dashboard() {
   useEffect(() => { symbolRef.current = symbol; }, [symbol]);
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:8001/trading-api/ws`);
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${proto}://${window.location.host}/trading-api/ws`);
     ws.onopen  = () => setWsConnected(true);
     ws.onclose = () => setWsConnected(false);
     ws.onmessage = (event) => {
@@ -58,7 +60,7 @@ export function Dashboard() {
         const msg = JSON.parse(event.data);
         if (msg.type === "candle" && msg.symbol === symbolRef.current) {
           refetch();
-          
+          setNarrativeRefresh(n => n + 1);
         }
       } catch {}
     };

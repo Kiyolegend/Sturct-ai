@@ -65,17 +65,7 @@ const CONDITION_COLORS: Record<string, string> = {
   "Consolidation":    "#475569",
 };
 
-const RATING_COLOR: Record<EnvRating, string> = {
-  Favorable:   "#26a69a",
-  Mixed:       "#f59e0b",
-  Unfavorable: "#ef5350",
-};
 
-const RATING_BG: Record<EnvRating, string> = {
-  Favorable:   "rgba(38,166,154,0.15)",
-  Mixed:       "rgba(245,158,11,0.15)",
-  Unfavorable: "rgba(239,83,80,0.15)",
-};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { AlertTriangle, X, CheckCircle, Loader2 } from "lucide-react";
 
-const API = "http://localhost:8001/trading-api";
-const PIP = (price: number) => price > 10 ? 0.01 : 0.0001;
+// FIX 1 — relative URL (was "http://localhost:8001/trading-api")
+const API = "/trading-api";
+// FIX 2 — threshold >50 matches TradingChart/FrameworkPanel (was >10); DEC added
+const PIP = (price: number) => price > 50 ? 0.01 : 0.0001;
+const DEC = (price: number) => price > 50 ? 3 : 5;
 const RISK_PER_PIP = (lots: number, price: number) =>
   price > 10 ? (lots * 100000 * 0.01) / price : lots * 100000 * 0.0001;
 
@@ -27,15 +30,15 @@ interface Position {
 export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceConsumed, onSLChange, onTPChange }: TradePanelProps) {
   const pip          = PIP(currentPrice);
   const defaultSL    = (price: number, dir: Direction) =>
-    dir === "BUY" ? +(price - 20 * pip).toFixed(5) : +(price + 20 * pip).toFixed(5);
+    dir === "BUY" ? +(price - 20 * pip).toFixed(DEC(price)) : +(price + 20 * pip).toFixed(DEC(price));
   const defaultTP    = (price: number, dir: Direction) =>
-    dir === "BUY" ? +(price + 40 * pip).toFixed(5) : +(price - 40 * pip).toFixed(5);
+    dir === "BUY" ? +(price + 40 * pip).toFixed(DEC(price)) : +(price - 40 * pip).toFixed(DEC(price));
 
   const [direction,        setDirection]        = useState<Direction>("BUY");
   const [orderType,        setOrderType]        = useState<OrderType>("MARKET");
-  const [limitPrice,       setLimitPrice]       = useState(currentPrice.toFixed(5));
-  const [sl,               setSL]               = useState(() => defaultSL(currentPrice, "BUY").toFixed(5));
-  const [tp,               setTP]               = useState(() => defaultTP(currentPrice, "BUY").toFixed(5));
+  const [limitPrice,       setLimitPrice]       = useState(currentPrice.toFixed(DEC(currentPrice)));
+  const [sl,               setSL]               = useState(() => defaultSL(currentPrice, "BUY").toFixed(DEC(currentPrice)));
+  const [tp,               setTP]               = useState(() => defaultTP(currentPrice, "BUY").toFixed(DEC(currentPrice)));
   const [lots,             setLots]             = useState("0.02");
   const [stage,            setStage]            = useState<Stage>("form");
   const [resultMsg,        setResultMsg]        = useState("");
@@ -46,30 +49,31 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   // Auto-update SL/TP when direction or symbol changes
   useEffect(() => {
     const p = orderType === "LIMIT" ? parseFloat(limitPrice) : currentPrice;
-    setSL(defaultSL(p, direction).toFixed(5));
-    setTP(defaultTP(p, direction).toFixed(5));
+    setSL(defaultSL(p, direction).toFixed(DEC(p)));
+    setTP(defaultTP(p, direction).toFixed(DEC(p)));
   }, [direction, symbol, currentPrice > 0 ? "loaded" : ""]);
 
   // Chart click routing — SL, TP, Entry, or default (switch to LIMIT)
   useEffect(() => {
     if (!clickedPrice) return;
     if (chartClickTarget === 'sl') {
-      setSL(clickedPrice.toFixed(5));
+      setSL(clickedPrice.toFixed(DEC(clickedPrice)));
     } else if (chartClickTarget === 'tp') {
-      setTP(clickedPrice.toFixed(5));
+      setTP(clickedPrice.toFixed(DEC(clickedPrice)));
     } else if (chartClickTarget === 'entry') {
-      setLimitPrice(clickedPrice.toFixed(5));
-      setSL(defaultSL(clickedPrice, direction).toFixed(5));
-      setTP(defaultTP(clickedPrice, direction).toFixed(5));
+      setLimitPrice(clickedPrice.toFixed(DEC(clickedPrice)));
+      setSL(defaultSL(clickedPrice, direction).toFixed(DEC(clickedPrice)));
+      setTP(defaultTP(clickedPrice, direction).toFixed(DEC(clickedPrice)));
     } else {
       setOrderType("LIMIT");
-      setLimitPrice(clickedPrice.toFixed(5));
-      setSL(defaultSL(clickedPrice, direction).toFixed(5));
-      setTP(defaultTP(clickedPrice, direction).toFixed(5));
+      setLimitPrice(clickedPrice.toFixed(DEC(clickedPrice)));
+      setSL(defaultSL(clickedPrice, direction).toFixed(DEC(clickedPrice)));
+      setTP(defaultTP(clickedPrice, direction).toFixed(DEC(clickedPrice)));
     }
     setChartClickTarget(null);
     onClickedPriceConsumed?.();
   }, [clickedPrice]);
+
   useEffect(() => {
     const v = parseFloat(sl);
     onSLChange?.(isNaN(v) ? null : v);
@@ -92,9 +96,6 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     }
   }, [stage]);
 
-
-
-
   // Poll open positions
   useEffect(() => {
     const poll = () =>
@@ -107,9 +108,15 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     return () => clearInterval(id);
   }, []);
 
-  // Poll for execution results
+  // FIX 3 — Poll for execution results with 30s timeout
   useEffect(() => {
     if (stage !== "sending") return;
+    // Timeout: if MT5 doesn't respond in 30s, show error instead of spinning forever
+    const timeout = setTimeout(() => {
+      setResultMsg("No response from MT5 — order may not have executed. Check MT5 manually.");
+      setResultOk(false);
+      setStage("result");
+    }, 30000);
     const id = setInterval(() => {
       fetch(`${API}/trade/results`)
         .then(r => r.json())
@@ -124,7 +131,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
           }
         }).catch(() => {});
     }, 1000);
-    return () => clearInterval(id);
+    return () => { clearInterval(id); clearTimeout(timeout); };
   }, [stage]);
 
   const entryPrice = orderType === "MARKET" ? currentPrice : parseFloat(limitPrice);
@@ -159,9 +166,9 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   const reset = () => {
     setStage("form");
     setResultMsg("");
-    setLimitPrice(currentPrice.toFixed(5));
-    setSL(defaultSL(currentPrice, direction).toFixed(5));
-    setTP(defaultTP(currentPrice, direction).toFixed(5));
+    setLimitPrice(currentPrice.toFixed(DEC(currentPrice)));
+    setSL(defaultSL(currentPrice, direction).toFixed(DEC(currentPrice)));
+    setTP(defaultTP(currentPrice, direction).toFixed(DEC(currentPrice)));
     setChartClickTarget(null);
   };
 
@@ -307,6 +314,28 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
           {chartClickTarget && (
             <div className="text-[10px] text-orange-400/80 text-center py-0.5 bg-orange-400/5 rounded border border-orange-400/20">
               Click chart to set {chartClickTarget === 'sl' ? 'Stop Loss' : chartClickTarget === 'tp' ? 'Take Profit' : 'Entry'} price
+            </div>
+          )}
+
+          {/* FIX 4 — SL/TP wrong-side validation warnings */}
+          {isBuy  && parseFloat(sl) >= entryPrice && (
+            <div className="text-[10px] text-red-400 bg-red-500/10 rounded px-2 py-1">
+              ⚠ SL must be BELOW entry for a BUY
+            </div>
+          )}
+          {!isBuy && parseFloat(sl) <= entryPrice && (
+            <div className="text-[10px] text-red-400 bg-red-500/10 rounded px-2 py-1">
+              ⚠ SL must be ABOVE entry for a SELL
+            </div>
+          )}
+          {isBuy  && parseFloat(tp) <= entryPrice && (
+            <div className="text-[10px] text-red-400 bg-red-500/10 rounded px-2 py-1">
+              ⚠ TP must be ABOVE entry for a BUY
+            </div>
+          )}
+          {!isBuy && parseFloat(tp) >= entryPrice && (
+            <div className="text-[10px] text-red-400 bg-red-500/10 rounded px-2 py-1">
+              ⚠ TP must be BELOW entry for a SELL
             </div>
           )}
 

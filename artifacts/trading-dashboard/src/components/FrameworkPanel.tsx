@@ -87,7 +87,7 @@ export function FrameworkPanel({ symbol }: Props) {
   // price: used for all SL/TP/entry calculations (MTF bias, 5min refresh)
   // livePrice: used for drift/invalidation checks (data5m, 60s refresh — more current)
   const price     = mtf?.bias_4h.current_price ?? 0;
-  const livePrice = data5m?.current_price ?? price;
+  const livePrice = data5m?.candles?.at(-1)?.close ?? price;
   const pip       = pipSize(price);
 
   const strength = strengthInfo(conf4h);

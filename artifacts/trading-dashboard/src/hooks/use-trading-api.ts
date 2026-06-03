@@ -88,6 +88,7 @@ export interface TradingAnalysisResponse {
   choch: ChochEvent[];
   trendlines: TrendlinesData;
   zones: Zone[];
+  current_price?: number | null;
 }
 
 export interface SRLevel {
