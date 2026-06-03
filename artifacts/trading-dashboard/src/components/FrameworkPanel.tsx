@@ -38,13 +38,13 @@ function phaseInfo(b4h: Bias, b1h: Bias, b15: Bias): { label: string; color: str
   if (b4h === "neutral") return { label: "No 4H trend", color: "#475569", good: false };
   const opp = b4h === "bullish" ? "bearish" : "bullish";
   if (b1h === b4h && b15 === b4h)
-    return { label: "Full impulse — all TFs aligned, wait for pullback", color: "#f59e0b", good: false };
+    return { label: "Impulse — all TFs aligned, wait for pullback to begin", color: "#f59e0b", good: false };
   if (b1h === b4h && (b15 === opp || b15 === "neutral"))
-    return { label: "Shallow 15M pullback — near entry zone", color: "#4ade80", good: true  };
+    return { label: "Pullback early stage — 15M turning, 1H still with trend", color: "#4ade80", good: true };
   if ((b1h === opp || b1h === "neutral") && b15 === b4h)
-    return { label: "Deep 1H pullback, 15M recovering — prime window", color: "#4ade80", good: true  };
+    return { label: "Pullback late stage — 1H deep, 15M recovering — prime window", color: "#4ade80", good: true };
   if (b1h === opp && b15 === opp)
-    return { label: "Strong pullback — not yet confirmed", color: "#f59e0b", good: false };
+    return { label: "Pullback mid-stage — 1H & 15M both correcting, wait", color: "#f59e0b", good: false };
   return { label: "Mixed signals — wait for clarity", color: "#475569", good: false };
 }
 
@@ -202,7 +202,14 @@ export function FrameworkPanel({ symbol }: Props) {
     const slHigh = mtf?.bias_15m.last_high_price;
     let slP: number;
     if (mode === "limit" && zone) {
-      slP = isBull ? zone.bottom - 10 * pip : zone.top + 10 * pip;
+      const zone15m = ob15m ?? fvg15m;
+      const sl1h = isBull ? zone.bottom - 10 * pip : zone.top + 10 * pip;
+      if (zone15m) {
+        const sl15m = isBull ? zone15m.bottom - 5 * pip : zone15m.top + 5 * pip;
+        slP = isBull ? Math.min(sl1h, sl15m) : Math.max(sl1h, sl15m);
+      } else {
+        slP = sl1h;
+      }
     } else {
       slP = isBull
         ? (sl5m  ? sl5m  - 3 * pip : slLow  ? slLow  - 3 * pip : entryP - 20 * pip)
@@ -228,7 +235,7 @@ export function FrameworkPanel({ symbol }: Props) {
     const reward = Math.abs(tpP - entryP);
     const rr     = risk > 0 ? Math.round((reward / risk) * 10) / 10 : 0;
     return { entry: entryP, sl: slP, tp: tpP, rr };
-  }, [price, hasDir, isBull, ob1h, fvg1h, zone1h, sl5m, mtf, srData, pip, mode]);
+  }, [price, hasDir, isBull, ob1h, fvg1h, zone1h, ob15m, fvg15m, sl5m, mtf, srData, pip, mode]);
 
   // ── STALE PRICE / INVALIDATION GUARDS ────────────────────────────────────────
 
@@ -259,13 +266,25 @@ export function FrameworkPanel({ symbol }: Props) {
     }
   }, [mode, livePrice, ob1h, fvg1h, zone1h, isBull, pip]);
 
+    // How many pips price has moved AWAY from the 1H zone (positive = further away)
+  const limit_zone_distance = useMemo(() => {
+    if (mode !== "limit" || !livePrice) return 0;
+    const zone = ob1h ?? fvg1h ?? zone1h;
+    if (!zone) return 0;
+    return isBull
+      ? Math.round((livePrice - zone.top) / pip)
+      : Math.round((zone.bottom - livePrice) / pip);
+  }, [mode, livePrice, ob1h, fvg1h, zone1h, isBull, pip]);
+
+  const limit_out_of_reach = limit_zone_distance > 50;
+
   // ── READY FLAGS ───────────────────────────────────────────────────────────────
   const scalp_signal_ok = !scalp_chasing && !scalp_tp_hit;
   const scalp_ready = hasDir && phase.good && (ob1h !== null || fvg1h !== null) &&
-    (choch15m !== null || bos15m !== null) && bos5m !== null && scalp_signal_ok && !newsBlocked;
+    (choch15m !== null || bos15m !== null) && bos5m !== null && scalp_signal_ok && !newsBlocked && (setup?.rr ?? 0) >= 2.5;
 
   const limit_ready = hasDir && phase.good && (ob1h !== null || fvg1h !== null || zone1h !== null) &&
-    (ob15mInZone || fvg15mInZone) && limit_zone_status !== "blown" && !newsBlocked;
+    (ob15mInZone || fvg15mInZone) && limit_zone_status !== "blown" && !limit_out_of_reach && !newsBlocked && (setup?.rr ?? 0) >= 2.5;
 
   const ready = mode === "scalp" ? scalp_ready : limit_ready;
 
@@ -280,9 +299,10 @@ export function FrameworkPanel({ symbol }: Props) {
     }
     if (mode === "limit") {
       if (limit_zone_status === "blown") return "ZONE BLOWN — price passed through zone, setup invalidated";
+      if (limit_out_of_reach) return `ZONE OUT OF REACH — price moved ${limit_zone_distance}p from zone, do not chase`;
     }
     return null;
-  }, [mode, scalp_tp_hit, scalp_chasing, scalp_drift, limit_zone_status]);
+  }, [mode, scalp_tp_hit, scalp_chasing, scalp_drift, limit_zone_status, limit_out_of_reach, limit_zone_distance]);
 
   return (
     <div style={{

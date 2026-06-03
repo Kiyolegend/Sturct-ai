@@ -4,10 +4,10 @@ import { TradingChart } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 
 
-import { ConditionAlert } from "@/components/ConditionAlert";
+
 import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
-import { FrameworkPanel } from "@/components/FrameworkPanel";
+
 import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
 
@@ -96,7 +96,7 @@ export function Dashboard() {
 
 
           
-          <FrameworkPanel symbol={symbol} />
+          
           <TradePanel
             symbol={symbol}
             currentPrice={data?.candles?.at(-1)?.close ?? 0}
@@ -187,7 +187,7 @@ export function Dashboard() {
           )}
         </main>
       </div>
-      <ConditionAlert />
+      
     </div>
   );
 }

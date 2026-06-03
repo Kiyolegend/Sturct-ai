@@ -321,6 +321,7 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
         </div>
         <ApiBadge />
         <BridgeBadge />
+                <a href="/analysis" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80 transition-all">Analysis ↗</a>
       </div>
     </div>
   );
