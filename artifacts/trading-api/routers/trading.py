@@ -7,6 +7,7 @@ Dashboard sends orders here → bridge polls and executes on MT5 → result repo
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+import asyncio
 import time
 import uuid
 
@@ -15,6 +16,7 @@ router = APIRouter()
 _pending_orders: list[dict] = []
 _order_results:  list[dict] = []
 _last_positions: list[dict] = []
+_order_event = asyncio.Event()
 
 
 class OrderRequest(BaseModel):
@@ -64,13 +66,20 @@ async def open_trade(order: OrderRequest):
         "comment":    order.comment,
         "queued_at":  time.time(),
     })
+    _order_event.set()
     print(f"[TRADE] Queued: {order.direction} {order.lots} {order.symbol} id={order_id}")
     return {"status": "queued", "order_id": order_id}
 
 
 @router.get("/trade/pending")
 async def get_pending_orders():
-    """Bridge polls this. Queue is cleared on read."""
+    """Bridge long-polls this. Holds connection until an order arrives (max 15s)."""
+    if not _pending_orders:
+        try:
+            await asyncio.wait_for(_order_event.wait(), timeout=15.0)
+        except asyncio.TimeoutError:
+            pass
+    _order_event.clear()
     orders = list(_pending_orders)
     _pending_orders.clear()
     return {"orders": orders}
@@ -100,6 +109,7 @@ async def close_trade(req: CloseRequest):
         "ticket":     req.ticket,
         "queued_at":  time.time(),
     })
+    _order_event.set()
     return {"status": "queued", "order_id": order_id}
 
 

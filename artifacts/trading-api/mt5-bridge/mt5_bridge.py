@@ -328,7 +328,7 @@ def _sync_positions():
 
 def check_pending_orders():
     try:
-        resp = requests.get(ORDERS_URL, headers=HEADERS, timeout=5)
+        resp = requests.get(ORDERS_URL, headers=HEADERS, timeout=20)
         if resp.status_code != 200:
             return
         orders = resp.json().get("orders", [])
@@ -341,6 +341,20 @@ def check_pending_orders():
             _sync_positions()
     except Exception as e:
         print(f"  [TRADE] poll error: {e}")
+
+# ================================
+# ORDER POLL THREAD
+# ================================
+
+def _order_poll_loop():
+    """Runs in a background thread. Long-polls for orders independently of the push cycle."""
+    print("[TRADE] Order poll thread started")
+    while True:
+        try:
+            check_pending_orders()
+        except Exception as e:
+            print(f"  [TRADE] order poll error: {e}")
+            time.sleep(1)
 
 # ================================
 # RUN LOOP
@@ -361,6 +375,10 @@ def run():
 
     print("\nStarting loop... Press Ctrl+C to stop")
 
+    # Start dedicated order-poll thread (long-polls server, independent of push cycle)
+    order_thread = _threading.Thread(target=_order_poll_loop, daemon=True)
+    order_thread.start()
+
     consecutive_errors = 0
 
     while True:
@@ -372,8 +390,7 @@ def run():
             if not connect_mt5():
                 time.sleep(30)
                 continue
-            
-        check_pending_orders() 
+
         t0      = time.time()
         success = push_all()
         expected = len(SYMBOLS) * len(TIMEFRAME_MAP)
@@ -389,7 +406,6 @@ def run():
             consecutive_errors = 0
             print(f"Done: {success}/{expected} successful")
 
-        check_pending_orders()
         _sync_positions()
 
         elapsed = time.time() - t0
