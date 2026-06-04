@@ -7,6 +7,7 @@ Dashboard sends orders here → bridge polls and executes on MT5 → result repo
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from services.mt5_store import get_latest_timestamp as _broker_time
 import asyncio
 import time
 import uuid
@@ -64,7 +65,7 @@ async def open_trade(order: OrderRequest):
         "tp":         order.tp,
         "lots":       order.lots,
         "comment":    order.comment,
-        "queued_at":  time.time(),
+        "queued_at":  _broker_time() or int(time.time()),
     })
     _order_event.set()
     print(f"[TRADE] Queued: {order.direction} {order.lots} {order.symbol} id={order_id}")
@@ -107,7 +108,7 @@ async def close_trade(req: CloseRequest):
         "order_id":   order_id,
         "order_type": "CLOSE",
         "ticket":     req.ticket,
-        "queued_at":  time.time(),
+        "queued_at":  _broker_time() or int(time.time()),
     })
     _order_event.set()
     return {"status": "queued", "order_id": order_id}
