@@ -223,15 +223,16 @@ def _report(order_id, ticket, status, message, fill_price=None):
 def _execute_order(order: dict):
     order_id = order["order_id"]
 
-    # Discard MARKET orders that sat in queue too long — price may have moved
-    age = time.time() - order.get("queued_at", 0)
-    if order.get("order_type") == "MARKET" and age > 10:
-        mt5_sym_check = _api_to_mt5(order.get("symbol", ""))
-        tick_check = mt5.symbol_info_tick(mt5_sym_check) if mt5_sym_check else None
-        broker_now = tick_check.time if tick_check else 0
-        age = broker_now - queued_at if broker_now > 0 else 0
+        # Discard MARKET orders that sat in queue too long — price may have moved.
+    # Uses broker server time (from MT5 tick) instead of PC clock — PC clock may be wrong.
+    queued_at = order.get("queued_at", 0)
+    if order.get("order_type") == "MARKET" and queued_at > 0:
+        _stale_sym = _api_to_mt5(order.get("symbol", ""))
+        _stale_tick = mt5.symbol_info_tick(_stale_sym) if _stale_sym else None
+        broker_now = _stale_tick.time if _stale_tick else 0
+        age = (broker_now - queued_at) if broker_now > 0 else 0
         if age > 10:
-            print(f"  [TRADE] STALE market order discarded ({age:.1f}s old): {order['symbol']}")
+            print(f"  [TRADE] STALE market order discarded ({age:.1f}s old, broker time): {order['symbol']}")
             _report(order_id, None, "CANCELLED", f"Market order stale ({age:.1f}s) — resubmit")
             return
     mt5_sym  = _api_to_mt5(order["symbol"])

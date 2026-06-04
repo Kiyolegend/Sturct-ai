@@ -259,12 +259,16 @@ async def get_pair_sweep():
     results = await asyncio.gather(*tasks)
     pairs: dict[str, dict] = {}
     shifts: list[dict] = []
+    sweep_broker_ts: int = 0
     with _env_lock:
         for symbol, env in results:
             if "error" in env:
                 pairs[symbol] = env
                 continue
             pairs[symbol] = env
+            env_broker_ts = int(env.get("broker_time", 0)) or int(time.time())
+            if env_broker_ts > sweep_broker_ts:
+                sweep_broker_ts = env_broker_ts
             # ── Shift detection ───────────────────────────────────────────────
             if symbol not in _env_history:
                 _env_history[symbol] = deque(maxlen=30)
@@ -278,7 +282,7 @@ async def get_pair_sweep():
                         "from":      prev["scalp"],
                         "to":        env["scalp"],
                         "reason":    env["scalp_reason"],
-                        "timestamp": broker_ts,
+                        "timestamp": env_broker_ts,
                     })
                 if prev.get("limit") != env.get("limit"):
                     shifts.append({
@@ -287,17 +291,17 @@ async def get_pair_sweep():
                         "from":      prev["limit"],
                         "to":        env["limit"],
                         "reason":    env["limit_reason"],
-                        "timestamp": broker_ts,
+                        "timestamp": env_broker_ts,
                     })
             _env_history[symbol].append({
                 "scalp":     env.get("scalp"),
                 "limit":     env.get("limit"),
-                "timestamp": broker_ts,
+                "timestamp": env_broker_ts,
             })
     return {
         "pairs":     pairs,
         "shifts":    shifts,
-        "timestamp": broker_ts,
+        "timestamp": sweep_broker_ts or int(time.time()),
     }
 @router.get("/environment-history")
 async def get_environment_history(symbol: str = Query(default="USD/JPY")):
