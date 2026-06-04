@@ -42,12 +42,12 @@ SCAN_SYMBOLS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"]
 
 
 
-def _get_news_status(symbol: str) -> tuple[bool, str]:
+def _get_news_status(symbol: str, broker_ts: int = 0) -> tuple[bool, str]:
     """Returns (blocked, reason) from the Repo 3 news service. Fails silently."""
     try:
         r = requests.get(
             f"{NEWS_SERVICE_URL}/api/impact/symbol",
-            params={"pair": symbol},
+            params={"pair": symbol, **({"at": broker_ts} if broker_ts else {})},
             timeout=2,
         )
         data = r.json()
@@ -151,7 +151,7 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
         pass
 
     # ── News status ───────────────────────────────────────────────────────────
-    news_blocked, news_reason = _get_news_status(symbol)
+    news_blocked, news_reason = _get_news_status(symbol, broker_ts=broker_ts)
 
     # ── Generate narrative ────────────────────────────────────────────────────
     narrative = generate_narrative(
@@ -234,7 +234,7 @@ async def get_pair_sweep():
                     ]
             except Exception:
                 pass
-            news_blocked, news_reason = _get_news_status(symbol)
+            news_blocked, news_reason = _get_news_status(symbol, broker_ts=broker_ts)
             env = build_environment(
                 current_price=current_price,
                 pip_size=pip_size,
