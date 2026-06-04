@@ -351,4 +351,22 @@ export function usePairSweep(intervalMs = 20000) {
   });
 }
 
+export interface BrokerTimeResponse {
+  broker_time: number;
+}
+
+export function useBrokerTime() {
+  return useQuery<BrokerTimeResponse, Error>({
+    queryKey: ["broker-time"],
+    queryFn: async () => {
+      const res = await fetch("/trading-api/mt5/server-time");
+      if (!res.ok) throw new Error("Broker time error");
+      return res.json();
+    },
+    refetchInterval: 30 * 1000,
+    retry: 1,
+    staleTime: 25 * 1000,
+  });
+}
+
 

@@ -9,8 +9,12 @@ import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
 import { MarketNarrative } from "@/components/MarketNarrative";
 
-import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch } from "@/hooks/use-trading-api";
+import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch, useBrokerTime } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
+
+const { data: brokerTimeData } = useBrokerTime();
+const brokerNow = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
+
 
 const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
   "5m":  10 * 60,
@@ -73,8 +77,8 @@ export function Dashboard() {
     if (!data?.candles || data.candles.length === 0) return false;
     const lastCandle = data.candles[data.candles.length - 1];
     const threshold  = MARKET_CLOSED_THRESHOLDS[timeframe] ?? 600;
-    return (Math.floor(Date.now() / 1000) - lastCandle.time) > threshold;
-  }, [data, timeframe]);
+    return (brokerNow - lastCandle.time) > threshold;
+  }, [data, timeframe, brokerNow]);
 
   const displaySymbol = symbol.replace("/", "");
 

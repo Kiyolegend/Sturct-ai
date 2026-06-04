@@ -15,7 +15,7 @@ from ws_manager import broadcast
 
 
 
-from services.mt5_store import store_candles, status as mt5_status, VALID_INTERVALS
+from services.mt5_store import store_candles, status as mt5_status, get_latest_timestamp, VALID_INTERVALS
 
 router = APIRouter()
 
@@ -84,3 +84,11 @@ async def mt5_push(
 @router.get("/mt5/status")
 async def mt5_status_endpoint():
     return mt5_status()
+
+
+
+@router.get("/mt5/server-time")
+async def mt5_server_time():
+    """Returns last broker candle timestamp. Frontend uses this instead of Date.now()."""
+    ts = get_latest_timestamp()
+    return {"broker_time": ts if ts is not None else int(time.time())}

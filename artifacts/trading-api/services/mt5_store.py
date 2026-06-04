@@ -65,3 +65,12 @@ def status() -> dict:
         "last_contact_secs_ago": age,
         "frames": frames,
     }
+def get_latest_timestamp() -> int | None:
+    """Return the most recent broker candle timestamp across all stored frames."""
+    best: int | None = None
+    for frame in _store.values():
+        if frame.df is not None and len(frame.df) > 0:
+            ts = int(frame.df.iloc[-1]["time"].timestamp())
+            if best is None or ts > best:
+                 best = ts
+    return best

@@ -16,6 +16,7 @@ import {
   useSRLevels,
   useTradingAnalysis,
   useNewsStatus,
+  useBrokerTime,
 } from "@/hooks/use-trading-api";
 import { detectOrderBlocks, detectFVGs, pipSize } from "@/components/TradingChart";
 
@@ -78,6 +79,9 @@ export function FrameworkPanel({ symbol }: Props) {
   const { data: data1h }   = useTradingAnalysis(symbol, "1h",  150);
   const { data: data15m }  = useTradingAnalysis(symbol, "15m", 200);
   const { data: data5m }   = useTradingAnalysis(symbol, "5m",  100);
+
+  const { data: brokerTimeData } = useBrokerTime();
+  const brokerNow = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
 
   const bias4h  = (mtf?.bias_4h.trend  ?? "neutral") as Bias;
   const bias1h  = (mtf?.bias_1h.trend  ?? "neutral") as Bias;
@@ -175,27 +179,27 @@ export function FrameworkPanel({ symbol }: Props) {
 
   const choch15m = useMemo(() => {
     if (!data15m?.choch) return null;
-    const now = Math.floor(Date.now() / 1000);
+    
     return data15m.choch
-      .filter((c: any) => c.direction === dir && c.time >= now - 3 * 3600)
+      .filter((c: any) => c.direction === dir && c.time >= brokerNow - 3 * 3600)
       .sort((a: any, b: any) => b.time - a.time)[0] ?? null;
-  }, [data15m, dir]);
+  }, [data15m, dir, brokerNow]);
 
   const bos15m = useMemo(() => {
     if (!data15m?.bos) return null;
-    const now = Math.floor(Date.now() / 1000);
+    
     return data15m.bos
-      .filter((b: any) => b.direction === dir && b.time >= now - 2 * 3600)
+      .filter((b: any) => b.direction === dir && b.time >= brokerNow - 2 * 3600)
       .sort((a: any, b: any) => b.time - a.time)[0] ?? null;
-  }, [data15m, dir]);
+  }, [data15m, dir, brokerNow]);
 
   const bos5m = useMemo(() => {
     if (!data5m?.bos) return null;
-    const now = Math.floor(Date.now() / 1000);
+    
     return data5m.bos
-      .filter((b: any) => b.direction === dir && b.time >= now - 30 * 60)
+      .filter((b: any) => b.direction === dir && b.time >= brokerNow - 30 * 60)
       .sort((a: any, b: any) => b.time - a.time)[0] ?? null;
-  }, [data5m, dir]);
+  }, [data5m, dir, brokerNow]);
 
   const sl5m = useMemo(() => {
     if (!data5m?.structure_labels?.length || !hasDir) return null;
@@ -323,7 +327,7 @@ export function FrameworkPanel({ symbol }: Props) {
 
   const fmt  = (p: number) => p > 50 ? p.toFixed(3) : p.toFixed(5);
   const pips = (a: number, b: number) => Math.round(Math.abs(a - b) / pip);
-  const ago  = (t: number) => Math.round((Date.now() / 1000 - t) / 60);
+  const ago  = (t: number) => Math.round((brokerNow - t) / 60);
 
   const invalidReason: string | null = useMemo(() => {
     if (mode === "scalp") {
