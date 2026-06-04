@@ -278,7 +278,7 @@ async def get_pair_sweep():
                         "from":      prev["scalp"],
                         "to":        env["scalp"],
                         "reason":    env["scalp_reason"],
-                        "timestamp": int(time.time()),
+                        "timestamp": broker_ts,
                     })
                 if prev.get("limit") != env.get("limit"):
                     shifts.append({
@@ -287,17 +287,17 @@ async def get_pair_sweep():
                         "from":      prev["limit"],
                         "to":        env["limit"],
                         "reason":    env["limit_reason"],
-                        "timestamp": int(time.time()),
+                        "timestamp": broker_ts,
                     })
             _env_history[symbol].append({
                 "scalp":     env.get("scalp"),
                 "limit":     env.get("limit"),
-                "timestamp": int(time.time()),
+                "timestamp": broker_ts,
             })
     return {
         "pairs":     pairs,
         "shifts":    shifts,
-        "timestamp": int(time.time()),
+        "timestamp": broker_ts,
     }
 @router.get("/environment-history")
 async def get_environment_history(symbol: str = Query(default="USD/JPY")):

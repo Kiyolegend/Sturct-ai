@@ -226,10 +226,14 @@ def _execute_order(order: dict):
     # Discard MARKET orders that sat in queue too long — price may have moved
     age = time.time() - order.get("queued_at", 0)
     if order.get("order_type") == "MARKET" and age > 10:
-        print(f"  [TRADE] STALE market order discarded ({age:.1f}s old): {order['symbol']}")
-        _report(order_id, None, "CANCELLED", f"Market order stale ({age:.1f}s) — resubmit")
-        return
-
+        mt5_sym_check = _api_to_mt5(order.get("symbol", ""))
+        tick_check = mt5.symbol_info_tick(mt5_sym_check) if mt5_sym_check else None
+        broker_now = tick_check.time if tick_check else 0
+        age = broker_now - queued_at if broker_now > 0 else 0
+        if age > 10:
+            print(f"  [TRADE] STALE market order discarded ({age:.1f}s old): {order['symbol']}")
+            _report(order_id, None, "CANCELLED", f"Market order stale ({age:.1f}s) — resubmit")
+            return
     mt5_sym  = _api_to_mt5(order["symbol"])
     
     if not mt5_sym:
@@ -382,8 +386,9 @@ def run():
     consecutive_errors = 0
 
     while True:
-        now = datetime.datetime.now().strftime("%H:%M:%S")
-        print(f"\n[{now}] Pushing data...")
+        tick_t = mt5.symbol_info_tick(SYMBOLS[0]["mt5_name"])
+        broker_hms = datetime.datetime.fromtimestamp(_tick_t.time, tz=datetime.timezone.utc).strftime("%H:%M:%S UTC") if _tick_t else "??:??:?? UTC"
+        print(f"\n[{broker_hms}] Pushing data...")
 
         if mt5.terminal_info() is None:
             print("MT5 connection lost, reconnecting...")
