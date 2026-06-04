@@ -388,7 +388,7 @@ def run():
 
     while True:
         tick_t = mt5.symbol_info_tick(SYMBOLS[0]["mt5_name"])
-        broker_hms = datetime.datetime.fromtimestamp(_tick_t.time, tz=datetime.timezone.utc).strftime("%H:%M:%S UTC") if _tick_t else "??:??:?? UTC"
+        broker_hms = datetime.datetime.fromtimestamp(tick_t.time, tz=datetime.timezone.utc).strftime("%H:%M:%S UTC") if tick_t else "??:??:?? UTC"
         print(f"\n[{broker_hms}] Pushing data...")
 
         if mt5.terminal_info() is None:

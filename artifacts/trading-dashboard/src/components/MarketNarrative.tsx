@@ -90,8 +90,9 @@ function qualityColor(q: "High" | "Medium" | "Low") {
 function fmtPrice(p: number, ref: number) {
   return p.toFixed(ref > 50 ? 3 : 5);
 }
-function secAgo(ts: number) {
-  const s = Math.floor(Date.now() / 1000) - ts;
+function secAgo(ts: number, brokerNowSecs?: number) {
+  const s = (brokerNowSecs ?? Math.floor(Date.now() / 1000)) - ts;
+  if (s < 0) return "just now";
   if (s < 60)   return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   return `${Math.floor(s / 3600)}h ago`;
@@ -518,7 +519,7 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
 
               <div style={{ marginTop: 4, textAlign: "right" }}>
                 <span style={{ fontSize: 5.5, color: "#1e293b" }}>
-                  {secAgo(n.generated_at)}
+                  {secAgo(n.generated_at, n.broker_time)}
                 </span>
               </div>
             </>
