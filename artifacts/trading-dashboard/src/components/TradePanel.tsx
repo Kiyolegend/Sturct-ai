@@ -47,6 +47,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   const [resultOk,         setResultOk]         = useState(false);
   const [positions,        setPositions]        = useState<Position[]>([]);
   const [chartClickTarget, setChartClickTarget] = useState<'entry' | 'sl' | 'tp' | null>(null);
+  const [wasPrefilled, setWasPrefilled] = useState(false);
 
   // Auto-update SL/TP when direction or symbol changes
   useEffect(() => {
@@ -61,6 +62,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     setDirection(prefill.direction);
     setSL(prefill.sl.toFixed(DEC(currentPrice)));
     setTP(prefill.tp.toFixed(DEC(currentPrice)));
+    setWasPrefilled(true);
     onPrefillConsumed?.();
   }, [prefill]);
 
@@ -82,6 +84,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
       setTP(defaultTP(clickedPrice, direction).toFixed(DEC(clickedPrice)));
     }
     setChartClickTarget(null);
+    setWasPrefilled(false);
     onClickedPriceConsumed?.();
   }, [clickedPrice]);
 
@@ -245,7 +248,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
       {stage === "form" && (
         <div className="flex flex-col gap-2">
           {/* Scalp pre-fill banner */}
-          {prefill && (
+          {wasPrefilled && (
             <div className="text-[10px] text-teal-400 bg-teal-500/10 rounded px-2 py-1 border border-teal-500/20 font-semibold">
               ⚡ SCALP PRE-FILLED — verify SL/TP then click execute
             </div>
