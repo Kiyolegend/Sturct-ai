@@ -243,7 +243,7 @@ def compute_framework_status(
 
     bos_5m_list = [
         b for b in (r5m.get("bos") or [])
-        if b.get("direction") == direction and b.get("time", 0) >= broker_ts - 30 * 60
+        if b.get("direction") == direction and b.get("time", 0) >= broker_ts - 45 * 60
     ]
     bos_5m = max(bos_5m_list, key=lambda b: b["time"]) if bos_5m_list else None
 
@@ -266,7 +266,8 @@ def compute_framework_status(
             sl5m = float(candidates[-1]["price"])
     except Exception:
         sl5m = None
-            # ── sl15m from 15M structure labels (FrameworkPanel.tsx slLow / slHigh) ───
+
+    # ── sl15m from 15M structure labels (FrameworkPanel.tsx slLow / slHigh) ───
     sl15m: Optional[float] = None
     try:
         labels_15m = r15m.get("structure_labels") or []
@@ -279,8 +280,7 @@ def compute_framework_status(
     except Exception:
         sl15m = None
 
-
-    # ── Retrace % gate (38–78% of last 4H swing) ─────────────────────────────
+    # ── Retrace % gate (38–70% of last 4H swing) ─────────────────────────────
     trend_4h  = r4h.get("trend") or {}
     hi_price  = trend_4h.get("last_high_price")
     lo_price  = trend_4h.get("last_low_price")
@@ -293,12 +293,11 @@ def compute_framework_status(
                 else ((current_price - lo_price) / leg_size * 100)
             )
             retrace_pct = round(raw_pct)
-            retrace_gate = 38 <= retrace_pct <= 78
+            retrace_gate = 38 <= retrace_pct <= 70
 
     # ── Setup (entry / SL / TP / RR) ─────────────────────────────────────────
     def _setup(mode: str) -> dict:
         zone = (ob1h or fvg1h or zone1h) if mode == "limit" else None
-        # Fix 1 — Entry 30% inside zone (matches FrameworkPanel.tsx)
         zone_width = (zone["top"] - zone["bottom"]) if zone else 0
         entry_p = (
             (zone["bottom"] + zone_width * 0.30 if is_bull else zone["top"] - zone_width * 0.30)
@@ -307,7 +306,6 @@ def compute_framework_status(
 
         if mode == "limit" and zone:
             zone15 = ob15m or fvg15m
-            # Fix 2 — Adaptive SL: max(10 pips, zone_width × 0.25)
             sl_buffer = max(10 * pip, zone_width * 0.25)
             sl_1h  = (zone["bottom"] - sl_buffer) if is_bull else (zone["top"] + sl_buffer)
             if zone15:
@@ -340,7 +338,6 @@ def compute_framework_status(
             tp_cands = sorted(
                 [l for l in sr_f if l.get("kind") == "support" and l["price"] < entry_p],
                 key=lambda l: -l["price"])
-        # Pair-aware TP fallback: JPY=60, EUR/GBP=40, AUD/CHF=30
         fb_pips = 60 if "JPY" in symbol else (40 if ("GBP" in symbol or "EUR" in symbol) else 30)
         tp_p = tp_cands[0]["price"] if tp_cands else (
             entry_p + fb_pips * pip if is_bull else entry_p - fb_pips * pip)

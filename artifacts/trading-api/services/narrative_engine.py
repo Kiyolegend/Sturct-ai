@@ -192,6 +192,251 @@ def _structure_summary(
     return lines
 
 
+# ── Swing Context ─────────────────────────────────────────────────────────────
+
+def _swing_context(
+    hi_price: float | None,
+    lo_price: float | None,
+    current_price: float,
+    bias_4h: str,
+    pip_size: float,
+) -> dict:
+    """
+    Returns plain-English description of where price is in the 4H swing.
+    Tells the trader: how far has the pullback gone? Am I in the entry window?
+    """
+    if not hi_price or not lo_price or not current_price:
+        return {}
+
+    leg_size = hi_price - lo_price
+    if leg_size <= 0:
+        return {}
+
+    is_bull = bias_4h == "bullish"
+    leg_pips = round(leg_size / pip_size)
+
+    if is_bull:
+        retrace_pct = round(((hi_price - current_price) / leg_size) * 100)
+    else:
+        retrace_pct = round(((current_price - lo_price) / leg_size) * 100)
+
+    in_window = 38 <= retrace_pct <= 70
+
+    if retrace_pct < 20:
+        desc = (
+            f"The 4H leg covered {leg_pips} pips. Price has barely pulled back "
+            f"({retrace_pct}% retrace) — momentum is still running. "
+            f"Not a great entry zone yet."
+        )
+    elif retrace_pct < 38:
+        desc = (
+            f"The 4H leg covered {leg_pips} pips. Price is at a {retrace_pct}% retrace — "
+            f"approaching the Fibonacci entry window (38%) but not there yet. "
+            f"Watch but wait."
+        )
+    elif retrace_pct <= 70:
+        desc = (
+            f"The 4H leg covered {leg_pips} pips. Price is at a {retrace_pct}% retrace — "
+            f"inside the Fibonacci entry window (38–70%). "
+            f"This is the zone to look for entries."
+        )
+    elif retrace_pct <= 85:
+        desc = (
+            f"The 4H leg covered {leg_pips} pips. Price has retraced {retrace_pct}% — "
+            f"deeper than ideal (above 70%). Setup is lower conviction. "
+            f"Tighten your criteria before entering."
+        )
+    else:
+        desc = (
+            f"The 4H leg covered {leg_pips} pips. Price has retraced {retrace_pct}% — "
+            f"this deep a pullback suggests the move may be reversing entirely. "
+            f"Do not trade in the original direction."
+        )
+
+    return {
+        "leg_pips":    leg_pips,
+        "retrace_pct": retrace_pct,
+        "in_window":   in_window,
+        "description": desc,
+    }
+
+
+# ── Strongest Level ───────────────────────────────────────────────────────────
+
+def _strongest_level(
+    sr_levels: list,
+    zones: list,
+    current_price: float,
+    bias_4h: str,
+    pip_size: float,
+) -> dict:
+    """
+    Identifies the single most important level for the trader to watch.
+    For bulls → strongest support below. For bears → strongest resistance above.
+    Returns plain-English description.
+    """
+    if bias_4h == "neutral":
+        return {}
+
+    is_bull = bias_4h == "bullish"
+    candidates: list[dict] = []
+
+    for lvl in (sr_levels or []):
+        p = lvl.get("price")
+        if not isinstance(p, (int, float)):
+            continue
+        if is_bull and p >= current_price:
+            continue
+        if not is_bull and p <= current_price:
+            continue
+        score   = lvl.get("score", 1)
+        touches = lvl.get("touches", 1)
+        tf      = lvl.get("timeframe", "")
+        tf_weight = {"4h": 3, "1h": 2, "15m": 1}.get(tf, 1)
+        importance = (score * 2) + (touches * 1.5) + (tf_weight * 2)
+        pips = abs(p - current_price) / pip_size
+        candidates.append({
+            "price":      round(p, 5),
+            "kind":       lvl.get("kind", "level"),
+            "timeframe":  tf.upper(),
+            "touches":    touches,
+            "pips_away":  round(pips),
+            "importance": importance,
+            "source":     "S/R",
+        })
+
+    for zone in (zones or []):
+        top    = zone.get("top", 0)
+        bottom = zone.get("bottom", 0)
+        if not top or not bottom:
+            continue
+        center = (top + bottom) / 2
+        if is_bull and center >= current_price:
+            continue
+        if not is_bull and center <= current_price:
+            continue
+        tf        = zone.get("timeframe", "")
+        tf_weight = {"4h": 3, "1h": 2, "15m": 1}.get(tf, 1)
+        strength  = zone.get("strength", 1)
+        importance = (strength * 2) + (tf_weight * 3)
+        pips = abs(center - current_price) / pip_size
+        candidates.append({
+            "price":      round(center, 5),
+            "kind":       "zone",
+            "timeframe":  tf.upper(),
+            "pips_away":  round(pips),
+            "importance": importance,
+            "source":     "Zone",
+            "range":      [round(bottom, 5), round(top, 5)],
+        })
+
+    if not candidates:
+        return {}
+
+    best = max(candidates, key=lambda x: x["importance"])
+    tf_label    = best["timeframe"] or "Key"
+    kind_label  = "Order Block / Zone" if best["source"] == "Zone" else best["kind"].capitalize()
+    pips        = best["pips_away"]
+    side_word   = "below" if is_bull else "above"
+    action_word = "support" if is_bull else "resistance"
+
+    best["description"] = (
+        f"The strongest level is the {tf_label} {kind_label} at {best['price']} — "
+        f"{pips} pips {side_word} current price. "
+        f"This is the key {action_word} zone where institutional interest is most likely. "
+        f"{'Watch for a bounce here for longs.' if is_bull else 'Watch for a rejection here for shorts.'}"
+    )
+    return best
+
+
+# ── Watch For ─────────────────────────────────────────────────────────────────
+
+def _watch_for(
+    condition: str,
+    bias_4h: str,
+    bias_1h: str,
+    bias_15m: str,
+    choch_15m: list,
+    bos_5m: list,
+    broker_ts: float,
+) -> str:
+    """
+    Returns one plain-English sentence telling the trader exactly what to wait for
+    before committing to a trade.
+    """
+    now = broker_ts or time.time()
+    is_bull = bias_4h == "bullish"
+    is_bear = bias_4h == "bearish"
+
+    if condition in ("Consolidation", "Range"):
+        return (
+            "Wait for price to break and close a full candle outside the current range "
+            "on the 1H timeframe before considering any directional trade."
+        )
+
+    if condition == "Expansion":
+        if is_bull:
+            return (
+                "Momentum is running — do not chase. Wait for a 15M pullback and a fresh "
+                "5M bullish BOS above the most recent swing high before re-entering."
+            )
+        return (
+            "Momentum is running — do not chase. Wait for a 15M bounce and a fresh "
+            "5M bearish BOS below the most recent swing low before re-entering."
+        )
+
+    if condition == "Distribution":
+        return (
+            "Conflicting timeframes — wait for the 4H to close a new high (confirming continuation) "
+            "or the 1H to break its recent low (confirming reversal) before committing."
+        )
+
+    if condition == "Accumulation":
+        return (
+            "Conflicting timeframes — wait for the 1H to print a clear higher high above the "
+            "last 1H swing high before trusting the long side."
+        )
+
+    recent_bos = any(now - b.get("time", 0) <= 90 * 60 for b in bos_5m)
+
+    if is_bull:
+        if bias_15m in ("bearish", "neutral"):
+            return (
+                "15M is pulling back into the trend. Wait for a 15M bullish CHoCH or a fresh "
+                "5M bullish BOS near the key support level — that is your entry signal."
+            )
+        if recent_bos:
+            return (
+                "5M bullish BOS is active. Watch for price to hold above the BOS level on the "
+                "next 5M dip — that confirms momentum is real. Enter on the pullback."
+            )
+        return (
+            "Structure is bullish but no fresh 5M trigger yet. Wait for a 5M bullish BOS "
+            "above the last swing high to confirm momentum before entering."
+        )
+
+    if is_bear:
+        if bias_15m in ("bullish", "neutral"):
+            return (
+                "15M is bouncing into the trend. Wait for a 15M bearish CHoCH or a fresh "
+                "5M bearish BOS near the key resistance level — that is your entry signal."
+            )
+        if recent_bos:
+            return (
+                "5M bearish BOS is active. Watch for price to hold below the BOS level on the "
+                "next 5M bounce — that confirms momentum is real. Enter on the bounce."
+            )
+        return (
+            "Structure is bearish but no fresh 5M trigger yet. Wait for a 5M bearish BOS "
+            "below the last swing low to confirm momentum before entering."
+        )
+
+    return (
+        "No clear directional structure. Wait for the 4H to establish a trend before "
+        "looking for any entries."
+    )
+
+
 # ── Key Levels ────────────────────────────────────────────────────────────────
 
 def _key_levels(
@@ -331,24 +576,20 @@ def _trade_readiness(
         }
 
     # ── Build 5-condition checklist ──────────────────────────────────────────
-    # 1. HTF alignment
     htf_met = True
 
-    # 2. 15M pullback / pause structure
     recent_choch = [c for c in choch_15m if now - c.get("time", 0) <= 4 * 3600]
     pullback_met = (
         (direction == "long"  and (bias15m in ("neutral", "bearish") or any(c.get("direction") == "bearish" for c in recent_choch))) or
         (direction == "short" and (bias15m in ("neutral", "bullish") or any(c.get("direction") == "bullish" for c in recent_choch)))
     )
 
-    # 3. 5M BOS in trade direction (last 90 min)
     bos_dir = "bullish" if direction == "long" else "bearish"
     bos_met = any(
         b.get("direction") == bos_dir and now - b.get("time", 0) <= 90 * 60
         for b in bos_5m
     )
 
-    # 4. Key level nearby (within 15 pips)
     threshold = 15 * pip_size
     level_met = False
     for lvl in (sr_levels or []):
@@ -365,7 +606,6 @@ def _trade_readiness(
                     level_met = True
                     break
 
-    # 5. Active session
     session_met = in_session
 
     conditions = [
@@ -472,10 +712,11 @@ def generate_narrative(
     news_blocked:  bool,
     news_reason:   str,
     broker_ts:     float = 0,
+    hi_4h:         float | None = None,
+    lo_4h:         float | None = None,
 ) -> dict:
     pip_size = pip_size or 0.0001
     now = broker_ts or time.time()
-
 
     # Near-level flags for condition classifier
     threshold = 20 * pip_size
@@ -494,7 +735,7 @@ def generate_narrative(
         bias_4h, bias_1h, bias_15m, bos_5m, choch_15m, near_res, near_sup, broker_ts=now,
     )
 
-    structure  = _structure_summary(bias_4h, bias_1h, bias_15m, choch_15m, bos_5m,  broker_ts=now,)
+    structure  = _structure_summary(bias_4h, bias_1h, bias_15m, choch_15m, bos_5m, broker_ts=now)
     key_levels = _key_levels(sr_levels, zones, current_price, pip_size)
     session    = _session_context(sessions)
     readiness  = _trade_readiness(
@@ -503,6 +744,10 @@ def generate_narrative(
         sr_levels, zones, current_price, pip_size, news_blocked, broker_ts=now,
     )
     confidence = _confidence(readiness, bias_4h, bias_1h, bias_15m)
+
+    swing_ctx      = _swing_context(hi_4h, lo_4h, current_price, bias_4h, pip_size)
+    strongest_lvl  = _strongest_level(sr_levels, zones, current_price, bias_4h, pip_size)
+    watch_for_text = _watch_for(condition, bias_4h, bias_1h, bias_15m, choch_15m, bos_5m, now)
 
     return {
         "symbol":           symbol,
@@ -514,15 +759,20 @@ def generate_narrative(
         "session":          session,
         "trade_readiness":  readiness,
         "confidence":       confidence,
+        "swing_context":    swing_ctx,
+        "strongest_level":  strongest_lvl,
+        "watch_for":        watch_for_text,
         "news": {
             "blocked": news_blocked,
             "reason":  news_reason,
         },
         "broker_time":  int(now),
-        "generated_at": int(now), 
+        "generated_at": int(time.time()),
     }
 
-    # ── Environment Evaluator ─────────────────────────────────────────────────────
+
+# ── Environment Evaluator ─────────────────────────────────────────────────────
+
 def build_environment(
     current_price: float,
     pip_size: float,
@@ -536,29 +786,28 @@ def build_environment(
     news_blocked: bool,
     news_reason: str,
     broker_ts: float = 0,
-
 ) -> dict:
     """
     Returns Scalp and Limit environment ratings for one symbol.
     Ratings: "Favorable" | "Mixed" | "Unfavorable"
     No trade signals — only describes market conditions.
     """
-    
     now = broker_ts or time.time()
-    # ── Helpers ───────────────────────────────────────────────────────────────
+
     def recent_choch(hours: float = 4) -> bool:
         cutoff = now - hours * 3600
         return any(c.get("time", 0) >= cutoff for c in choch_15m)
+
     def recent_bos(hours: float = 1) -> bool:
         cutoff = now - hours * 3600
         return any(b.get("time", 0) >= cutoff for b in bos_5m)
+
     def aligned_tfs() -> int:
-        """How many of the 3 TFs agree on direction."""
         directions = [bias_4h, bias_1h, bias_15m]
         bull = directions.count("bullish")
         bear = directions.count("bearish")
         return max(bull, bear)
-    # ── Nearest S/R level distance in pips ────────────────────────────────────
+
     nearest_pips: float | None = None
     nearest_label: str = ""
     level_warning: str | None = None
@@ -578,12 +827,12 @@ def build_environment(
             nearest_label = f"{tf_label} {side}"
             if nearest_pips <= 10:
                 level_warning = f"Price {nearest_pips:.0f} pips from {nearest_label}"
-    # ── Session quality ────────────────────────────────────────────────────────
+
     active = [s.lower() for s in sessions]
-    prime_session  = any(s in active for s in ("london",  "ny"))
-    dead_session   = not active  # no recognised session active
-    # ── SCALP environment ─────────────────────────────────────────────────────
-    scalp_issues:   list[str] = []
+    prime_session = any(s in active for s in ("london", "ny"))
+    dead_session  = not active
+
+    scalp_issues:    list[str] = []
     scalp_positives: list[str] = []
     if news_blocked:
         scalp_issues.append(f"news block active — {news_reason}")
@@ -598,7 +847,6 @@ def build_environment(
         scalp_issues.append("no clear multi-TF alignment")
     if prime_session:
         scalp_positives.append("prime session active")
-    # Fresh CHoCH = structure is transitioning; mixed for scalp (not blocked)
     fresh_choch = recent_choch(hours=2)
     if fresh_choch:
         scalp_issues.append("fresh CHoCH — structure transitioning")
@@ -613,17 +861,15 @@ def build_environment(
     else:
         scalp_rating = "Unfavorable"
         scalp_reason = scalp_issues[0]
-    # ── LIMIT environment ─────────────────────────────────────────────────────
+
     limit_issues:    list[str] = []
     limit_positives: list[str] = []
     if news_blocked:
         limit_issues.append(f"news block — {news_reason}")
-    # Strong momentum = limit orders get blown through
     if alignment == 3 and recent_bos(hours=0.5):
         limit_issues.append("strong expansion momentum — limits may be blown through")
     elif alignment >= 2:
         limit_positives.append("clear directional bias present")
-    # Distance logic
     if nearest_pips is None:
         limit_issues.append("no meaningful S/R level nearby")
     elif nearest_pips <= 5:
@@ -632,7 +878,6 @@ def build_environment(
         limit_positives.append(f"level {nearest_pips:.0f} pips away")
     else:
         limit_issues.append(f"nearest level {nearest_pips:.0f} pips away — too distant")
-    # CHoCH: fresh = mixed for limits (level may not hold), not unfavorable
     if fresh_choch and alignment < 2:
         limit_issues.append("conflicting structure during CHoCH — level reliability reduced")
     elif fresh_choch:
@@ -646,6 +891,7 @@ def build_environment(
     else:
         limit_rating = "Unfavorable"
         limit_reason = limit_issues[0]
+
     return {
         "scalp":         scalp_rating,
         "scalp_reason":  scalp_reason,
@@ -653,5 +899,3 @@ def build_environment(
         "limit_reason":  limit_reason,
         "level_warning": level_warning,
     }
-
-

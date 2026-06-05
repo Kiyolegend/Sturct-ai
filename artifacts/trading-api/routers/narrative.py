@@ -13,10 +13,7 @@ import requests
 import threading
 from collections import deque
 
-
-
 from fastapi import APIRouter, HTTPException, Query
-
 
 from services.data_service import fetch_ohlc
 from services.zigzag_engine import detect_swings
@@ -34,16 +31,13 @@ router = APIRouter()
 NEWS_SERVICE_URL = os.environ.get("NEWS_SERVICE_URL", "http://localhost:5003")
 
 # ── In-memory environment history (for shift detection) ──────────────────────
-# Stores last 30 snapshots per symbol: {"USD/JPY": deque([{...}, {...}], maxlen=30)}
 _env_history: dict[str, deque] = {}
 _env_lock = threading.Lock()
 SCAN_SYMBOLS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"]
 
 
-
-
 def _get_news_status(symbol: str, broker_ts: int = 0) -> tuple[bool, str]:
-    """Returns (blocked, reason) from the Repo 3 news service. Fails silently."""
+    """Returns (blocked, reason) from the news service. Fails silently."""
     try:
         r = requests.get(
             f"{NEWS_SERVICE_URL}/api/impact/symbol",
@@ -69,7 +63,7 @@ async def _analyse_timeframe(symbol: str, interval: str, outputsize: int) -> dic
         bos           = detect_bos(df, swings, labels, trend["trend"])
         choch         = detect_choch(df, swings, labels, trend["trend"])
         zones         = detect_zones(swings, interval, float(df["close"].iloc[-1]))
-                # Convert structure labels to serialisable dicts for framework checker
+
         labels_out: list[dict] = []
         try:
             for s in labels:
@@ -120,9 +114,14 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
     pip_size = 0.01 if current_price > 50 else 0.0001
 
     # ── Extract analysis fields ───────────────────────────────────────────────
-    bias_4h  = (r4h.get("trend")  or {}).get("trend",  "neutral")
+    trend_4h = r4h.get("trend") or {}
+    bias_4h  = trend_4h.get("trend",  "neutral")
     bias_1h  = (r1h.get("trend")  or {}).get("trend",  "neutral")
     bias_15m = (r15m.get("trend") or {}).get("trend",  "neutral")
+
+    # 4H swing hi/lo for retrace context
+    hi_4h = trend_4h.get("last_high_price")
+    lo_4h = trend_4h.get("last_low_price")
 
     bos_5m    = r5m.get("bos",   []) or []
     bos_15m   = r15m.get("bos",  []) or []
@@ -144,19 +143,19 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
     except Exception:
         pass
 
-    # ── Active sessions from 1H data ──────────────────────────────────────────
-        # ── Broker time from last MT5 candle (avoids corrupted PC clock) ──────────
+    # ── Broker time from last MT5 candle ──────────────────────────────────────
     try:
         _df = r5m.get("df") or r15m.get("df") or r1h.get("df")
         broker_ts = int(_df.iloc[-1]["time"].timestamp()) if _df is not None and len(_df) > 0 else int(time.time())
     except Exception:
         broker_ts = int(time.time())
+
+    # ── Active sessions from 1H data ──────────────────────────────────────────
     active_sessions: list[str] = []
     try:
         df_1h = r1h.get("df")
         if df_1h is not None and len(df_1h) > 0:
             all_sess = compute_sessions(df_1h)
-            
             active_sessions = [
                 s["session"]
                 for s in all_sess
@@ -186,9 +185,28 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
         news_blocked=news_blocked,
         news_reason=news_reason,
         broker_ts=float(broker_ts),
+        hi_4h=hi_4h,
+        lo_4h=lo_4h,
     )
 
+    # ── Attach framework status (scalp_ready / limit_ready) ──────────────────
+    try:
+        from services.framework_checker import compute_framework_status
+        fw = compute_framework_status(
+            symbol=symbol, r4h=r4h, r1h=r1h, r15m=r15m, r5m=r5m,
+            broker_ts=broker_ts, sr_levels=sr_levels, news_blocked=news_blocked,
+        )
+        narrative["framework"] = {
+            "scalp_ready": fw["scalp_ready"],
+            "limit_ready": fw["limit_ready"],
+            "scalp_rr":    fw.get("scalp_rr", 0),
+            "limit_rr":    fw.get("limit_rr", 0),
+        }
+    except Exception:
+        narrative["framework"] = None
+
     return narrative
+
 
 @router.get("/pair-sweep")
 async def get_pair_sweep():
@@ -215,7 +233,7 @@ async def get_pair_sweep():
             bias_4h  = (r4h.get("trend")  or {}).get("trend",  "neutral")
             bias_1h  = (r1h.get("trend")  or {}).get("trend",  "neutral")
             bias_15m = (r15m.get("trend") or {}).get("trend",  "neutral")
-            bos_5m   = r5m.get("bos",    []) or []
+            bos_5m    = r5m.get("bos",    []) or []
             choch_15m = r15m.get("choch", []) or []
             sr_levels: list[dict] = []
             try:
@@ -242,13 +260,13 @@ async def get_pair_sweep():
                 df_1h = r1h.get("df")
                 if df_1h is not None and len(df_1h) > 0:
                     all_sess = compute_sessions(df_1h)
-                    
                     active_sessions = [
                         s["session"] for s in all_sess
                         if s.get("start_time", 0) <= broker_ts <= s.get("end_time", 0) + 300
                     ]
             except Exception:
                 pass
+
             news_blocked, news_reason = _get_news_status(symbol, broker_ts=broker_ts)
             env = build_environment(
                 current_price=current_price,
@@ -269,7 +287,7 @@ async def get_pair_sweep():
             return symbol, env
         except Exception as e:
             return symbol, {"error": str(e)}
-    # Run all 5 pairs in parallel
+
     tasks = [_evaluate_one(sym) for sym in SCAN_SYMBOLS]
     results = await asyncio.gather(*tasks)
     pairs: dict[str, dict] = {}
@@ -281,10 +299,9 @@ async def get_pair_sweep():
                 pairs[symbol] = env
                 continue
             pairs[symbol] = env
-            env_broker_ts = int(env.get("broker_time", 0)) or int(time.time())
+            env_broker_ts = broker_ts if (broker_ts := int(env.get("broker_time", 0))) else int(time.time())
             if env_broker_ts > sweep_broker_ts:
                 sweep_broker_ts = env_broker_ts
-            # ── Shift detection ───────────────────────────────────────────────
             if symbol not in _env_history:
                 _env_history[symbol] = deque(maxlen=30)
             history = _env_history[symbol]
@@ -318,12 +335,15 @@ async def get_pair_sweep():
         "shifts":    shifts,
         "timestamp": sweep_broker_ts or int(time.time()),
     }
+
+
 @router.get("/environment-history")
 async def get_environment_history(symbol: str = Query(default="USD/JPY")):
     """Returns the last 30 environment snapshots for shift trend display."""
     with _env_lock:
         history = list(_env_history.get(symbol, []))
     return {"symbol": symbol, "history": history}
+
 
 @router.get("/framework-status")
 async def get_framework_status():

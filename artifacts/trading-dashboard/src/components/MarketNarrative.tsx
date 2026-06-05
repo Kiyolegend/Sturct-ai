@@ -3,10 +3,14 @@
  *
  * Replaces TradeTeller's raw signal codes (S1/BOS/FVG) with analyst-style narrative:
  *   • Market Condition  (Bullish Pullback / Range / Expansion …)
+ *   • Framework Status  (SCALP READY / LIMIT READY if live)
  *   • Structure Summary (4H → 1H → 15M in plain English)
+ *   • Swing Context     (where am I in the 4H move? retrace %)
  *   • Key Levels        (nearest resistance & support with pip distance)
+ *   • Strongest Level   (the one level that matters most right now)
  *   • Session Context   (what to expect right now)
  *   • Trade Readiness   (5-condition checklist, progress bar, action line)
+ *   • Watch For         (plain English: exactly what to wait for before acting)
  *   • Confidence        (market clarity / structure quality / signal %)
  *
  * Data source: GET /trading-api/narrative?symbol=X
@@ -19,8 +23,6 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { ChevronUp, Minus, RefreshCw, AlertTriangle } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-
 
 interface Condition {
   label: string;
@@ -46,6 +48,30 @@ interface KeyLevel {
   range?: [number, number];
 }
 
+interface SwingContext {
+  leg_pips: number;
+  retrace_pct: number;
+  in_window: boolean;
+  description: string;
+}
+
+interface StrongestLevel {
+  price: number;
+  kind: string;
+  timeframe: string;
+  pips_away: number;
+  description: string;
+  source: string;
+  range?: [number, number];
+}
+
+interface Framework {
+  scalp_ready: boolean;
+  limit_ready: boolean;
+  scalp_rr: number;
+  limit_rr: number;
+}
+
 interface Narrative {
   symbol: string;
   price: number;
@@ -61,6 +87,10 @@ interface Narrative {
     signal_confidence: number;
   };
   news: { blocked: boolean; reason: string };
+  swing_context?: SwingContext;
+  strongest_level?: StrongestLevel;
+  watch_for?: string;
+  framework?: Framework | null;
   generated_at: number;
   broker_time?: number;
 }
@@ -223,11 +253,43 @@ function SkeletonLine({ width = "100%", h = 6 }: { width?: string; h?: number })
   );
 }
 
+// ── Swing context retrace bar ─────────────────────────────────────────────────
+
+function RetraceBar({ pct, inWindow }: { pct: number; inWindow: boolean }) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  const color = inWindow ? "#4ade80" : pct > 70 ? "#f59e0b" : "#475569";
+  return (
+    <div style={{ marginTop: 4, marginBottom: 2 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+        <span style={{ fontSize: 6, color: "#1f2937" }}>0%</span>
+        <span style={{ fontSize: 6, color: inWindow ? "#4ade80" : "#374151", fontWeight: 700 }}>
+          {pct}% retrace {inWindow ? "✓ entry window" : ""}
+        </span>
+        <span style={{ fontSize: 6, color: "#1f2937" }}>100%</span>
+      </div>
+      <div style={{ position: "relative", height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2 }}>
+        {/* Fibonacci window 38–70% */}
+        <div style={{
+          position: "absolute", left: "38%", width: "32%",
+          height: "100%", background: "rgba(74,222,128,0.15)",
+          borderRadius: 2,
+        }} />
+        {/* Current position */}
+        <div style={{
+          position: "absolute", left: `${clamped}%`,
+          transform: "translateX(-50%)",
+          width: 3, height: 3, borderRadius: "50%",
+          background: color, boxShadow: `0 0 4px ${color}`,
+        }} />
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface MarketNarrativeProps {
   symbol: string;
-  /** Increment this from the parent's WebSocket candle handler to trigger an immediate re-fetch */
   refreshTrigger?: number;
 }
 
@@ -237,7 +299,7 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
   const [error,      setError]      = useState<string | null>(null);
   const [minimized,  setMinimized]  = useState(false);
   const [fetchedAt,  setFetchedAt]  = useState(0);
-  const abortRef   = useRef<AbortController | null>(null);
+  const abortRef    = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchNarrative = useCallback(async (sym: string) => {
@@ -263,14 +325,11 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
     }
   }, []);
 
-  // Fetch immediately on symbol change
   useEffect(() => {
     setNarrative(null);
     fetchNarrative(symbol);
   }, [symbol, fetchNarrative]);
 
-  // Re-fetch when parent signals a new candle arrived (debounced 3s so we don't
-  // hammer the API on every push cycle — the bridge pushes 20 candles at once)
   useEffect(() => {
     if (!refreshTrigger) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -278,7 +337,6 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [refreshTrigger, symbol, fetchNarrative]);
 
-  // 30-second background poll as fallback
   useEffect(() => {
     const id = setInterval(() => fetchNarrative(symbol), 30_000);
     return () => clearInterval(id);
@@ -341,7 +399,6 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
       {!minimized && (
         <div style={{ padding: "8px 10px" }}>
 
-          {/* Error */}
           {error && !loading && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, paddingBottom: 6 }}>
               <AlertTriangle size={9} style={{ color: "#ef5350", flexShrink: 0 }} />
@@ -351,7 +408,6 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
             </div>
           )}
 
-          {/* Skeleton */}
           {loading && !n && (
             <>
               <SkeletonLine width="55%" />
@@ -361,10 +417,9 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
             </>
           )}
 
-          {/* ── Content ── */}
           {n && (
             <>
-              {/* News block banner */}
+              {/* ── News block banner ── */}
               {n.news.blocked && (
                 <div style={{
                   display: "flex", alignItems: "flex-start", gap: 5,
@@ -383,7 +438,7 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
                 </div>
               )}
 
-              {/* Condition sentence */}
+              {/* ── Condition sentence ── */}
               <div style={{
                 fontSize: 7.5, color: "#475569", lineHeight: 1.7,
                 borderBottom: "1px solid rgba(255,255,255,0.04)",
@@ -392,7 +447,47 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
                 {n.condition_detail}
               </div>
 
-              {/* Structure summary */}
+              {/* ── Framework ready badge ── */}
+              {n.framework && (n.framework.scalp_ready || n.framework.limit_ready) && (
+                <div style={{
+                  display: "flex", gap: 5, marginBottom: 8, flexWrap: "wrap",
+                }}>
+                  {n.framework.scalp_ready && (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      background: "rgba(74,222,128,0.08)",
+                      border: "1px solid rgba(74,222,128,0.3)",
+                      borderRadius: 4, padding: "3px 8px",
+                    }}>
+                      <span style={{ fontSize: 8 }}>⚡</span>
+                      <span style={{ fontSize: 7.5, fontWeight: 700, color: "#4ade80", letterSpacing: "0.06em" }}>
+                        SCALP READY
+                      </span>
+                      <span style={{ fontSize: 6.5, color: "#4ade80", opacity: 0.7 }}>
+                        R:R {n.framework.scalp_rr}
+                      </span>
+                    </div>
+                  )}
+                  {n.framework.limit_ready && (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      background: "rgba(167,139,250,0.08)",
+                      border: "1px solid rgba(167,139,250,0.3)",
+                      borderRadius: 4, padding: "3px 8px",
+                    }}>
+                      <span style={{ fontSize: 8 }}>📍</span>
+                      <span style={{ fontSize: 7.5, fontWeight: 700, color: "#a78bfa", letterSpacing: "0.06em" }}>
+                        LIMIT READY
+                      </span>
+                      <span style={{ fontSize: 6.5, color: "#a78bfa", opacity: 0.7 }}>
+                        R:R {n.framework.limit_rr}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Structure summary ── */}
               <div style={{ marginBottom: 8 }}>
                 <SectionLabel>Structure Summary</SectionLabel>
                 {n.structure.map((line, i) => (
@@ -402,7 +497,21 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
                 ))}
               </div>
 
-              {/* Key levels */}
+              {/* ── Swing context ── */}
+              {n.swing_context && n.swing_context.description && (
+                <div style={{ marginBottom: 8 }}>
+                  <SectionLabel>4H Swing Context</SectionLabel>
+                  <div style={{ fontSize: 7.5, color: "#374151", lineHeight: 1.65, marginBottom: 4 }}>
+                    {n.swing_context.description}
+                  </div>
+                  <RetraceBar
+                    pct={n.swing_context.retrace_pct}
+                    inWindow={n.swing_context.in_window}
+                  />
+                </div>
+              )}
+
+              {/* ── Key levels ── */}
               {(n.key_levels.resistance.length > 0 || n.key_levels.support.length > 0) && (
                 <div style={{ marginBottom: 8 }}>
                   <SectionLabel>Key Levels</SectionLabel>
@@ -411,7 +520,6 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
                     <LevelRow key={`r${i}`} level={lvl} kind="res" refPrice={n.price} />
                   ))}
 
-                  {/* Current price marker */}
                   <div style={{
                     display: "flex", alignItems: "center", gap: 6,
                     margin: "3px 0", padding: "2px 0",
@@ -431,7 +539,38 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
                 </div>
               )}
 
-              {/* Session context */}
+              {/* ── Strongest level ── */}
+              {n.strongest_level && n.strongest_level.description && (
+                <div style={{ marginBottom: 8 }}>
+                  <SectionLabel>Level To Watch</SectionLabel>
+                  <div style={{
+                    display: "flex", alignItems: "flex-start", gap: 6,
+                    background: "rgba(251,191,36,0.04)",
+                    border: "1px solid rgba(251,191,36,0.15)",
+                    borderRadius: 3, padding: "5px 7px",
+                  }}>
+                    <div style={{
+                      width: 2.5, flexShrink: 0, alignSelf: "stretch",
+                      background: "#fbbf24", borderRadius: 1, marginTop: 1,
+                    }} />
+                    <div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "#fbbf24", marginBottom: 3 }}>
+                        {fmtPrice(n.strongest_level.price, n.price)}
+                        {n.strongest_level.timeframe && (
+                          <span style={{ fontSize: 6, color: "#78350f", marginLeft: 5, fontWeight: 400 }}>
+                            {n.strongest_level.timeframe} · {n.strongest_level.pips_away}p away
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 7, color: "#374151", lineHeight: 1.6 }}>
+                        {n.strongest_level.description}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Session context ── */}
               <div style={{ marginBottom: 8 }}>
                 <SectionLabel>Session Context</SectionLabel>
                 <SessionCountdown brokerTime={n.broker_time} />
@@ -442,7 +581,7 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
                 ))}
               </div>
 
-              {/* Trade readiness */}
+              {/* ── Trade readiness ── */}
               <div style={{ marginBottom: 8 }}>
                 <SectionLabel>Trade Readiness</SectionLabel>
 
@@ -460,7 +599,6 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
                   {n.trade_readiness.summary}
                 </div>
 
-                {/* Checklist */}
                 <div style={{
                   background: "rgba(255,255,255,0.015)",
                   border: "1px solid rgba(255,255,255,0.04)",
@@ -473,7 +611,6 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
 
                 <ReadinessBar met={n.trade_readiness.met} total={n.trade_readiness.total} />
 
-                {/* Action */}
                 <div style={{
                   marginTop: 6, fontSize: 7.5, lineHeight: 1.65,
                   color: n.trade_readiness.ready ? "#4ade80" : "#374151",
@@ -481,9 +618,29 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
                 }}>
                   {n.trade_readiness.action}
                 </div>
+
+                {/* ── Watch for ── */}
+                {n.watch_for && (
+                  <div style={{
+                    marginTop: 6,
+                    background: "rgba(255,255,255,0.015)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    borderRadius: 3, padding: "5px 7px",
+                  }}>
+                    <div style={{
+                      fontSize: 6.5, fontWeight: 700, letterSpacing: "0.12em",
+                      color: "#1e293b", textTransform: "uppercase", marginBottom: 3,
+                    }}>
+                      What to wait for
+                    </div>
+                    <div style={{ fontSize: 7.5, color: "#4ade80", lineHeight: 1.65 }}>
+                      {n.watch_for}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Confidence tiles */}
+              {/* ── Confidence tiles ── */}
               <div style={{
                 display: "flex", gap: 5,
                 borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 7,
@@ -518,9 +675,11 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
               </div>
 
               <div style={{ marginTop: 4, textAlign: "right" }}>
-                <span style={{ fontSize: 5.5, color: "#1e293b" }}>
-                  {secAgo(n.generated_at, n.broker_time)}
-                </span>
+                {fetchedAt > 0 && (
+                  <span style={{ fontSize: 5.5, color: "#1e293b" }}>
+                    updated {secAgo(Math.floor(fetchedAt / 1000))}
+                  </span>
+                )}
               </div>
             </>
           )}
@@ -537,7 +696,7 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
 
 
 function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
-    const [now, setNow] = React.useState(() => brokerTime ? new Date(brokerTime * 1000) : new Date());
+  const [now, setNow] = React.useState(() => brokerTime ? new Date(brokerTime * 1000) : new Date());
   React.useEffect(() => {
     const t = setInterval(() => setNow(prev => {
       if (!brokerTime) return new Date();
@@ -545,13 +704,10 @@ function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
     }), 30_000);
     return () => clearInterval(t);
   }, [brokerTime]);
-  
-  // ✅ ADD THIS NEW BLOCK HERE — resyncs clock whenever fresh broker time arrives:
+
   React.useEffect(() => {
     if (brokerTime) setNow(new Date(brokerTime * 1000));
   }, [brokerTime]);
-  
-
 
   const midMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15));
   const lonOff = (() => { try { const m = midMonth.toLocaleString("en", { timeZone: "Europe/London",    timeZoneName: "shortOffset" }).match(/([+-])(\d+)/); return m ? (m[1] === "+" ? 1 : -1) * parseInt(m[2]) : 0;  } catch { return 0;  } })();
@@ -570,7 +726,7 @@ function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
     const openMin  = s.open  * 60;
     const closeMin = s.close * 60;
     if (totalMin >= openMin && totalMin < closeMin) {
-      const elapsed = totalMin - openMin;
+      const elapsed   = totalMin - openMin;
       const remaining = closeMin - totalMin;
       statusLine = `${s.name} session active — ${elapsed}m since open`;
       nextLine   = `closes in ${Math.floor(remaining / 60)}h ${remaining % 60}m`;
@@ -578,14 +734,13 @@ function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
     }
   }
   if (!statusLine) {
-    // Find next session
     const nexts = sessions.map(s => {
       let diff = s.open * 60 - totalMin;
       if (diff <= 0) diff += 24 * 60;
       return { name: s.name, diff };
     }).sort((a, b) => a.diff - b.diff);
-    const n = nexts[0];
-    nextLine = `${n.name} opens in ${Math.floor(n.diff / 60)}h ${n.diff % 60}m`;
+    const nx = nexts[0];
+    nextLine   = `${nx.name} opens in ${Math.floor(nx.diff / 60)}h ${nx.diff % 60}m`;
     statusLine = "No prime session active";
   }
   return (
