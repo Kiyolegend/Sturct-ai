@@ -233,11 +233,11 @@ function LevelRow({ level, kind, refPrice }: { level: KeyLevel; kind: "res" | "s
           }}>MAJOR</span>
         )}
         {level.timeframe && (
-          <span style={{ fontSize: 5.5, color: "#1f2937", letterSpacing: "0.07em" }}>
+          <span style={{ fontSize: 5.5, color: "#475569", letterSpacing: "0.07em" }}>
             {level.timeframe}
           </span>
         )}
-        <span style={{ fontSize: 6, color: "#1f2937" }}>{level.pips_away}p</span>
+        <span style={{ fontSize: 6, color: "#475569" }}>{level.pips_away}p</span>
       </div>
     </div>
   );

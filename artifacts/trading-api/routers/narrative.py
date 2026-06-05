@@ -120,8 +120,15 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
     bias_15m = (r15m.get("trend") or {}).get("trend",  "neutral")
 
     # 4H swing hi/lo for retrace context
-    hi_4h = trend_4h.get("last_high_price")
-    lo_4h = trend_4h.get("last_low_price")
+    hi_4h: float | None = None
+    lo_4h: float | None = None
+    for s in reversed(r4h.get("structure_labels") or []):
+        if s.get("label") in ("HH", "LH", "EQH") and hi_4h is None:
+            hi_4h = float(s["price"])
+        if s.get("label") in ("HL", "LL", "EQL") and lo_4h is None:
+            lo_4h = float(s["price"])
+        if hi_4h is not None and lo_4h is not None:
+            break
 
     bos_5m    = r5m.get("bos",   []) or []
     bos_15m   = r15m.get("bos",  []) or []
