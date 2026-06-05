@@ -22,7 +22,7 @@ const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
   "4h":  5 * 60 * 60,
 };
 
-export function Dashboard({ activeSetups = [],setSymbol }: { activeSetups?: ActiveSetup[]; setSymbol: (symbol: string) => void }) {
+export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetups?: ActiveSetup[]; symbol: string; setSymbol: (s: string) => void }) {
   const [timeframe, setTimeframe] = useState("5m");
   const [toggles, setToggles] = useState<ToggleState>({
     zigzag:   true,
