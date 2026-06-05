@@ -258,6 +258,13 @@ function SkeletonLine({ width = "100%", h = 6 }: { width?: string; h?: number })
 function RetraceBar({ pct, inWindow }: { pct: number; inWindow: boolean }) {
   const clamped = Math.max(0, Math.min(100, pct));
   const color = inWindow ? "#4ade80" : pct > 70 ? "#f59e0b" : "#475569";
+  const FIB_LEVELS = [
+    { pct: 23.6, label: "23.6" },
+    { pct: 38.2, label: "38.2", key: true },
+    { pct: 50,   label: "50" },
+    { pct: 61.8, label: "61.8", key: true },
+    { pct: 78.6, label: "78.6" },
+  ];
   return (
     <div style={{ marginTop: 4, marginBottom: 2 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
@@ -267,22 +274,49 @@ function RetraceBar({ pct, inWindow }: { pct: number; inWindow: boolean }) {
         </span>
         <span style={{ fontSize: 6, color: "#1f2937" }}>100%</span>
       </div>
-      <div style={{ position: "relative", height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2 }}>
+      <div style={{ position: "relative", height: 5, background: "rgba(255,255,255,0.06)", borderRadius: 2 }}>
         {/* Fibonacci window 38–70% */}
         <div style={{
-          position: "absolute", left: "38%", width: "32%",
-          height: "100%", background: "rgba(74,222,128,0.15)",
+          position: "absolute", left: "38.2%", width: "23.6%",
+          height: "100%", background: "rgba(74,222,128,0.13)",
           borderRadius: 2,
         }} />
-        {/* Current position */}
+        {/* Fibonacci tick marks */}
+        {FIB_LEVELS.map(f => (
+          <div key={f.pct} style={{
+            position: "absolute", left: `${f.pct}%`,
+            transform: "translateX(-50%)",
+            width: 1, height: "100%",
+            background: (f as { key?: boolean }).key
+              ? "rgba(74,222,128,0.55)"
+              : "rgba(255,255,255,0.18)",
+          }} />
+        ))}
+        {/* Current position dot */}
         <div style={{
           position: "absolute", left: `${clamped}%`,
           transform: "translateX(-50%)",
-          width: 3, height: 3, borderRadius: "50%",
-          background: color, boxShadow: `0 0 4px ${color}`,
+          width: 4, height: 5, borderRadius: 1,
+          background: color, boxShadow: `0 0 5px ${color}`,
+          zIndex: 1,
         }} />
       </div>
-    </div>
+      {/* Fib level labels below bar */}
+      <div style={{ position: "relative", height: 8, marginTop: 1 }}>
+        {FIB_LEVELS.map(f => (
+          <span key={f.pct} style={{
+            position: "absolute", left: `${f.pct}%`,
+            transform: "translateX(-50%)",
+            fontSize: 5.5,
+            color: (f as { key?: boolean }).key ? "rgba(74,222,128,0.7)" : "rgba(255,255,255,0.2)",
+            whiteSpace: "nowrap",
+            fontWeight: (f as { key?: boolean }).key ? 700 : 400,
+          }}>
+            {f.label}
+          </span>
+        ))}
+       </div>
+      </div>    
   );
 }
 
@@ -713,8 +747,8 @@ function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
   const lonOff = (() => { try { const m = midMonth.toLocaleString("en", { timeZone: "Europe/London",    timeZoneName: "shortOffset" }).match(/([+-])(\d+)/); return m ? (m[1] === "+" ? 1 : -1) * parseInt(m[2]) : 0;  } catch { return 0;  } })();
   const nyOff  = (() => { try { const m = midMonth.toLocaleString("en", { timeZone: "America/New_York", timeZoneName: "shortOffset" }).match(/([+-])(\d+)/); return m ? (m[1] === "+" ? 1 : -1) * parseInt(m[2]) : -5; } catch { return -5; } })();
   const sessions = [
-    { name: "London", open: 8  + lonOff, close: 17 + lonOff },
-    { name: "NY",     open: 13 + nyOff,  close: 22 + nyOff  },
+    { name: "London", open: 8  - lonOff, close: 17 - lonOff },
+    { name: "NY",     open: 8 - nyOff,  close: 17 - nyOff  },
     { name: "Asian",  open: 0,            close: 9            },
   ];
   const utcH   = now.getUTCHours();

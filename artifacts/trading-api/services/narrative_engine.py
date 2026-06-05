@@ -457,7 +457,7 @@ def _key_levels(
         score     = lvl.get("score", 1)
         touches   = lvl.get("touches", 1)
         timeframe = lvl.get("timeframe", "")
-        major     = score >= 3 or touches >= 4 or timeframe == "4h"
+        major     = score >= 0.7 or touches >= 4 or timeframe == "4h"
         pips      = round(abs(p - current_price) / pip_size)
         entry     = {
             "price":     round(p, 5),
