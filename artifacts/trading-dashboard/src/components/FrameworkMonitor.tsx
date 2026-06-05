@@ -75,6 +75,7 @@ export function FrameworkMonitor({ onActiveSetups,onSwitchSymbol }: Props) {
   // CHANGE 1: added `direction: string` to prevState shape
   const prevState = useRef<Record<string, { scalp: boolean; limit: boolean; direction: string }>>({});
   const permRequested = useRef(false);
+  const initialized = useRef(false);
 
   useEffect(() => {
     if (!permRequested.current && typeof Notification !== "undefined" && Notification.permission === "default") {
@@ -85,6 +86,15 @@ export function FrameworkMonitor({ onActiveSetups,onSwitchSymbol }: Props) {
 
   useEffect(() => {
     if (!data?.pairs) return;
+    if (!initialized.current) {
+     initialized.current = true;
+     for (const pair of PAIRS) {
+       const s = data.pairs[pair];
+       if (!s || s.error) continue;
+       prevState.current[pair] = { scalp: s.scalp_ready, limit: s.limit_ready, direction: s.direction };
+    }
+    return;
+  }
 
     const brokerTime = data.broker_time;
     const ts = fmtBrokerTime(brokerTime);

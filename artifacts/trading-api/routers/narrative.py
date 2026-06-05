@@ -77,6 +77,18 @@ async def _analyse_timeframe(symbol: str, interval: str, outputsize: int) -> dic
         except Exception:
             labels_out = []
 
+        last_high_price = None
+        last_low_price  = None
+        for s in reversed(labels_out):
+            if s["label"] in ("HH", "LH", "EQH") and last_high_price is None:
+                last_high_price = s["price"]
+            if s["label"] in ("HL", "LL", "EQL") and last_low_price is None:
+                last_low_price = s["price"]
+            if last_high_price is not None and last_low_price is not None:
+                break
+        trend["last_high_price"] = last_high_price
+        trend["last_low_price"]  = last_low_price
+
         return {
             "df":               df,
             "trend":            trend,
