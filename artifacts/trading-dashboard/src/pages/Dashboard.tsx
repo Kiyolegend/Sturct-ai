@@ -53,10 +53,22 @@ export function Dashboard({ activeSetups = [] }: { activeSetups?: ActiveSetup[] 
   
   const [slLine,         setSlLine]         = useState<number | null>(null);
   const [tpLine,         setTpLine]         = useState<number | null>(null);
+  const [prefill, setPrefill] = useState<{ direction: "BUY"|"SELL"; sl: number; tp: number } | null>(null);
   
 
   const symbolRef = useRef(symbol);
   useEffect(() => { symbolRef.current = symbol; }, [symbol]);
+    // When a scalp setup fires for the active symbol, push values to TradePanel
+  useEffect(() => {
+    const scalp = activeSetups.find(s => s.mode === "scalp" && s.pair === symbol);
+    if (scalp && scalp.sl && scalp.tp) {
+      setPrefill({
+        direction: scalp.direction === "bullish" ? "BUY" : "SELL",
+        sl: scalp.sl,
+        tp: scalp.tp,
+      });
+    }
+  }, [activeSetups, symbol]);
 
   useEffect(() => {
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
@@ -115,6 +127,8 @@ export function Dashboard({ activeSetups = [] }: { activeSetups?: ActiveSetup[] 
             onClickedPriceConsumed={() => setClickedPrice(null)}
             onSLChange={setSlLine}
             onTPChange={setTpLine}
+            prefill={prefill}
+            onPrefillConsumed={() => setPrefill(null)}
           />
 
           <NewsPanel />

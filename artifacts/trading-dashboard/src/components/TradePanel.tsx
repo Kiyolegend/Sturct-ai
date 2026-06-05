@@ -16,6 +16,8 @@ interface TradePanelProps {
   onClickedPriceConsumed?:  () => void;
   onSLChange?:  (v: number | null) => void;
   onTPChange?:  (v: number | null) => void;
+  prefill?:     { direction: "BUY" | "SELL"; sl: number; tp: number } | null;
+  onPrefillConsumed?: () => void;
 }
 
 type Direction  = "BUY" | "SELL";
@@ -27,7 +29,7 @@ interface Position {
   price_open: number; price_current: number; sl: number; tp: number; profit: number;
 }
 
-export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceConsumed, onSLChange, onTPChange }: TradePanelProps) {
+export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceConsumed, onSLChange, onTPChange, prefill, onPrefillConsumed  }: TradePanelProps) {
   const pip          = PIP(currentPrice);
   const defaultSL    = (price: number, dir: Direction) =>
     dir === "BUY" ? +(price - 20 * pip).toFixed(DEC(price)) : +(price + 20 * pip).toFixed(DEC(price));
@@ -52,6 +54,15 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     setSL(defaultSL(p, direction).toFixed(DEC(p)));
     setTP(defaultTP(p, direction).toFixed(DEC(p)));
   }, [direction, symbol, currentPrice > 0 ? "loaded" : ""]);
+
+    // Scalp pre-fill — fires when Dashboard pushes a scalp setup for this symbol
+  useEffect(() => {
+    if (!prefill || !currentPrice) return;
+    setDirection(prefill.direction);
+    setSL(prefill.sl.toFixed(DEC(currentPrice)));
+    setTP(prefill.tp.toFixed(DEC(currentPrice)));
+    onPrefillConsumed?.();
+  }, [prefill]);
 
   // Chart click routing — SL, TP, Entry, or default (switch to LIMIT)
   useEffect(() => {
@@ -233,6 +244,12 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
       {/* FORM */}
       {stage === "form" && (
         <div className="flex flex-col gap-2">
+          {/* Scalp pre-fill banner */}
+          {prefill && (
+            <div className="text-[10px] text-teal-400 bg-teal-500/10 rounded px-2 py-1 border border-teal-500/20 font-semibold">
+              ⚡ SCALP PRE-FILLED — verify SL/TP then click execute
+            </div>
+          )}
           {/* BUY / SELL */}
           <div className="flex gap-1">
             <button className={btnBuy}  onClick={() => setDirection("BUY")}>BUY</button>
