@@ -153,7 +153,7 @@ def _structure_summary(
 
     # 15M with CHoCH annotation
     recent_15m = sorted(
-        [c for c in choch_15m if now - c.get("time", 0) <= 8 * 3600],
+        [c for c in choch_15m if now - c.get("time", 0) <= 3 * 3600],
         key=lambda x: x.get("time", 0), reverse=True,
     )
     if recent_15m:
