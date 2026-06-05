@@ -754,6 +754,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
             width: containerWidth, height: 0,
             borderTop: isExt
               ? `1px dotted ${lineColor}`
+              : isKey
               ? `1px solid ${lineColor}`
               : `1px dashed ${lineColor}`,
             pointerEvents: 'none',

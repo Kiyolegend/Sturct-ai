@@ -338,9 +338,16 @@ def compute_framework_status(
             tp_cands = sorted(
                 [l for l in sr_f if l.get("kind") == "support" and l["price"] < entry_p],
                 key=lambda l: -l["price"])
-        fb_pips = 60 if "JPY" in symbol else (40 if ("GBP" in symbol or "EUR" in symbol) else 30)
-        tp_p = tp_cands[0]["price"] if tp_cands else (
-            entry_p + fb_pips * pip if is_bull else entry_p - fb_pips * pip)
+        # NEW — Fibonacci extension fallback
+if hi_price and lo_price and hi_price > lo_price:
+    fib_range = hi_price - lo_price
+    ext_127 = (hi_price + 0.272 * fib_range) if is_bull else (lo_price - 0.272 * fib_range)
+    ext_162 = (hi_price + 0.618 * fib_range) if is_bull else (lo_price - 0.618 * fib_range)
+    fib_tp = ext_127 if mode == "scalp" else ext_162
+else:
+    fb_pips = 60 if "JPY" in symbol else (40 if ("GBP" in symbol or "EUR" in symbol) else 30)
+    fib_tp = entry_p + fb_pips * pip if is_bull else entry_p - fb_pips * pip
+tp_p = tp_cands[0]["price"] if tp_cands else fib_tp
 
         risk   = abs(entry_p - sl_p)
         reward = abs(tp_p - entry_p)

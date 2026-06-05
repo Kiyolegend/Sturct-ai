@@ -272,11 +272,18 @@ export function FrameworkPanel({ symbol }: Props) {
       ? levels.filter((l: any) => l.kind === "resistance" && l.price > entryP).sort((a: any, b: any) => a.price - b.price)[0]
       : levels.filter((l: any) => l.kind === "support"    && l.price < entryP).sort((a: any, b: any) => b.price - a.price)[0];
     // Pair-aware TP fallback: JPY=60, EUR/GBP=40, AUD/CHF=30
-    const fbPips = symbol.includes('JPY') ? 60
-      : (symbol.includes('GBP') || symbol.includes('EUR')) ? 40 : 30;
-    const tpP = tpLevel
-      ? tpLevel.price
-      : isBull ? entryP + fbPips * pip : entryP - fbPips * pip;
+    const hi4h = mtf?.bias_4h.last_high_price as number | undefined;
+    const lo4h = mtf?.bias_4h.last_low_price  as number | undefined;
+    const fibFallback = (hi4h && lo4h && hi4h > lo4h)
+       ? (() => {
+           const fibRange = hi4h - lo4h;
+           const ext127 = isBull ? hi4h + 0.272 * fibRange : lo4h - 0.272 * fibRange;
+           const ext162 = isBull ? hi4h + 0.618 * fibRange : lo4h - 0.618 * fibRange;
+           return mode === 'scalp' ? ext127 : ext162;
+         })()
+       : isBull ? entryP + (symbol.includes('JPY') ? 60 : 40) * pip
+                : entryP - (symbol.includes('JPY') ? 60 : 40) * pip;
+    const tpP = tpLevel ? tpLevel.price : fibFallback;
 
     const risk   = Math.abs(entryP - slP);
     const reward = Math.abs(tpP - entryP);
