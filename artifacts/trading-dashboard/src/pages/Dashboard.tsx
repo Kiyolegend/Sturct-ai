@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { TopBar, type ToggleState } from "@/components/TopBar";
-import { TradingChart } from "@/components/TradingChart";
+import { TradingChart, type FibLevel } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 
 
@@ -35,6 +35,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     bos:      true,
     ob:       false,
     fvg:      false,
+    fib:      false,
   });
 
   const { data: brokerTimeData } = useBrokerTime();
@@ -47,6 +48,23 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const { data: sessionsData } = useSessions(symbol, timeframe);
   const { data: bosChochData } = useBosChoch(symbol);
 
+  const fibLevels = useMemo((): FibLevel[] => {
+    const hi = biasData?.bias_4h?.last_high_price as number | undefined;
+    const lo = biasData?.bias_4h?.last_low_price  as number | undefined;
+    if (!hi || !lo || hi <= lo) return [];
+    const range = hi - lo;
+    return [
+      { pct: 0,    label: "0%",    isKey: false },
+      { pct: 23.6, label: "23.6%", isKey: false },
+      { pct: 38.2, label: "38.2%", isKey: true  },
+      { pct: 50,   label: "50%",   isKey: false  },
+      { pct: 61.8, label: "61.8%", isKey: true  },
+      { pct: 78.6, label: "78.6%", isKey: false },
+      { pct: 100,  label: "100%",  isKey: false },
+    ].map(r => ({ ...r, price: hi - (r.pct / 100) * range }));
+  }, [biasData?.bias_4h]);
+
+  
   const [wsConnected,    setWsConnected]    = useState(false);
   const [clickedPrice,   setClickedPrice]   = useState<number | null>(null);
   
@@ -189,6 +207,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                 onPriceClick={setClickedPrice}
                 slLine={slLine}
                 tpLine={tpLine}
+                fibLevels={fibLevels}
               />
 
               {/* Live / Offline indicator */}

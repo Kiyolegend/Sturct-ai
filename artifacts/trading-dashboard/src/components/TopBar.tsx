@@ -19,6 +19,7 @@ export interface ToggleState {
   bos: boolean;
   ob: boolean;   // NEW — Order Blocks
   fvg: boolean;  // NEW — Fair Value Gaps
+  fib: boolean;  // Fibonacci retracement levels from last 4H swing
 }
 
 type TrendDir = "bullish" | "bearish" | "neutral";
@@ -290,6 +291,15 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
                 : "text-white/40 hover:text-white/70"
             )}
             title="Toggle Fair Value Gaps — price imbalance zones">FVG</button>
+            
+          {/* Fibonacci retracement levels from last 4H swing */}
+          <button onClick={() => toggleLayer('fib')} aria-pressed={toggles.fib}
+            className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+              toggles.fib
+                ? "text-amber-300 bg-amber-400/15 border border-amber-400/30"
+                : "text-white/40 hover:text-white/70"
+            )}
+            title="Toggle Fibonacci retracement levels (4H swing — shows on all timeframes)">FIB</button>
         </div>
 
         <div className="flex items-center gap-1 bg-[#161e2c] rounded-lg p-1 border border-white/5">

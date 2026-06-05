@@ -40,7 +40,7 @@ interface TradingChartProps {
   onPriceClick?: (price: number) => void;
   slLine?: number | null;
   tpLine?: number | null;
-
+  fibLevels?: FibLevel[];
 }
 
 // ── Exported so TradeTeller can reuse them without duplicating logic ──────────
@@ -71,6 +71,15 @@ const SR_TF_CONFIG: Record<string, { proximity: number; maxEach: number }> = {
 // ── Exported: pip size helper ─────────────────────────────────────────────────
 export function pipSize(price: number): number {
   return price > 50 ? 0.01 : 0.0001;
+}
+
+
+// ── Exported: Fibonacci level ─────────────────────────────────────────────────
+export interface FibLevel {
+  price: number;
+  label: string;
+  pct: number;
+  isKey: boolean;
 }
 
 // ── Exported: Order Block detection ──────────────────────────────────────────
@@ -213,7 +222,7 @@ export function detectFVGs(candles: any[], currentPrice: number): FVGData[] {
   }));
 }
 
-export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine  }: TradingChartProps) {
+export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine, fibLevels }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -691,6 +700,74 @@ containerRef.current?.addEventListener('click', handleChartClick);
       });
     }
 
+        // ── Fibonacci retracement levels (4H swing, visible on all timeframes) ────
+    if (toggles.fib && fibLevels?.length) {
+      const containerWidth = containerRef.current?.clientWidth ?? 0;
+
+      // Golden zone fill: 38.2% → 61.8%
+      const f382 = fibLevels.find(f => f.pct === 38.2);
+      const f618 = fibLevels.find(f => f.pct === 61.8);
+      if (f382 && f618) {
+        const y1 = priceSeries.priceToCoordinate(f382.price);
+        const y2 = priceSeries.priceToCoordinate(f618.price);
+        if (y1 !== null && y2 !== null) {
+          elements.push(
+            <div key="fib-golden-zone" style={{
+              position: 'absolute', left: 0,
+              top: Math.min(y1, y2),
+              width: containerWidth,
+              height: Math.max(Math.abs(y2 - y1), 2),
+              background: 'rgba(251,191,36,0.06)',
+              pointerEvents: 'none',
+            }} />
+          );
+        }
+      }
+
+      // Individual level lines + labels
+      fibLevels.forEach((fib, idx) => {
+        const y = priceSeries.priceToCoordinate(fib.price);
+        if (y === null) return;
+
+        const isKey     = fib.isKey;
+        const isMid     = fib.pct === 50;
+        const lineColor = isKey
+          ? 'rgba(251,191,36,0.80)'
+          : isMid
+          ? 'rgba(251,191,36,0.45)'
+          : 'rgba(255,255,255,0.18)';
+        const labelColor = isKey
+          ? 'rgba(251,191,36,0.95)'
+          : isMid
+          ? 'rgba(251,191,36,0.60)'
+          : 'rgba(255,255,255,0.30)';
+
+        elements.push(
+          <div key={`fib-${idx}`} style={{
+            position: 'absolute', left: 0, top: y,
+            width: containerWidth, height: 0,
+            borderTop: isKey
+              ? `1px solid ${lineColor}`
+              : `1px dashed ${lineColor}`,
+            pointerEvents: 'none',
+          }}>
+            <span style={{
+              position: 'absolute', right: 54, top: -9,
+              fontSize: '7.5px',
+              fontWeight: isKey ? 700 : 400,
+              color: labelColor,
+              fontFamily: 'monospace',
+              userSelect: 'none',
+              letterSpacing: '0.04em',
+              whiteSpace: 'nowrap',
+            }}>
+              {fib.label}
+            </span>
+          </div>
+        );
+      });
+    }
+ 
     return elements;
   })();
 
