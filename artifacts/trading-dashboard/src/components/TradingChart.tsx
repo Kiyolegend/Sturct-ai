@@ -80,6 +80,7 @@ export interface FibLevel {
   label: string;
   pct: number;
   isKey: boolean;
+  isExt?: boolean;
 }
 
 // ── Exported: Order Block detection ──────────────────────────────────────────
@@ -731,12 +732,17 @@ containerRef.current?.addEventListener('click', handleChartClick);
 
         const isKey     = fib.isKey;
         const isMid     = fib.pct === 50;
-        const lineColor = isKey
+        const isExt     = fib.isExt ?? false;
+        const lineColor = isExt
+          ? 'rgba(251,191,36,0.35)'
+          : isKey
           ? 'rgba(251,191,36,0.80)'
           : isMid
           ? 'rgba(251,191,36,0.45)'
           : 'rgba(255,255,255,0.18)';
-        const labelColor = isKey
+        const labelColor = isExt
+          ? 'rgba(251,191,36,0.55)'
+          : isKey
           ? 'rgba(251,191,36,0.95)'
           : isMid
           ? 'rgba(251,191,36,0.60)'
@@ -746,7 +752,8 @@ containerRef.current?.addEventListener('click', handleChartClick);
           <div key={`fib-${idx}`} style={{
             position: 'absolute', left: 0, top: y,
             width: containerWidth, height: 0,
-            borderTop: isKey
+            borderTop: isExt
+              ? `1px dotted ${lineColor}`
               ? `1px solid ${lineColor}`
               : `1px dashed ${lineColor}`,
             pointerEvents: 'none',

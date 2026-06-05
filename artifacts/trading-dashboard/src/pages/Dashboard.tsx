@@ -54,13 +54,17 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     if (!hi || !lo || hi <= lo) return [];
     const range = hi - lo;
     return [
-      { pct: 0,    label: "0%",    isKey: false },
-      { pct: 23.6, label: "23.6%", isKey: false },
-      { pct: 38.2, label: "38.2%", isKey: true  },
-      { pct: 50,   label: "50%",   isKey: false  },
-      { pct: 61.8, label: "61.8%", isKey: true  },
-      { pct: 78.6, label: "78.6%", isKey: false },
-      { pct: 100,  label: "100%",  isKey: false },
+      { pct: -61.8, label: "+161.8%", isKey: false, isExt: true  },
+      { pct: -27.2, label: "+127.2%", isKey: false, isExt: true  },
+      { pct: 0,     label: "0%",      isKey: false               },
+      { pct: 23.6,  label: "23.6%",   isKey: false               },
+      { pct: 38.2,  label: "38.2%",   isKey: true                },
+      { pct: 50,    label: "50%",     isKey: false               },
+      { pct: 61.8,  label: "61.8%",   isKey: true                },
+      { pct: 78.6,  label: "78.6%",   isKey: false               },
+      { pct: 100,   label: "100%",    isKey: false               },
+      { pct: 127.2, label: "127.2%",  isKey: false, isExt: true  },
+      { pct: 161.8, label: "161.8%",  isKey: false, isExt: true  },
     ].map(r => ({ ...r, price: hi - (r.pct / 100) * range }));
   }, [biasData?.bias_4h]);
 
