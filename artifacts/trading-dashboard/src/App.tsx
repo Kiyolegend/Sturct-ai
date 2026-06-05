@@ -21,7 +21,7 @@ const queryClient = new QueryClient({
 function Router({ activeSetups }: { activeSetups: ActiveSetup[] }) {
   return (
     <Switch>
-      <Route path="/" component={() => <Dashboard activeSetups={activeSetups} />} />
+      <Route path="/">{() => <Dashboard activeSetups={activeSetups} />}</Route>
       <Route path="/analysis" component={AnalysisPage} />
       <Route component={NotFound} />
     </Switch>

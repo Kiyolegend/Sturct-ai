@@ -7,7 +7,7 @@ import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 
 import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
-import { MarketNarrative } from "@/components/MarketNarrative";
+
 
 import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch, useBrokerTime, type ActiveSetup } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
@@ -50,7 +50,7 @@ export function Dashboard({ activeSetups = [] }: { activeSetups?: ActiveSetup[] 
 
   const [wsConnected,    setWsConnected]    = useState(false);
   const [clickedPrice,   setClickedPrice]   = useState<number | null>(null);
-  const [narrativeRefresh, setNarrativeRefresh] = useState(0);
+  
   const [slLine,         setSlLine]         = useState<number | null>(null);
   const [tpLine,         setTpLine]         = useState<number | null>(null);
   
@@ -68,7 +68,7 @@ export function Dashboard({ activeSetups = [] }: { activeSetups?: ActiveSetup[] 
         const msg = JSON.parse(event.data);
         if (msg.type === "candle" && msg.symbol === symbolRef.current) {
           refetch();
-          setNarrativeRefresh(n => n + 1);
+      
         }
       } catch {}
     };
@@ -118,7 +118,7 @@ export function Dashboard({ activeSetups = [] }: { activeSetups?: ActiveSetup[] 
           />
 
           <NewsPanel />
-          <MarketNarrative symbol={symbol} refreshTrigger={narrativeRefresh} />
+          
 
         </HeatmapSidebar>
 

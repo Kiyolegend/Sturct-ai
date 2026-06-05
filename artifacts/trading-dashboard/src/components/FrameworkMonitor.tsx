@@ -5,6 +5,9 @@
  * When any pair transitions scalp_ready or limit_ready false → true,
  * fires a browser notification + an in-app toast.
  *
+ * Also fires when 4H direction flips (bullish ↔ bearish) — the one
+ * signal that justifies cancelling a pending limit order.
+ *
  * All timestamps displayed use broker time from MT5 candles.
  * Requests notification permission on first mount.
  */
@@ -67,7 +70,8 @@ interface Props {
 export function FrameworkMonitor({ onActiveSetups }: Props) {
   const { data } = useFrameworkStatus(30_000);
   const { toast } = useToast();
-  const prevState = useRef<Record<string, { scalp: boolean; limit: boolean }>>({});
+  // CHANGE 1: added `direction: string` to prevState shape
+  const prevState = useRef<Record<string, { scalp: boolean; limit: boolean; direction: string }>>({});
   const permRequested = useRef(false);
 
   useEffect(() => {
@@ -88,7 +92,8 @@ export function FrameworkMonitor({ onActiveSetups }: Props) {
       const status = data.pairs[pair];
       if (!status || status.error) continue;
 
-      const prev = prevState.current[pair] ?? { scalp: false, limit: false };
+      // CHANGE 2: added `direction: ""` as default fallback
+      const prev = prevState.current[pair] ?? { scalp: false, limit: false, direction: "" };
       const cur  = { scalp: status.scalp_ready, limit: status.limit_ready };
 
       // ── scalp: false → true ───────────────────────────────────────────────
@@ -133,7 +138,27 @@ export function FrameworkMonitor({ onActiveSetups }: Props) {
         });
       }
 
-      prevState.current[pair] = cur;
+      // CHANGE 3: HTF direction flip — fires when 4H bias reverses ──────────
+      if (
+        prev.direction !== "" &&
+        prev.direction !== "neutral" &&
+        status.direction !== "neutral" &&
+        prev.direction !== status.direction
+      ) {
+        playAlert("limit");
+        fireSystemNotification(
+          `🔄 HTF BIAS FLIPPED — ${pair}`,
+          `Direction changed ${prev.direction.toUpperCase()} → ${status.direction.toUpperCase()}. Cancel any pending limit orders on ${pair}.`
+        );
+        toast({
+          title:       `🔄 HTF BIAS FLIPPED — ${pair}`,
+          description: `Direction reversed ${prev.direction.toUpperCase()} → ${status.direction.toUpperCase()}. Cancel pending limit orders on ${pair}.`,
+          duration:    60_000,
+        });
+      }
+
+      // CHANGE 4: persist direction alongside scalp/limit flags ─────────────
+      prevState.current[pair] = { ...cur, direction: status.direction };
 
       if (cur.scalp) active.push({
         pair, mode: "scalp", direction: status.direction, rr: status.scalp_rr,
