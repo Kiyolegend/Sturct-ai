@@ -220,14 +220,13 @@ def compute_framework_status(
         fvgs15 = detect_fvgs(candles_15m, current_price)
         fvg15m = next((f for f in fvgs15 if f["type"] == direction), None)
 
-    zone_sources = [z for z in [ob1h, fvg1h, zone1h] if z is not None]
-    if zone_sources:
-        h_bottom = min(z["bottom"] for z in zone_sources)
-        h_top    = max(z["top"]    for z in zone_sources)
-        ob15m_in_zone  = ob15m  is not None and ob15m["top"]  >= h_bottom and ob15m["bottom"]  <= h_top
-        fvg15m_in_zone = fvg15m is not None and fvg15m["top"] >= h_bottom and fvg15m["bottom"] <= h_top
-    else:
-        ob15m_in_zone = fvg15m_in_zone = False
+    # Fix #4 — Per-zone overlap: 15M must align with a specific 1H zone, not a merged box
+    def _overlaps(a: dict, b: dict) -> bool:
+        return a["top"] >= b["bottom"] and a["bottom"] <= b["top"]
+
+    _1h_zones = [z for z in [ob1h, fvg1h, zone1h] if z is not None]
+    ob15m_in_zone  = ob15m  is not None and any(_overlaps(ob15m,  h) for h in _1h_zones)
+    fvg15m_in_zone = fvg15m is not None and any(_overlaps(fvg15m, h) for h in _1h_zones)
 
     # ── Recency-filtered CHoCH / BOS ──────────────────────────────────────────
     choch_15m_list = [
@@ -281,14 +280,36 @@ def compute_framework_status(
         sl15m = None
 
 
+    # ── Retrace % gate (38–78% of last 4H swing) ─────────────────────────────
+    trend_4h  = r4h.get("trend") or {}
+    hi_price  = trend_4h.get("last_high_price")
+    lo_price  = trend_4h.get("last_low_price")
+    retrace_gate = True  # default: pass when data unavailable
+    if hi_price and lo_price and current_price and has_dir:
+        leg_size = hi_price - lo_price
+        if leg_size > 0:
+            raw_pct = (
+                ((hi_price - current_price) / leg_size * 100) if is_bull
+                else ((current_price - lo_price) / leg_size * 100)
+            )
+            retrace_pct = round(raw_pct)
+            retrace_gate = 38 <= retrace_pct <= 78
+
     # ── Setup (entry / SL / TP / RR) ─────────────────────────────────────────
     def _setup(mode: str) -> dict:
         zone = (ob1h or fvg1h or zone1h) if mode == "limit" else None
-        entry_p = (zone["bottom"] if is_bull else zone["top"]) if zone else current_price
+        # Fix 1 — Entry 30% inside zone (matches FrameworkPanel.tsx)
+        zone_width = (zone["top"] - zone["bottom"]) if zone else 0
+        entry_p = (
+            (zone["bottom"] + zone_width * 0.30 if is_bull else zone["top"] - zone_width * 0.30)
+            if zone else current_price
+        )
 
         if mode == "limit" and zone:
             zone15 = ob15m or fvg15m
-            sl_1h  = (zone["bottom"] - 10 * pip) if is_bull else (zone["top"] + 10 * pip)
+            # Fix 2 — Adaptive SL: max(10 pips, zone_width × 0.25)
+            sl_buffer = max(10 * pip, zone_width * 0.25)
+            sl_1h  = (zone["bottom"] - sl_buffer) if is_bull else (zone["top"] + sl_buffer)
             if zone15:
                 sl_15m = (zone15["bottom"] - 5 * pip) if is_bull else (zone15["top"] + 5 * pip)
                 sl_p = min(sl_1h, sl_15m) if is_bull else max(sl_1h, sl_15m)
@@ -319,8 +340,10 @@ def compute_framework_status(
             tp_cands = sorted(
                 [l for l in sr_f if l.get("kind") == "support" and l["price"] < entry_p],
                 key=lambda l: -l["price"])
+        # Pair-aware TP fallback: JPY=60, EUR/GBP=40, AUD/CHF=30
+        fb_pips = 60 if "JPY" in symbol else (40 if ("GBP" in symbol or "EUR" in symbol) else 30)
         tp_p = tp_cands[0]["price"] if tp_cands else (
-            entry_p + 60 * pip if is_bull else entry_p - 60 * pip)
+            entry_p + fb_pips * pip if is_bull else entry_p - fb_pips * pip)
 
         risk   = abs(entry_p - sl_p)
         reward = abs(tp_p - entry_p)
@@ -360,7 +383,7 @@ def compute_framework_status(
         scalp_setup["rr"] >= 2.5
     )
     limit_ready = bool(
-        has_dir and phase_ok and has_1h_zone and
+        has_dir and phase_ok and retrace_gate and has_1h_zone and
         (ob15m_in_zone or fvg15m_in_zone) and
         limit_zone_status != "blown" and not limit_out_of_reach and
         not news_blocked and limit_setup["rr"] >= 2.5

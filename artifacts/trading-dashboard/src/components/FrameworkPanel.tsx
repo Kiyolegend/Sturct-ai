@@ -211,36 +211,43 @@ export function FrameworkPanel({ symbol }: Props) {
     return (labels[labels.length - 1]?.price as number) ?? null;
   }, [data5m, isBull, hasDir]);
 
-  const hunting1hBounds = useMemo(() => {
-    const zones = [ob1h, fvg1h, zone1h].filter(Boolean) as { top: number; bottom: number }[];
-    if (!zones.length) return null;
-    return {
-      bottom: Math.min(...zones.map(z => z.bottom)),
-      top:    Math.max(...zones.map(z => z.top)),
-    };
-  }, [ob1h, fvg1h, zone1h]);
+  // Fix #4 — Per-zone overlap: 15M must align with a specific 1H zone, not a merged box
+  const _overlaps1h = (z: { top: number; bottom: number }) =>
+    [ob1h, fvg1h, zone1h].some(h => h !== null && z.top >= h.bottom && z.bottom <= h.top);
 
-  const ob15mInZone = useMemo(() => {
-    if (!ob15m || !hunting1hBounds) return false;
-    return ob15m.top >= hunting1hBounds.bottom && ob15m.bottom <= hunting1hBounds.top;
-  }, [ob15m, hunting1hBounds]);
+  const ob15mInZone  = useMemo(() => ob15m  !== null && _overlaps1h(ob15m),  [ob15m,  ob1h, fvg1h, zone1h]);
+  const fvg15mInZone = useMemo(() => fvg15m !== null && _overlaps1h(fvg15m), [fvg15m, ob1h, fvg1h, zone1h]);
 
-  const fvg15mInZone = useMemo(() => {
-    if (!fvg15m || !hunting1hBounds) return false;
-    return fvg15m.top >= hunting1hBounds.bottom && fvg15m.bottom <= hunting1hBounds.top;
-  }, [fvg15m, hunting1hBounds]);
+  // Retrace % gate — limit only fires between 38–78% of last 4H swing
+  const retracePct = useMemo(() => {
+    const hi = mtf?.bias_4h.last_high_price as number | undefined;
+    const lo = mtf?.bias_4h.last_low_price  as number | undefined;
+    if (!hi || !lo || !price || !hasDir) return null;
+    const legSize = hi - lo;
+    if (legSize <= 0) return null;
+    const raw = isBull ? ((hi - price) / legSize) * 100 : ((price - lo) / legSize) * 100;
+    return Math.round(raw);
+  }, [mtf, price, isBull, hasDir]);
+
+  const retraceGate = retracePct !== null && retracePct >= 38 && retracePct <= 78;
 
   const setup = useMemo(() => {
     if (!price || !hasDir) return null;
     const zone = mode === "limit" ? (ob1h ?? fvg1h ?? zone1h) : null;
-    const entryP = zone ? (isBull ? zone.bottom : zone.top) : price;
+    // Fix 1 — Entry 30% inside zone (improves fill rate vs exact edge)
+    const zoneWidth = zone ? zone.top - zone.bottom : 0;
+    const entryP = zone
+      ? (isBull ? zone.bottom + zoneWidth * 0.30 : zone.top - zoneWidth * 0.30)
+      : price;
 
     const slLow  = mtf?.bias_15m.last_low_price;
     const slHigh = mtf?.bias_15m.last_high_price;
     let slP: number;
     if (mode === "limit" && zone) {
       const zone15m = ob15m ?? fvg15m;
-      const sl1h = isBull ? zone.bottom - 10 * pip : zone.top + 10 * pip;
+      // Fix 2 — Adaptive SL: wider zone → wider buffer (min 10 pips)
+      const slBuffer = Math.max(10 * pip, zoneWidth * 0.25);
+      const sl1h = isBull ? zone.bottom - slBuffer : zone.top + slBuffer;
       if (zone15m) {
         const sl15m = isBull ? zone15m.bottom - 5 * pip : zone15m.top + 5 * pip;
         slP = isBull ? Math.min(sl1h, sl15m) : Math.max(sl1h, sl15m);
@@ -264,15 +271,18 @@ export function FrameworkPanel({ symbol }: Props) {
     const tpLevel = isBull
       ? levels.filter((l: any) => l.kind === "resistance" && l.price > entryP).sort((a: any, b: any) => a.price - b.price)[0]
       : levels.filter((l: any) => l.kind === "support"    && l.price < entryP).sort((a: any, b: any) => b.price - a.price)[0];
+    // Pair-aware TP fallback: JPY=60, EUR/GBP=40, AUD/CHF=30
+    const fbPips = symbol.includes('JPY') ? 60
+      : (symbol.includes('GBP') || symbol.includes('EUR')) ? 40 : 30;
     const tpP = tpLevel
       ? tpLevel.price
-      : isBull ? entryP + 60 * pip : entryP - 60 * pip;
+      : isBull ? entryP + fbPips * pip : entryP - fbPips * pip;
 
     const risk   = Math.abs(entryP - slP);
     const reward = Math.abs(tpP - entryP);
     const rr     = risk > 0 ? Math.round((reward / risk) * 10) / 10 : 0;
     return { entry: entryP, sl: slP, tp: tpP, rr };
-  }, [price, hasDir, isBull, ob1h, fvg1h, zone1h, ob15m, fvg15m, sl5m, mtf, srData, pip, mode]);
+  }, [price, hasDir, isBull, ob1h, fvg1h, zone1h, ob15m, fvg15m, sl5m, mtf, srData, pip, mode, symbol]);
 
   // ── STALE PRICE / INVALIDATION GUARDS ────────────────────────────────────────
 
@@ -320,7 +330,7 @@ export function FrameworkPanel({ symbol }: Props) {
   const scalp_ready = hasDir && phase.good && (ob1h !== null || fvg1h !== null || zone1h !== null) &&
     (choch15m !== null || bos15m !== null) && bos5m !== null && scalp_signal_ok && !newsBlocked && (setup?.rr ?? 0) >= 2.5;
 
-  const limit_ready = hasDir && phase.good && (ob1h !== null || fvg1h !== null || zone1h !== null) &&
+  const limit_ready = hasDir && phase.good && retraceGate && (ob1h !== null || fvg1h !== null || zone1h !== null) &&
     (ob15mInZone || fvg15mInZone) && limit_zone_status !== "blown" && !limit_out_of_reach && !newsBlocked && (setup?.rr ?? 0) >= 2.5;
 
   const ready = mode === "scalp" ? scalp_ready : limit_ready;
@@ -423,6 +433,12 @@ export function FrameworkPanel({ symbol }: Props) {
                     <span style={{ color: "#374151", fontSize: 7 }}> {zone1h.touches} touches</span>
                   </div>
                 )}
+                {/* Fix 3 — Zone freshness warning */}
+                {zone1h && zone1h.touches >= 3 && (
+                  <div style={{ fontSize: 6.5, color: "#f59e0b", marginTop: 2 }}>
+                    ⚠ Zone tested {zone1h.touches}× — weaker, reduce size
+                  </div>
+                )}
                 {!ob1h && !fvg1h && !zone1h && (
                   <div style={{ fontSize: 7, color: "#374151" }}>No 1H zone nearby — wait</div>
                 )}
@@ -511,6 +527,12 @@ export function FrameworkPanel({ symbol }: Props) {
                       <div style={{ fontSize: 7.5, color: "#a78bfa" }}>
                         S/D @ {fmt(zone1h.bottom)}–{fmt(zone1h.top)}
                         <span style={{ color: "#374151", fontSize: 7 }}> {zone1h.touches} touches</span>
+                      </div>
+                    )}
+                    {/* Fix 3 — Zone freshness warning */}
+                    {zone1h && zone1h.touches >= 3 && (
+                      <div style={{ fontSize: 6.5, color: "#f59e0b", marginTop: 2 }}>
+                        ⚠ Zone tested {zone1h.touches}× — weaker, reduce size
                       </div>
                     )}
                     {limit_zone_status === "approaching" && (
