@@ -369,4 +369,57 @@ export function useBrokerTime() {
   });
 }
 
+// ── Framework Status (notification monitor) ───────────────────────────────────
+
+export interface PairFrameworkStatus {
+  scalp_ready:      boolean;
+  limit_ready:      boolean;
+  direction:        "bullish" | "bearish" | "neutral";
+  scalp_rr:         number;
+  limit_rr:         number;
+  phase_good:       boolean;
+  has_1h_zone:      boolean;
+  has_15m_confirm:  boolean;
+  has_5m_trigger:   boolean;
+  news_blocked:     boolean;
+  price:            number;
+  scalp_entry?:     number | null;
+  scalp_sl?:        number | null;
+  scalp_tp?:        number | null;
+  limit_entry?:     number | null;
+  limit_sl?:        number | null;
+  limit_tp?:        number | null;
+  broker_time?:     number;
+  error?:           string;
+}
+
+export interface FrameworkStatusResponse {
+  pairs:       Record<string, PairFrameworkStatus>;
+  broker_time: number;
+}
+
+export interface ActiveSetup {
+  pair:      string;
+  mode:      "scalp" | "limit";
+  direction: string;
+  rr:        number;
+  entry?:    number | null;
+  tp?:       number | null;
+  sl?:       number | null;
+}
+
+export function useFrameworkStatus(intervalMs = 30_000) {
+  return useQuery<FrameworkStatusResponse, Error>({
+    queryKey: ["framework-status"],
+    queryFn: async () => {
+      const res = await fetch("/trading-api/framework-status");
+      if (!res.ok) throw new Error(`Framework status error: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: intervalMs,
+    retry: 1,
+    staleTime: 25_000,
+  });
+}
+
 

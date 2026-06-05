@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Activity, BarChart2, ChevronDown } from "lucide-react";
+import { Activity, BarChart2, ChevronDown, Bell } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useMT5Status } from "../hooks/use-trading-api";
+import { useMT5Status, type ActiveSetup } from "../hooks/use-trading-api";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -34,6 +34,7 @@ interface TopBarProps {
   bias15m?: TrendDir;
   bias1h?: TrendDir;
   bias4h?: TrendDir;
+  activeSetups?: ActiveSetup[];
 }
 
 const SYMBOLS = [
@@ -206,7 +207,7 @@ function SymbolSelector({ symbol, setSymbol }: { symbol: string; setSymbol: (s: 
   );
 }
 
-export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h }: TopBarProps) {
+export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, activeSetups = [] }: TopBarProps) {
   const timeframes = ["5M", "15M", "1H", "4H"];
 
   const toggleLayer = (key: keyof ToggleState) => {
@@ -304,7 +305,49 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
 
       {/* RIGHT: Bias + API + Bridge */}
             {/* RIGHT: Analysis link + Bias + API + Bridge */}
+            {/* RIGHT: Framework alerts + Bias + API + Bridge + Analysis */}
       <div className="flex items-center space-x-2">
+        {/* Framework notification badge */}
+        {activeSetups.length > 0 && (
+          <div className="relative group">
+            <button className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors">
+              <Bell className="w-4 h-4 text-emerald-400" />
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white leading-none">
+                {activeSetups.length}
+              </span>
+              <span className="absolute inset-0 rounded-lg animate-ping bg-emerald-500/20" />
+            </button>
+            {/* Hover dropdown */}
+            <div className="absolute right-0 top-10 z-50 hidden group-hover:block w-72 rounded-lg border border-white/10 bg-[#0d1420] shadow-2xl p-2">
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5 px-1">
+                Active Setups
+              </p>
+              {activeSetups.map((s, i) => (
+                <div key={i} className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-white/5">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                      s.mode === "scalp" ? "bg-amber-500/15 text-amber-400" : "bg-blue-500/15 text-blue-400"
+                    )}>
+                      {s.mode.toUpperCase()}
+                    </span>
+                    <span className="text-xs font-mono text-white/80">{s.pair}</span>
+                    <span className={cn(
+                      "text-[10px]",
+                      s.direction === "bullish" ? "text-emerald-400" : "text-red-400"
+                    )}>
+                      {s.direction === "bullish" ? "▲" : "▼"}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-white/60">
+                    RR {s.rr}:1
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <a
           href="/analysis"
           target="_blank"
@@ -321,8 +364,4 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
         </div>
         <ApiBadge />
         <BridgeBadge />
-                <a href="/analysis" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80 transition-all">Analysis ↗</a>
       </div>
-    </div>
-  );
-}

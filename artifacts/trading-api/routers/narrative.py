@@ -69,13 +69,28 @@ async def _analyse_timeframe(symbol: str, interval: str, outputsize: int) -> dic
         bos           = detect_bos(df, swings, labels, trend["trend"])
         choch         = detect_choch(df, swings, labels, trend["trend"])
         zones         = detect_zones(swings, interval, float(df["close"].iloc[-1]))
+                # Convert structure labels to serialisable dicts for framework checker
+        labels_out: list[dict] = []
+        try:
+            for s in labels:
+                t = s.get("time") if isinstance(s, dict) else getattr(s, "time", None)
+                labels_out.append({
+                    "time":  int(t.timestamp()) if hasattr(t, "timestamp") else (int(t) if t is not None else 0),
+                    "price": float(s.get("price") if isinstance(s, dict) else getattr(s, "price", 0)),
+                    "label": str(s.get("label")  if isinstance(s, dict) else getattr(s, "label", "")),
+                    "kind":  str(s.get("kind")   if isinstance(s, dict) else getattr(s, "kind",  "")),
+                })
+        except Exception:
+            labels_out = []
+
         return {
-            "df":     df,
-            "trend":  trend,
-            "bos":    bos,
-            "choch":  choch,
-            "zones":  zones,
-            "price":  float(df["close"].iloc[-1]),
+            "df":               df,
+            "trend":            trend,
+            "bos":              bos,
+            "choch":            choch,
+            "zones":            zones,
+            "price":            float(df["close"].iloc[-1]),
+            "structure_labels": labels_out,
         }
     except Exception:
         return {}
@@ -309,3 +324,65 @@ async def get_environment_history(symbol: str = Query(default="USD/JPY")):
     with _env_lock:
         history = list(_env_history.get(symbol, []))
     return {"symbol": symbol, "history": history}
+
+@router.get("/framework-status")
+async def get_framework_status():
+    """
+    Returns scalp_ready + limit_ready for all 5 pairs in parallel.
+    Used by the frontend notification system — polls every 30 s.
+    All timestamps are broker time (from MT5 candles), never system clock.
+    """
+    from services.framework_checker import compute_framework_status
+
+    async def _check_one(symbol: str) -> tuple[str, dict]:
+        try:
+            results = await asyncio.gather(
+                _analyse_timeframe(symbol, "4h",  80),
+                _analyse_timeframe(symbol, "1h",  150),
+                _analyse_timeframe(symbol, "15m", 200),
+                _analyse_timeframe(symbol, "5m",  100),
+            )
+            r4h, r1h, r15m, r5m = results
+
+            try:
+                _df = r5m.get("df") or r15m.get("df") or r1h.get("df")
+                broker_ts = int(_df.iloc[-1]["time"].timestamp()) if _df is not None and len(_df) > 0 else int(time.time())
+            except Exception:
+                broker_ts = int(time.time())
+
+            sr_levels: list[dict] = []
+            try:
+                df_map: dict = {}
+                for key, res in [("4h", r4h), ("1h", r1h), ("15m", r15m)]:
+                    df = res.get("df")
+                    if df is not None and len(df) > 0:
+                        df_map[key] = df
+                if df_map:
+                    sr_levels = compute_mtf_sr_levels(df_map)
+            except Exception:
+                pass
+
+            news_blocked, _ = _get_news_status(symbol, broker_ts=broker_ts)
+
+            status = compute_framework_status(
+                symbol=symbol, r4h=r4h, r1h=r1h, r15m=r15m, r5m=r5m,
+                broker_ts=broker_ts, sr_levels=sr_levels, news_blocked=news_blocked,
+            )
+            status["broker_time"] = broker_ts
+            return symbol, status
+        except Exception as e:
+            return symbol, {"scalp_ready": False, "limit_ready": False, "error": str(e)}
+
+    tasks = [_check_one(sym) for sym in SCAN_SYMBOLS]
+    raw = await asyncio.gather(*tasks)
+
+    pairs = {sym: status for sym, status in raw}
+    try:
+        broker_ts = max(
+            (v.get("broker_time", 0) for v in pairs.values() if "broker_time" in v),
+            default=int(time.time()),
+        )
+    except Exception:
+        broker_ts = int(time.time())
+
+    return {"pairs": pairs, "broker_time": broker_ts}

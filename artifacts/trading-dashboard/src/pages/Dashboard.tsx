@@ -9,11 +9,10 @@ import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
 import { MarketNarrative } from "@/components/MarketNarrative";
 
-import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch, useBrokerTime } from "@/hooks/use-trading-api";
+import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch, useBrokerTime, type ActiveSetup } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
 
-const { data: brokerTimeData } = useBrokerTime();
-const brokerNow = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
+
 
 
 const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
@@ -23,7 +22,7 @@ const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
   "4h":  5 * 60 * 60,
 };
 
-export function Dashboard() {
+export function Dashboard({ activeSetups = [] }: { activeSetups?: ActiveSetup[] }){
   const [timeframe, setTimeframe] = useState("5m");
   const [symbol,    setSymbol]    = useState("USD/JPY");
   const [toggles, setToggles] = useState<ToggleState>({
@@ -38,6 +37,10 @@ export function Dashboard() {
     ob:       false,
     fvg:      false,
   });
+
+  const { data: brokerTimeData } = useBrokerTime();
+  const brokerNow = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
+
 
   const { data, isLoading, error, refetch, isRefetching } = useTradingAnalysis(symbol, timeframe, 500);
   const { data: srData }       = useSRLevels(symbol);
@@ -95,6 +98,7 @@ export function Dashboard() {
         bias15m={biasData?.bias_15m?.trend}
         bias1h={biasData?.bias_1h?.trend}
         bias4h={biasData?.bias_4h?.trend}
+        activeSetups={activeSetups}
       />
 
       <div className="flex-1 flex flex-row min-h-0">
