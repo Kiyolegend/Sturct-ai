@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Activity, BarChart2, ChevronDown, Bell } from "lucide-react";
+import { Activity, BarChart2, ChevronDown, Bell, Volume2, VolumeX } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useMT5Status, type ActiveSetup } from "../hooks/use-trading-api";
@@ -208,6 +208,7 @@ function SymbolSelector({ symbol, setSymbol }: { symbol: string; setSymbol: (s: 
 }
 
 export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, activeSetups = [] }: TopBarProps) {
+  const [soundMuted, setSoundMuted] = useState(() => localStorage.getItem("struct_sound_muted") === "true");
   const timeframes = ["5M", "15M", "1H", "4H"];
 
   const toggleLayer = (key: keyof ToggleState) => {
@@ -307,6 +308,24 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
             {/* RIGHT: Analysis link + Bias + API + Bridge */}
             {/* RIGHT: Framework alerts + Bias + API + Bridge + Analysis */}
       <div className="flex items-center space-x-2">
+                {/* Sound mute toggle */}
+        <button
+          onClick={() => {
+            const next = !soundMuted;
+            setSoundMuted(next);
+            localStorage.setItem("struct_sound_muted", String(next));
+          }}
+          className={cn(
+            "flex items-center justify-center w-8 h-8 rounded-lg border transition-colors",
+            soundMuted
+              ? "bg-white/5 border-white/10 text-white/30 hover:text-white/60"
+              : "bg-white/5 border-white/10 text-white/50 hover:text-white/80"
+          )}
+          title={soundMuted ? "Sound alerts muted — click to unmute" : "Sound alerts on — click to mute"}
+        >
+          {soundMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+        </button>
+
         {/* Framework notification badge */}
         {activeSetups.length > 0 && (
           <div className="relative group">
@@ -365,3 +384,6 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
         <ApiBadge />
         <BridgeBadge />
       </div>
+    </div>
+  );
+}  

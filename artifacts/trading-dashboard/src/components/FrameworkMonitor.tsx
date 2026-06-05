@@ -26,6 +26,33 @@ function fmtBrokerTime(ts: number): string {
   return `${hh}:${mm} UTC`;
 }
 
+function playAlert(mode: "scalp" | "limit") {
+  if (localStorage.getItem("struct_sound_muted") === "true") return;
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+
+    const notes = mode === "scalp"
+      ? [{ freq: 880,  start: 0,    dur: 0.12 },
+         { freq: 1100, start: 0.15, dur: 0.18 }]
+      : [{ freq: 660,  start: 0,    dur: 0.28 }];
+
+    notes.forEach(({ freq, start, dur }) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+      gain.gain.setValueAtTime(0.35, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+      osc.connect(gain);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + dur + 0.05);
+    });
+
+    setTimeout(() => ctx.close(), 1000);
+  } catch {}
+}
+
 function fireSystemNotification(title: string, body: string) {
   if (typeof Notification === "undefined") return;
   if (Notification.permission === "granted") {
@@ -73,6 +100,7 @@ export function FrameworkMonitor({ onActiveSetups }: Props) {
         const tpStr    = status.scalp_tp    ? fmt(status.scalp_tp)    : "—";
         const slStr    = status.scalp_sl    ? fmt(status.scalp_sl)    : "—";
 
+        playAlert("scalp");
         fireSystemNotification(
           `🎯 SCALP READY — ${pair}`,
           `${dir} · RR ${rr}:1 · Entry ${entryStr} · TP ${tpStr} · SL ${slStr} · ${ts}`
@@ -93,6 +121,7 @@ export function FrameworkMonitor({ onActiveSetups }: Props) {
         const tpStr    = status.limit_tp    ? fmt(status.limit_tp)    : "—";
         const slStr    = status.limit_sl    ? fmt(status.limit_sl)    : "—";
 
+        playAlert("limit");
         fireSystemNotification(
           `📍 LIMIT READY — ${pair}`,
           `${dir} · RR ${rr}:1 · Zone entry ${entryStr} · TP ${tpStr} · SL ${slStr} · ${ts}`
