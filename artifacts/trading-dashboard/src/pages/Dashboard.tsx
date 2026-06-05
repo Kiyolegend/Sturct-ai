@@ -57,16 +57,18 @@ export function Dashboard({ activeSetups = [] }: { activeSetups?: ActiveSetup[] 
   
 
   const symbolRef = useRef(symbol);
-  useEffect(() => { symbolRef.current = symbol;
-                    lastPrefillRef.current = "";
+  const lastPrefillRef = useRef<string>("");
+  useEffect(() => { 
+    symbolRef.current = symbol;
+    lastPrefillRef.current = "";
   }, [symbol]);                  
                     
-  const lastPrefillRef = useRef<string>("");
+  
     // When a scalp setup fires for the active symbol, push values to TradePanel
   useEffect(() => {
     const scalp = activeSetups.find(s => s.mode === "scalp" && s.pair === symbol);
     if (scalp && scalp.sl && scalp.tp) {
-      const key = `${symbol}-${scalp.direction}-${scalp.scalp_sl ?? scalp.sl}`;
+      const key = `${symbol}-${scalp.direction}-${scalp.sl}`;
       if (key === lastPrefillRef.current) return; // same setup, don't re-fire
       lastPrefillRef.current = key;
       setPrefill({

@@ -184,6 +184,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     setSL(defaultSL(currentPrice, direction).toFixed(DEC(currentPrice)));
     setTP(defaultTP(currentPrice, direction).toFixed(DEC(currentPrice)));
     setChartClickTarget(null);
+    setWasPrefilled(false);
   };
 
   const closePosition = (ticket: number) => {
