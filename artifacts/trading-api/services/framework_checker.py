@@ -267,6 +267,19 @@ def compute_framework_status(
             sl5m = float(candidates[-1]["price"])
     except Exception:
         sl5m = None
+            # ── sl15m from 15M structure labels (FrameworkPanel.tsx slLow / slHigh) ───
+    sl15m: Optional[float] = None
+    try:
+        labels_15m = r15m.get("structure_labels") or []
+        if is_bull:
+            cands_15m = [s for s in labels_15m if s.get("label") in ("HL", "EQL", "LL")]
+        else:
+            cands_15m = [s for s in labels_15m if s.get("label") in ("LH", "EQH", "HH")]
+        if cands_15m:
+            sl15m = float(cands_15m[-1]["price"])
+    except Exception:
+        sl15m = None
+
 
     # ── Setup (entry / SL / TP / RR) ─────────────────────────────────────────
     def _setup(mode: str) -> dict:
@@ -284,6 +297,8 @@ def compute_framework_status(
         else:
             if sl5m is not None:
                 sl_p = (sl5m - 3 * pip) if is_bull else (sl5m + 3 * pip)
+            elif sl15m is not None:
+                sl_p = (sl15m - 3 * pip) if is_bull else (sl15m + 3 * pip)
             else:
                 sl_p = (entry_p - 20 * pip) if is_bull else (entry_p + 20 * pip)
 
