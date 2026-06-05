@@ -16,7 +16,7 @@ interface TradePanelProps {
   onClickedPriceConsumed?:  () => void;
   onSLChange?:  (v: number | null) => void;
   onTPChange?:  (v: number | null) => void;
-  prefill?:     { direction: "BUY" | "SELL"; sl: number; tp: number } | null;
+  prefill?:     { direction: "BUY" | "SELL"; sl: number; tp: number; entry?: number; orderType?: "MARKET" | "LIMIT" } | null;
   onPrefillConsumed?: () => void;
 }
 
@@ -58,10 +58,12 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
 
     // Scalp pre-fill — fires when Dashboard pushes a scalp setup for this symbol
   useEffect(() => {
-    if (!prefill || !currentPrice) return;
+    if (!prefill) return;
     setDirection(prefill.direction);
-    setSL(prefill.sl.toFixed(DEC(currentPrice)));
-    setTP(prefill.tp.toFixed(DEC(currentPrice)));
+    setSL(prefill.sl.toFixed(DEC(prefill.sl)));
+    setTP(prefill.tp.toFixed(DEC(prefill.tp)));
+    if (prefill.orderType) setOrderType(prefill.orderType);
+    if (prefill.entry)     setLimitPrice(prefill.entry.toFixed(DEC(prefill.entry)));
     setWasPrefilled(true);
     onPrefillConsumed?.();
   }, [prefill]);

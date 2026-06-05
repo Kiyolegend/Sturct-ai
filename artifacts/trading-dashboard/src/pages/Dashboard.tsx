@@ -52,7 +52,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   
   const [slLine,         setSlLine]         = useState<number | null>(null);
   const [tpLine,         setTpLine]         = useState<number | null>(null);
-  const [prefill, setPrefill] = useState<{ direction: "BUY"|"SELL"; sl: number; tp: number } | null>(null);
+  const [prefill, setPrefill] = useState<{ direction: "BUY"|"SELL"; sl: number; tp: number; entry?: number; orderType?: "MARKET"|"LIMIT" } | null>(null);
   
 
   const symbolRef = useRef(symbol);
@@ -76,6 +76,8 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
         direction: setup.direction === "bullish" ? "BUY" : "SELL",
         sl: setup.sl,
         tp: setup.tp,
+        entry: setup.entry ?? undefined,
+        orderType: setup.mode === "limit" ? "LIMIT" : "MARKET",
       });
     }
   }, [activeSetups, symbol]);

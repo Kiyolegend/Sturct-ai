@@ -128,7 +128,9 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
     choch_5m  = r5m.get("choch", []) or []
     choch_15m = r15m.get("choch",[]) or []
 
-    all_zones = (r5m.get("zones") or []) + (r15m.get("zones") or []) + (r1h.get("zones") or [])
+    all_zones = (r5m.get("zones") or []) + (r15m.get("zones") or []) + (r1h.get("zones") or []) + (r4h.get("zones") or [])
+
+
 
     # ── S/R levels (multi-TF) ─────────────────────────────────────────────────
     sr_levels: list[dict] = []
