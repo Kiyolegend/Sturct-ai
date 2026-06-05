@@ -22,9 +22,8 @@ const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
   "4h":  5 * 60 * 60,
 };
 
-export function Dashboard({ activeSetups = [] }: { activeSetups?: ActiveSetup[] }){
+export function Dashboard({ activeSetups = [],setSymbol }: { activeSetups?: ActiveSetup[]; setSymbol: (symbol: string) => void }) {
   const [timeframe, setTimeframe] = useState("5m");
-  const [symbol,    setSymbol]    = useState("USD/JPY");
   const [toggles, setToggles] = useState<ToggleState>({
     zigzag:   true,
     labels:   true,
@@ -67,14 +66,16 @@ export function Dashboard({ activeSetups = [] }: { activeSetups?: ActiveSetup[] 
     // When a scalp setup fires for the active symbol, push values to TradePanel
   useEffect(() => {
     const scalp = activeSetups.find(s => s.mode === "scalp" && s.pair === symbol);
-    if (scalp && scalp.sl && scalp.tp) {
-      const key = `${symbol}-${scalp.direction}-${scalp.sl}`;
+    const limit = activeSetups.find(s => s.mode === "limit" && s.pair === symbol);
+    const setup = scalp ?? limit; // scalp takes priority over limit
+    if (setup && setup.sl && setup.tp) {
+      const key = `${symbol}-${setup.mode}-${setup.direction}-${setup.sl}`;
       if (key === lastPrefillRef.current) return; // same setup, don't re-fire
       lastPrefillRef.current = key;
       setPrefill({
-        direction: scalp.direction === "bullish" ? "BUY" : "SELL",
-        sl: scalp.sl,
-        tp: scalp.tp,
+        direction: setup.direction === "bullish" ? "BUY" : "SELL",
+        sl: setup.sl,
+        tp: setup.tp,
       });
     }
   }, [activeSetups, symbol]);

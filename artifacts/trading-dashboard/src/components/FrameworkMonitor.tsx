@@ -15,6 +15,7 @@
 import { useEffect, useRef } from "react";
 import { useFrameworkStatus, type ActiveSetup } from "@/hooks/use-trading-api";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 
 const PAIRS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"];
 
@@ -65,9 +66,10 @@ function fireSystemNotification(title: string, body: string) {
 
 interface Props {
   onActiveSetups: (setups: ActiveSetup[]) => void;
+  onSwitchSymbol: (pair: string) => void;
 }
 
-export function FrameworkMonitor({ onActiveSetups }: Props) {
+export function FrameworkMonitor({ onActiveSetups,onSwitchSymbol }: Props) {
   const { data } = useFrameworkStatus(30_000);
   const { toast } = useToast();
   // CHANGE 1: added `direction: string` to prevState shape
@@ -114,6 +116,11 @@ export function FrameworkMonitor({ onActiveSetups }: Props) {
           title:       `🎯 SCALP READY — ${pair}`,
           description: `${dir} · RR ${rr}:1 · Entry ${entryStr} · TP ${tpStr} · ${ts}`,
           duration:    20_000,
+          action: (
+            <ToastAction altText={`Switch to ${pair}`} onClick={() => onSwitchSymbol(pair)}>
+              GO TO {pair.replace("/", "")}
+            </ToastAction>
+          ),
         });
       }
 
@@ -135,6 +142,11 @@ export function FrameworkMonitor({ onActiveSetups }: Props) {
           title:       `📍 LIMIT READY — ${pair}`,
           description: `${dir} · RR ${rr}:1 · Zone entry ${entryStr} · TP ${tpStr} · ${ts}`,
           duration:    20_000,
+          action: (
+            <ToastAction altText={`Switch to ${pair}`} onClick={() => onSwitchSymbol(pair)}>
+              GO TO {pair.replace("/", "")}
+            </ToastAction>
+          ),
         });
       }
 

@@ -197,7 +197,7 @@ export function FrameworkPanel({ symbol }: Props) {
     if (!data5m?.bos) return null;
     
     return data5m.bos
-      .filter((b: any) => b.direction === dir && b.time >= brokerNow - 30 * 60)
+      .filter((b: any) => b.direction === dir && b.time >= brokerNow - 45 * 60)
       .sort((a: any, b: any) => b.time - a.time)[0] ?? null;
   }, [data5m, dir, brokerNow]);
 
@@ -229,7 +229,7 @@ export function FrameworkPanel({ symbol }: Props) {
     return Math.round(raw);
   }, [mtf, price, isBull, hasDir]);
 
-  const retraceGate = retracePct !== null && retracePct >= 38 && retracePct <= 78;
+  const retraceGate = retracePct !== null && retracePct >= 38 && retracePct <= 70;
 
   const setup = useMemo(() => {
     if (!price || !hasDir) return null;

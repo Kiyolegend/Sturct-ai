@@ -18,10 +18,14 @@ const queryClient = new QueryClient({
   },
 });
 
-function Router({ activeSetups }: { activeSetups: ActiveSetup[] }) {
+function Router({ activeSetups, symbol, setSymbol }: {
+  activeSetups: ActiveSetup[];
+  symbol: string;
+  setSymbol: (s: string) => void;
+}) {
   return (
     <Switch>
-      <Route path="/">{() => <Dashboard activeSetups={activeSetups} />}</Route>
+      <Route path="/">{() => <Dashboard activeSetups={activeSetups} symbol={symbol} setSymbol={setSymbol} />}</Route>
       <Route path="/analysis" component={AnalysisPage} />
       <Route component={NotFound} />
     </Switch>
@@ -30,14 +34,17 @@ function Router({ activeSetups }: { activeSetups: ActiveSetup[] }) {
 
 function App() {
   const [activeSetups, setActiveSetups] = useState<ActiveSetup[]>([]);
+  const [symbol, setSymbol] = useState("USD/JPY");
+
   const handleActiveSetups = useCallback((s: ActiveSetup[]) => setActiveSetups(s), []);
+  const handleSwitchSymbol = useCallback((pair: string) => setSymbol(pair), []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <FrameworkMonitor onActiveSetups={handleActiveSetups} />
-          <Router activeSetups={activeSetups} />
+          <FrameworkMonitor onActiveSetups={handleActiveSetups} onSwitchSymbol={handleSwitchSymbol} />
+          <Router activeSetups={activeSetups} symbol={symbol} setSymbol={setSymbol} />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
