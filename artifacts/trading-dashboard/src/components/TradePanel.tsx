@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { AlertTriangle, X, CheckCircle, Loader2 } from "lucide-react";
 
 // FIX 1 — relative URL (was "http://localhost:8001/trading-api")
@@ -47,14 +47,22 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   const [resultOk,         setResultOk]         = useState(false);
   const [positions,        setPositions]        = useState<Position[]>([]);
   const [chartClickTarget, setChartClickTarget] = useState<'entry' | 'sl' | 'tp' | null>(null);
-  const [wasPrefilled, setWasPrefilled] = useState(false);
+  const [wasPrefilled,     setWasPrefilled]     = useState(false);
+  // BUG 7 fix: state-based close confirmation replaces window.confirm (blocked in sandboxed iframes)
+  const [confirmCloseTicket, setConfirmCloseTicket] = useState<number | null>(null);
+  // BUG 2 fix: store order_id from POST /trade/open response to correlate with polling results
+  const orderIdRef = useRef<string | null>(null);
 
-  // Auto-update SL/TP when direction or symbol changes
+  // Auto-update SL/TP when direction, symbol, orderType change, or price first loads
+  // BUG 4 fix: was `currentPrice > 0 ? "loaded" : ""` — a string that locked to "loaded" and
+  // never changed again, so price updates never triggered this effect.
+  // Now uses numeric 0→1 transition (same single-fire on load) plus orderType so switching
+  // MARKET↔LIMIT recalculates defaults from the correct reference price.
   useEffect(() => {
     const p = orderType === "LIMIT" ? parseFloat(limitPrice) : currentPrice;
     setSL(defaultSL(p, direction).toFixed(DEC(p)));
     setTP(defaultTP(p, direction).toFixed(DEC(p)));
-  }, [direction, symbol, currentPrice > 0 ? "loaded" : ""]);
+  }, [direction, symbol, currentPrice > 0 ? 1 : 0, orderType]);
 
     // Scalp pre-fill — fires when Dashboard pushes a scalp setup for this symbol
   useEffect(() => {
@@ -69,6 +77,8 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   }, [prefill]);
 
   // Chart click routing — SL, TP, Entry, or default (switch to LIMIT)
+  // BUG 5 fix: added direction and chartClickTarget to deps — previously only [clickedPrice]
+  // caused defaultSL/defaultTP to run with stale direction/chartClickTarget closure values.
   useEffect(() => {
     if (!clickedPrice) return;
     if (chartClickTarget === 'sl') {
@@ -88,7 +98,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     setChartClickTarget(null);
     setWasPrefilled(false);
     onClickedPriceConsumed?.();
-  }, [clickedPrice]);
+  }, [clickedPrice, chartClickTarget, direction]);
 
   useEffect(() => {
     const v = parseFloat(sl);
@@ -127,9 +137,11 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   // FIX 3 — Poll for execution results with 30s timeout
   useEffect(() => {
     if (stage !== "sending") return;
-    // Timeout: if MT5 doesn't respond in 30s, show error instead of spinning forever
+    // BUG 3 fix: accurate timeout message — the order is still queued server-side and
+    // WILL execute when the MT5 bridge reconnects. The old message said "may not have
+    // executed" which is the opposite of the actual risk (zombie order).
     const timeout = setTimeout(() => {
-      setResultMsg("No response from MT5 — order may not have executed. Check MT5 manually.");
+      setResultMsg("MT5 bridge has not responded in 30s. The order is still queued and will execute when the bridge reconnects — verify in MT5 before placing another order.");
       setResultOk(false);
       setStage("result");
     }, 30000);
@@ -138,7 +150,13 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
         .then(r => r.json())
         .then(d => {
           if (d.results?.length > 0) {
-            const r = d.results[0];
+            // BUG 2 fix: match by order_id so a stale result from a previous trade
+            // (that wasn't consumed before the next order was placed) cannot be shown
+            // as the current trade's confirmation. Falls back to d.results[0] only
+            // when no order_id is stored (should not happen in normal flow).
+            const r = orderIdRef.current
+              ? (d.results.find((x: { order_id: string }) => x.order_id === orderIdRef.current) ?? d.results[0])
+              : d.results[0];
             setResultOk(r.status === "FILLED");
             setResultMsg(r.status === "FILLED"
               ? `Filled @ ${r.fill_price} (ticket ${r.ticket})`
@@ -159,7 +177,10 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   const sendOrder = useCallback(async () => {
     setStage("sending");
     try {
-      await fetch(`${API}/trade/open`, {
+      // BUG 1 fix: fetch() does NOT throw on 4xx/5xx — must check resp.ok manually.
+      // Previously a 400/422/500 from FastAPI was silently swallowed and the UI would
+      // spin for 30s then show a misleading "no MT5 response" timeout message.
+      const resp = await fetch(`${API}/trade/open`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
@@ -172,6 +193,17 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
           lots:       parseFloat(lots),
         }),
       });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        setResultMsg(`Order rejected by API (${resp.status}): ${errText}`);
+        setResultOk(false);
+        setStage("result");
+        return;
+      }
+      // BUG 2 fix: store the order_id returned by the API so the polling effect can
+      // filter results by this specific order rather than taking d.results[0] blindly.
+      const data = await resp.json();
+      orderIdRef.current = data.order_id ?? null;
     } catch {
       setResultMsg("Network error — order not sent");
       setResultOk(false);
@@ -187,14 +219,26 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     setTP(defaultTP(currentPrice, direction).toFixed(DEC(currentPrice)));
     setChartClickTarget(null);
     setWasPrefilled(false);
+    // BUG 2 fix: clear stored order_id so a new trade starts fresh
+    orderIdRef.current = null;
   };
 
+  // BUG 7+8 fix: replaced window.confirm (blocked/auto-dismissed in sandboxed iframes)
+  // with state-based inline confirmation. Also checks HTTP response status (BUG 8 —
+  // previously .catch only caught network errors, not 4xx/5xx from the API).
   const closePosition = (ticket: number) => {
-    if (!confirm(`Close position #${ticket}? This cannot be undone.`)) return;
+    setConfirmCloseTicket(ticket);
+  };
+
+  const confirmClose = (ticket: number) => {
+    setConfirmCloseTicket(null);
     fetch(`${API}/trade/close`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ ticket }),}).catch(() => alert("Close request failed — check MT5 manually"));
+      body:    JSON.stringify({ ticket }),
+    }).then(r => {
+      if (!r.ok) r.text().then(t => console.error(`Close failed (${r.status}): ${t}`));
+    }).catch(e => console.error("Close request failed — check MT5 manually", e));
   };
 
   const isBuy = direction === "BUY";
@@ -203,7 +247,15 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   
   const slInvalid = isNaN(parseFloat(sl)) || (isBuy ? parseFloat(sl) >= entryPrice : parseFloat(sl) <= entryPrice);
   const tpInvalid = isNaN(parseFloat(tp)) || (isBuy ? parseFloat(tp) <= entryPrice : parseFloat(tp) >= entryPrice);
-  const canSubmit  = !slInvalid && !tpInvalid && parseFloat(lots) > 0 && parseFloat(lots) <= 1;
+  // BUG 6 fix: added entryPrice > 0 guard — without it canSubmit was true when currentPrice
+  // is still 0 (before the MT5 bridge has pushed any data), allowing a BUY/SELL with price: 0.
+  const canSubmit  = !slInvalid && !tpInvalid && parseFloat(lots) > 0 && parseFloat(lots) <= 1 && entryPrice > 0;
+
+  // BUG 9 fix: only show positions for the currently active symbol — previously positions
+  // from all pairs were shown regardless of which pair was selected in the dashboard.
+  const visiblePositions = positions.filter(
+    p => p.symbol.replace("m", "").toLowerCase() === symbol.replace("/", "").toLowerCase()
+  );
 
   return (
     <div className="flex flex-col gap-2 p-3 bg-[#0f1520] border-t border-white/5 text-xs">
@@ -376,19 +428,35 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
         </div>
       )}
 
-      {/* OPEN POSITIONS */}
-      {positions.length > 0 && (
+      {/* OPEN POSITIONS — BUG 9 fix: filtered to current symbol only (was showing all pairs) */}
+      {visiblePositions.length > 0 && (
         <div className="mt-1 border-t border-white/5 pt-2 flex flex-col gap-1">
           <div className="text-white/30 uppercase text-[10px] font-semibold">Open Positions</div>
-          {positions.map(p => (
-            <div key={p.ticket} className="flex items-center gap-1 bg-white/5 rounded px-2 py-1">
-              <span className={p.type === "BUY" ? "text-emerald-400" : "text-red-400"}>{p.type}</span>
-              <span className="text-white/60 flex-1">{p.symbol.replace("m","")} {p.volume}</span>
-              <span className={p.profit >= 0 ? "text-emerald-400" : "text-red-400"}>{p.profit >= 0 ? "+" : ""}{p.profit.toFixed(2)}</span>
-              <button onClick={() => closePosition(p.ticket)}
-                className="ml-1 text-white/20 hover:text-red-400 transition-colors">
-                <X className="w-3 h-3" />
-              </button>
+          {visiblePositions.map(p => (
+            <div key={p.ticket} className="flex flex-col bg-white/5 rounded px-2 py-1 gap-1">
+              <div className="flex items-center gap-1">
+                <span className={p.type === "BUY" ? "text-emerald-400" : "text-red-400"}>{p.type}</span>
+                <span className="text-white/60 flex-1">{p.symbol.replace("m","")} {p.volume}</span>
+                <span className={p.profit >= 0 ? "text-emerald-400" : "text-red-400"}>{p.profit >= 0 ? "+" : ""}{p.profit.toFixed(2)}</span>
+                <button onClick={() => closePosition(p.ticket)}
+                  className="ml-1 text-white/20 hover:text-red-400 transition-colors">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              {/* BUG 7 fix: inline confirm row — replaces window.confirm which is blocked in iframes */}
+              {confirmCloseTicket === p.ticket && (
+                <div className="flex items-center gap-1">
+                  <span className="text-red-400/80 flex-1 text-[10px]">Close #{p.ticket}?</span>
+                  <button onClick={() => confirmClose(p.ticket)}
+                    className="px-2 py-0.5 bg-red-500 hover:bg-red-400 text-white rounded text-[10px] font-bold">
+                    Yes
+                  </button>
+                  <button onClick={() => setConfirmCloseTicket(null)}
+                    className="px-2 py-0.5 bg-white/5 hover:bg-white/10 text-white/60 rounded text-[10px]">
+                    No
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

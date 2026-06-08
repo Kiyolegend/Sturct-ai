@@ -66,6 +66,13 @@ HEADERS = {
 }
 
 # ================================
+# HTTP SESSION (connection pooling)
+# Re-uses TCP connections — avoids a new TLS handshake on every long-poll cycle.
+# ================================
+_session = requests.Session()
+_session.headers.update(HEADERS)
+
+# ================================
 # MT5 CONNECTION
 # ================================
 
@@ -127,7 +134,7 @@ def push_timeframe(api_symbol: str, tf_name: str, candles):
     }
 
     try:
-        resp = requests.post(PUSH_URL, json=payload, headers=HEADERS, timeout=15)
+        resp = _session.post(PUSH_URL, json=payload, timeout=15)
 
         if resp.status_code == 200:
             data = resp.json()
@@ -209,13 +216,13 @@ POSITIONS_URL = f"{API_BASE_URL}/trading-api/trade/positions/sync"
 
 def _report(order_id, ticket, status, message, fill_price=None):
     try:
-        requests.post(RESULT_URL, json={
+        _session.post(RESULT_URL, json={
             "order_id":   order_id,
             "ticket":     ticket,
             "status":     status,
             "message":    message,
             "fill_price": fill_price,
-        }, headers=HEADERS, timeout=5)
+        }, timeout=5)
     except Exception as e:
         print(f"  [TRADE] report error: {e}")
 
@@ -223,20 +230,20 @@ def _report(order_id, ticket, status, message, fill_price=None):
 def _execute_order(order: dict):
     order_id = order["order_id"]
 
-        # Discard MARKET orders that sat in queue too long — price may have moved.
-    # Uses broker server time (from MT5 tick) instead of PC clock — PC clock may be wrong.
-    queued_at = order.get("queued_at", 0)
-    if order.get("order_type") == "MARKET" and queued_at > 0:
-        _stale_sym = _api_to_mt5(order.get("symbol", ""))
-        _stale_tick = mt5.symbol_info_tick(_stale_sym) if _stale_sym else None
-        broker_now = _stale_tick.time if _stale_tick else 0
-        age = (broker_now - queued_at) if broker_now > 0 else 0
+    # Discard MARKET orders that sat in the bridge's execution queue too long.
+    # Uses _received_at — the bridge-local timestamp set the instant this batch
+    # was received from the server. Both this check and time.time() use the same
+    # PC clock, so server/PC clock skew and a corrupted PC clock are irrelevant.
+    received_at = order.get("_received_at")
+    if order.get("order_type") == "MARKET" and received_at is not None:
+        age = time.time() - received_at
         if age > 10:
-            print(f"  [TRADE] STALE market order discarded ({age:.1f}s old, broker time): {order['symbol']}")
-            _report(order_id, None, "CANCELLED", f"Market order stale ({age:.1f}s) — resubmit")
+            print(f"  [TRADE] STALE market order discarded ({age:.1f}s since received): {order['symbol']}")
+            _report(order_id, None, "CANCELLED", f"Market order stale ({age:.1f}s since received) — resubmit")
             return
+
     mt5_sym  = _api_to_mt5(order["symbol"])
-    
+
     if not mt5_sym:
         _report(order_id, None, "ERROR", f"Unknown symbol: {order['symbol']}")
         return
@@ -325,19 +332,24 @@ def _sync_positions():
         "profit":        round(p.profit, 2),
     } for p in positions]
     try:
-        requests.post(POSITIONS_URL, json={"positions": pos_list},
-                      headers=HEADERS, timeout=5)
+        _session.post(POSITIONS_URL, json={"positions": pos_list}, timeout=5)
     except Exception:
         pass
 
 
 def check_pending_orders():
     try:
-        resp = requests.get(ORDERS_URL, headers=HEADERS, timeout=20)
+        resp = _session.get(ORDERS_URL, timeout=20)
         if resp.status_code != 200:
             return
+        # Stamp the bridge-local receive time BEFORE executing anything.
+        # This is the only clock used for the MARKET-order stale check —
+        # the server's queued_at is ignored, so a corrupted PC clock or any
+        # server/PC clock skew cannot cause false-stale discards.
+        bridge_received_at = time.time()
         orders = resp.json().get("orders", [])
         for order in orders:
+            order["_received_at"] = bridge_received_at
             if order.get("order_type") == "CLOSE":
                 _execute_close(order)
             else:

@@ -274,7 +274,6 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
             )}
             title="Toggle BOS / CHOCH structure breaks (1H)">BOS</button>
 
-          {/* NEW — Order Blocks toggle (emerald green when active) */}
           <button onClick={() => toggleLayer('ob')} aria-pressed={toggles.ob}
             className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
               toggles.ob
@@ -283,7 +282,6 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
             )}
             title="Toggle Order Blocks — institutional entry zones">OB</button>
 
-          {/* NEW — Fair Value Gap toggle (sky blue when active) */}
           <button onClick={() => toggleLayer('fvg')} aria-pressed={toggles.fvg}
             className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
               toggles.fvg
@@ -291,8 +289,7 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
                 : "text-white/40 hover:text-white/70"
             )}
             title="Toggle Fair Value Gaps — price imbalance zones">FVG</button>
-            
-          {/* Fibonacci retracement levels from last 4H swing */}
+
           <button onClick={() => toggleLayer('fib')} aria-pressed={toggles.fib}
             className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
               toggles.fib
@@ -314,11 +311,9 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
         </div>
       </div>
 
-      {/* RIGHT: Bias + API + Bridge */}
-            {/* RIGHT: Analysis link + Bias + API + Bridge */}
-            {/* RIGHT: Framework alerts + Bias + API + Bridge + Analysis */}
+      {/* RIGHT: Framework alerts + Bias + API + Bridge + Analysis */}
       <div className="flex items-center space-x-2">
-                {/* Sound mute toggle */}
+        {/* Sound mute toggle */}
         <button
           onClick={() => {
             const next = !soundMuted;
@@ -346,13 +341,17 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
               </span>
               <span className="absolute inset-0 rounded-lg animate-ping bg-emerald-500/20" />
             </button>
-            {/* Hover dropdown */}
+            {/* Hover dropdown — click any row to switch chart to that pair */}
             <div className="absolute right-0 top-10 z-50 hidden group-hover:block w-72 rounded-lg border border-white/10 bg-[#0d1420] shadow-2xl p-2">
               <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5 px-1">
-                Active Setups
+                Active Setups — click to go to pair
               </p>
               {activeSetups.map((s, i) => (
-                <div key={i} className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-white/5">
+                <button
+                  key={i}
+                  onClick={() => setSymbol?.(s.pair)}
+                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-emerald-500/10 hover:border hover:border-emerald-500/20 cursor-pointer text-left transition-colors"
+                >
                   <div className="flex items-center gap-2">
                     <span className={cn(
                       "text-[10px] font-bold px-1.5 py-0.5 rounded",
@@ -371,7 +370,7 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
                   <span className="text-[10px] font-bold text-white/60">
                     RR {s.rr}:1
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -396,4 +395,4 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
       </div>
     </div>
   );
-}  
+}
