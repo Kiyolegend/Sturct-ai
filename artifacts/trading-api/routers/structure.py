@@ -20,6 +20,18 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h") else 5)
     structure_labels = classify_structure(swings)
     trend_data = detect_trend(structure_labels)
+    last_high_price = None
+    last_low_price  = None
+    for _item in reversed(structure_labels):
+        _lbl = _item.get("label", "")
+        if _lbl in ("HH", "LH", "EQH") and last_high_price is None:
+            last_high_price = float(_item["price"])
+        if _lbl in ("HL", "LL", "EQL") and last_low_price is None:
+            last_low_price = float(_item["price"])
+        if last_high_price is not None and last_low_price is not None:
+            break
+    trend_data["last_high_price"] = last_high_price
+    trend_data["last_low_price"]  = last_low_price
     trend = trend_data["trend"]
     bos_events = detect_bos(df, swings, structure_labels, trend)
     choch_events = detect_choch(df, swings, structure_labels, trend)
