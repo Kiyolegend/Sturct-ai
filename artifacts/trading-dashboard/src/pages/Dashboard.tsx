@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { TopBar, type ToggleState } from "@/components/TopBar";
 import { TradingChart, type FibLevel } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
+import { QuickScalpPanel } from "@/components/QuickScalpPanel";
+import type { QuickScalpSignal } from "@/hooks/use-trading-api";
 
 
 
@@ -82,7 +84,23 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   useEffect(() => { 
     symbolRef.current = symbol;
     lastPrefillRef.current = "";
-  }, [symbol]);                  
+  }, [symbol]);   
+    
+
+  // Quick Scalp — "Use Setup" fires: switch pair + auto-fill TradePanel
+  const handleQuickScalpUse = (signal: QuickScalpSignal) => {
+    if (!signal.direction || !signal.sl || !signal.tp) return;
+    setSymbol(signal.symbol);
+    setPrefill({
+      direction: signal.direction,
+      sl:        signal.sl,
+      tp:        signal.tp,
+      entry:     signal.entry ?? undefined,
+      orderType: "MARKET",
+    });
+  };
+
+  // When a scalp setup fires for the active symbol, push values to TradePanel               
                     
   
     // When a scalp setup fires for the active symbol, push values to TradePanel
@@ -151,8 +169,10 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
         {/* Left sidebar — pairs heatmap + narrative panel below */}
         <HeatmapSidebar activeSymbol={symbol} onSelectSymbol={setSymbol}>
 
-
-          
+          <QuickScalpPanel
+            activeSymbol={symbol}
+            onUseSetup={handleQuickScalpUse}
+          />
           
           <TradePanel
             symbol={symbol}

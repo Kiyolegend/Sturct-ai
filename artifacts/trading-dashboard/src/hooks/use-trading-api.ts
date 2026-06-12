@@ -421,5 +421,42 @@ export function useFrameworkStatus(intervalMs = 30_000) {
     staleTime: 25_000,
   });
 }
+// ── Quick Scalp Scanner ────────────────────────────────────────────────────────
 
+export interface QuickScalpCheck {
+  ok:  boolean;
+  msg: string;
+}
+
+export interface QuickScalpSignal {
+  symbol:    string;
+  status:    "green" | "yellow" | "red";
+  direction: "BUY" | "SELL" | null;
+  entry:     number | null;
+  sl:        number | null;
+  tp:        number | null;
+  sl_pips:   number | null;
+  tp_pips:   number;
+  checks:    Partial<Record<"session" | "trend" | "momentum" | "choch" | "news", QuickScalpCheck>>;
+  reason:    string;
+}
+
+export interface QuickScalpScanResponse {
+  signals:   QuickScalpSignal[];
+  timestamp: number;
+}
+
+export function useQuickScalpScan(intervalMs = 20_000) {
+  return useQuery<QuickScalpScanResponse, Error>({
+    queryKey: ["quick-scalp-scan"],
+    queryFn: async () => {
+      const res = await fetch("/trading-api/quick-scalp/scan");
+      if (!res.ok) throw new Error(`Quick scalp scan error: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: intervalMs,
+    retry: 1,
+    staleTime: 15_000,
+  });
+}
 
