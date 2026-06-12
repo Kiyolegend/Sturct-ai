@@ -4,18 +4,13 @@ import { TradingChart, type FibLevel } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 import { QuickScalpPanel } from "@/components/QuickScalpPanel";
 import type { QuickScalpSignal } from "@/hooks/use-trading-api";
-
-
-
 import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
-
+import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 
 import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBosChoch, useBrokerTime, type ActiveSetup } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
-
-
-
 
 const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
   "5m":  10 * 60,
@@ -40,9 +35,13 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     fib:      false,
   });
 
+  const { toast } = useToast();
+
+  // ── Scalp mode: "notify" = toast + click to use | "auto" = instant prefill ──
+  const [scalpMode, setScalpMode] = useState<"auto" | "notify">("notify");
+
   const { data: brokerTimeData } = useBrokerTime();
   const brokerNow = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
-
 
   const { data, isLoading, error, refetch, isRefetching } = useTradingAnalysis(symbol, timeframe, 500);
   const { data: srData }       = useSRLevels(symbol);
@@ -70,24 +69,20 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     ].map(r => ({ ...r, price: hi - (r.pct / 100) * range }));
   }, [biasData?.bias_4h]);
 
-  
-  const [wsConnected,    setWsConnected]    = useState(false);
-  const [clickedPrice,   setClickedPrice]   = useState<number | null>(null);
-  
-  const [slLine,         setSlLine]         = useState<number | null>(null);
-  const [tpLine,         setTpLine]         = useState<number | null>(null);
+  const [wsConnected,  setWsConnected]  = useState(false);
+  const [clickedPrice, setClickedPrice] = useState<number | null>(null);
+  const [slLine,       setSlLine]       = useState<number | null>(null);
+  const [tpLine,       setTpLine]       = useState<number | null>(null);
   const [prefill, setPrefill] = useState<{ direction: "BUY"|"SELL"; sl: number; tp: number; entry?: number; orderType?: "MARKET"|"LIMIT" } | null>(null);
-  
 
-  const symbolRef = useRef(symbol);
-  const lastPrefillRef = useRef<string>("");
-  useEffect(() => { 
-    symbolRef.current = symbol;
+  const symbolRef       = useRef(symbol);
+  const lastPrefillRef  = useRef<string>("");
+  useEffect(() => {
+    symbolRef.current      = symbol;
     lastPrefillRef.current = "";
-  }, [symbol]);   
-    
+  }, [symbol]);
 
-  // Quick Scalp — "Use Setup" fires: switch pair + auto-fill TradePanel
+  // ── Quick Scalp — manual "Use Setup" button ───────────────────────────────
   const handleQuickScalpUse = (signal: QuickScalpSignal) => {
     if (!signal.direction || !signal.sl || !signal.tp) return;
     setSymbol(signal.symbol);
@@ -100,23 +95,54 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     });
   };
 
-  // When a scalp setup fires for the active symbol, push values to TradePanel               
-                    
-  
-    // When a scalp setup fires for the active symbol, push values to TradePanel
+  // ── Quick Scalp — new green signal detected ───────────────────────────────
+  const handleNewGreenSignal = (signal: QuickScalpSignal) => {
+    if (!signal.direction || !signal.sl || !signal.tp) return;
+    const isBuy = signal.direction === "BUY";
+    const mode  = (signal as any).mode as string | undefined;
+
+    if (scalpMode === "auto") {
+      // Auto mode: immediately switch pair + prefill trade panel
+      setSymbol(signal.symbol);
+      setPrefill({
+        direction: signal.direction,
+        sl:        signal.sl,
+        tp:        signal.tp,
+        entry:     signal.entry ?? undefined,
+        orderType: "MARKET",
+      });
+    } else {
+      // Notify mode: show toast with a "Use" action button
+      toast({
+        title: `⚡ ${signal.symbol.replace("/", "")} ${signal.direction}${mode ? ` · Mode ${mode}` : ""}`,
+        description: signal.reason,
+        action: (
+          <ToastAction
+            altText="Use this scalp setup"
+            onClick={() => handleQuickScalpUse(signal)}
+            className={isBuy ? "bg-emerald-500 hover:bg-emerald-400 text-white border-0" : "bg-red-500 hover:bg-red-400 text-white border-0"}
+          >
+            {isBuy ? "▲ Use" : "▼ Use"}
+          </ToastAction>
+        ),
+      });
+    }
+  };
+
+  // ── Framework-based active setups (existing) ──────────────────────────────
   useEffect(() => {
     const scalp = activeSetups.find(s => s.mode === "scalp" && s.pair === symbol);
     const limit = activeSetups.find(s => s.mode === "limit" && s.pair === symbol);
-    const setup = scalp ?? limit; // scalp takes priority over limit
+    const setup = scalp ?? limit;
     if (setup && setup.sl && setup.tp) {
       const key = `${symbol}-${setup.mode}-${setup.direction}-${setup.sl}`;
-      if (key === lastPrefillRef.current) return; // same setup, don't re-fire
+      if (key === lastPrefillRef.current) return;
       lastPrefillRef.current = key;
       setPrefill({
         direction: setup.direction === "bullish" ? "BUY" : "SELL",
-        sl: setup.sl,
-        tp: setup.tp,
-        entry: setup.entry ?? undefined,
+        sl:        setup.sl,
+        tp:        setup.tp,
+        entry:     setup.entry ?? undefined,
         orderType: setup.mode === "limit" ? "LIMIT" : "MARKET",
       });
     }
@@ -125,14 +151,13 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   useEffect(() => {
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${proto}://${window.location.host}/trading-api/ws`);
-    ws.onopen  = () => setWsConnected(true);
-    ws.onclose = () => setWsConnected(false);
+    ws.onopen    = () => setWsConnected(true);
+    ws.onclose   = () => setWsConnected(false);
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === "candle" && msg.symbol === symbolRef.current) {
           refetch();
-      
         }
       } catch {}
     };
@@ -166,14 +191,16 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
       />
 
       <div className="flex-1 flex flex-row min-h-0">
-        {/* Left sidebar — pairs heatmap + narrative panel below */}
         <HeatmapSidebar activeSymbol={symbol} onSelectSymbol={setSymbol}>
 
           <QuickScalpPanel
             activeSymbol={symbol}
             onUseSetup={handleQuickScalpUse}
+            scalpMode={scalpMode}
+            onModeChange={setScalpMode}
+            onNewGreenSignal={handleNewGreenSignal}
           />
-          
+
           <TradePanel
             symbol={symbol}
             currentPrice={data?.candles?.at(-1)?.close ?? 0}
@@ -186,7 +213,6 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
           />
 
           <NewsPanel />
-          
 
         </HeatmapSidebar>
 
@@ -234,7 +260,6 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                 fibLevels={fibLevels}
               />
 
-              {/* Live / Offline indicator */}
               <div className={`absolute bottom-6 right-6 px-3 py-1.5 backdrop-blur-md border rounded-full flex items-center space-x-2 shadow-lg z-50 ${wsConnected ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30"}`}>
                 <div className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
                 <span className={`text-[10px] font-mono uppercase tracking-wider ${wsConnected ? "text-green-400" : "text-red-400"}`}>
@@ -268,7 +293,6 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
           )}
         </main>
       </div>
-      
     </div>
   );
 }

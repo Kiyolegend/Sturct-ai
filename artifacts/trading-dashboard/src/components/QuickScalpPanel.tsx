@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Zap, RefreshCw, Loader2 } from "lucide-react";
 import { useQuickScalpScan, type QuickScalpSignal } from "@/hooks/use-trading-api";
 
 interface QuickScalpPanelProps {
-  activeSymbol: string;
-  onUseSetup: (signal: QuickScalpSignal) => void;
+  activeSymbol:      string;
+  onUseSetup:        (signal: QuickScalpSignal) => void;
+  scalpMode:         "auto" | "notify";
+  onModeChange:      (mode: "auto" | "notify") => void;
+  onNewGreenSignal:  (signal: QuickScalpSignal) => void;
 }
 
 const STATUS_STYLE = {
@@ -28,13 +31,14 @@ function SignalCard({
   isActive,
   onUse,
 }: {
-  signal: QuickScalpSignal;
+  signal:   QuickScalpSignal;
   isActive: boolean;
-  onUse: () => void;
+  onUse:    () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const style = STATUS_STYLE[signal.status];
-  const isBuy = signal.direction === "BUY";
+  const style  = STATUS_STYLE[signal.status];
+  const isBuy  = signal.direction === "BUY";
+  const mode   = signal.mode;
 
   if (signal.status === "red") {
     return (
@@ -59,6 +63,11 @@ function SignalCard({
         {signal.direction && (
           <span className={`text-[10px] font-bold px-1 rounded ${isBuy ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"}`}>
             {signal.direction}
+          </span>
+        )}
+        {mode && (
+          <span className="text-[9px] px-1 rounded bg-white/5 text-white/30 font-mono">
+            {mode}
           </span>
         )}
         <span className={`text-[10px] flex-1 ${style.label}`}>
@@ -89,9 +98,11 @@ function SignalCard({
           <div className="flex flex-col gap-0.5 border-t border-white/5 pt-1">
             {signal.checks.session  && <CheckRow label="Session"  ok={signal.checks.session.ok}  msg={signal.checks.session.msg}  />}
             {signal.checks.trend    && <CheckRow label="Trend"    ok={signal.checks.trend.ok}    msg={signal.checks.trend.msg}    />}
-            {signal.checks.momentum && <CheckRow label="Momentum" ok={signal.checks.momentum.ok} msg={signal.checks.momentum.msg} />}
-            {signal.checks.choch    && <CheckRow label="CHoCH"    ok={signal.checks.choch.ok}    msg={signal.checks.choch.msg}    />}
             {signal.checks.news     && <CheckRow label="News"     ok={signal.checks.news.ok}     msg={signal.checks.news.msg}     />}
+            {signal.checks.mode_a   && <CheckRow label="Mode A"   ok={signal.checks.mode_a.ok}   msg={signal.checks.mode_a.msg}   />}
+            {signal.checks.mode_b   && <CheckRow label="Mode B"   ok={signal.checks.mode_b.ok}   msg={signal.checks.mode_b.msg}   />}
+            {signal.checks.mode_c   && <CheckRow label="Mode C"   ok={signal.checks.mode_c.ok}   msg={signal.checks.mode_c.msg}   />}
+            {signal.checks.mode_d   && <CheckRow label="Mode D"   ok={signal.checks.mode_d.ok}   msg={signal.checks.mode_d.msg}   />}
           </div>
 
           {signal.status === "green" && signal.sl && signal.tp && (
@@ -112,16 +123,40 @@ function SignalCard({
   );
 }
 
-export function QuickScalpPanel({ activeSymbol, onUseSetup }: QuickScalpPanelProps) {
+export function QuickScalpPanel({
+  activeSymbol,
+  onUseSetup,
+  scalpMode,
+  onModeChange,
+  onNewGreenSignal,
+}: QuickScalpPanelProps) {
   const { data, isLoading, refetch, dataUpdatedAt } = useQuickScalpScan(20_000);
 
-  const signals = data?.signals ?? [];
-  const greenCount = signals.filter(s => s.status === "green").length;
+  const signals     = data?.signals ?? [];
+  const greenCount  = signals.filter(s => s.status === "green").length;
   const yellowCount = signals.filter(s => s.status === "yellow").length;
 
   const lastUpdate = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
+
+  // Track previous statuses to detect green transitions
+  const prevStatusRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!data?.signals) return;
+    for (const sig of data.signals) {
+      const prev = prevStatusRef.current[sig.symbol];
+      // Only fire when a signal NEWLY becomes green (wasn't green before)
+      if (sig.status === "green" && prev !== undefined && prev !== "green") {
+        onNewGreenSignal(sig);
+      }
+    }
+    // Update ref with current statuses
+    prevStatusRef.current = Object.fromEntries(
+      data.signals.map(s => [s.symbol, s.status])
+    );
+  }, [data]);
 
   return (
     <div className="flex flex-col gap-1.5 p-3 border-b border-white/5 bg-[#0a0f1a]">
@@ -135,6 +170,18 @@ export function QuickScalpPanel({ activeSymbol, onUseSetup }: QuickScalpPanelPro
             <RefreshCw className="w-3 h-3" />
           </button>
         )}
+        {/* Mode toggle */}
+        <button
+          onClick={() => onModeChange(scalpMode === "auto" ? "notify" : "auto")}
+          className={`text-[9px] px-1.5 py-0.5 rounded font-bold border transition-all ${
+            scalpMode === "auto"
+              ? "bg-yellow-500/20 border-yellow-500/40 text-yellow-300"
+              : "bg-white/5 border-white/10 text-white/30 hover:text-white/50"
+          }`}
+          title={scalpMode === "auto" ? "Mode: Auto-fill trade panel on green" : "Mode: Notify on green — click to use"}
+        >
+          {scalpMode === "auto" ? "AUTO" : "NOTIFY"}
+        </button>
         <div className="flex items-center gap-1">
           {greenCount > 0 && (
             <span className="text-[9px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full font-bold">
@@ -150,7 +197,7 @@ export function QuickScalpPanel({ activeSymbol, onUseSetup }: QuickScalpPanelPro
       </div>
 
       <div className="text-[9px] text-white/20 font-mono">
-        5M · SL=structural swing · TP=6p · 0.02 lots · {lastUpdate ? `updated ${lastUpdate}` : "scanning…"}
+        5M · SL=structural · TP=6-8p · 0.02 lots · {lastUpdate ? `updated ${lastUpdate}` : "scanning…"}
       </div>
 
       <div className="flex flex-col gap-1">
