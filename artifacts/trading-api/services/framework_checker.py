@@ -228,31 +228,7 @@ def compute_framework_status(
     ob15m_in_zone  = ob15m  is not None and any(_overlaps(ob15m,  h) for h in _1h_zones)
     fvg15m_in_zone = fvg15m is not None and any(_overlaps(fvg15m, h) for h in _1h_zones)
 
-    # ── Recency-filtered CHoCH / BOS ──────────────────────────────────────────
-    choch_15m_list = [
-        c for c in (r15m.get("choch") or [])
-        if c.get("direction") == direction and c.get("time", 0) >= broker_ts - 3 * 3600
-    ]
-    choch_15m = max(choch_15m_list, key=lambda c: c["time"]) if choch_15m_list else None
-
-    bos_15m_list = [
-        b for b in (r15m.get("bos") or [])
-        if b.get("direction") == direction and b.get("time", 0) >= broker_ts - 2 * 3600
-    ]
-    bos_15m = max(bos_15m_list, key=lambda b: b["time"]) if bos_15m_list else None
-
-    bos_5m_list = [
-        b for b in (r5m.get("bos") or [])
-        if b.get("direction") == direction and b.get("time", 0) >= broker_ts - 45 * 60
-    ]
-    bos_5m = max(bos_5m_list, key=lambda b: b["time"]) if bos_5m_list else None
-
-    has_15m_confirm = choch_15m is not None or bos_15m is not None
-    has_5m_trigger  = bos_5m is not None
-
-    # ── Scalp invalidation guards ─────────────────────────────────────────────
-    scalp_drift   = round(abs(current_price - bos_5m["price"]) / pip) if bos_5m else 0
-    scalp_chasing = scalp_drift > 20
+    
 
     # ── sl5m from 5M structure labels ─────────────────────────────────────────
     sl5m: Optional[float] = None
@@ -354,13 +330,10 @@ def compute_framework_status(
         rr     = round(reward / risk, 1) if risk > 0 else 0.0
         return {"entry": round(entry_p, 5), "sl": round(sl_p, 5), "tp": round(tp_p, 5), "rr": rr}
 
-    scalp_setup = _setup("scalp")
+    
     limit_setup = _setup("limit")
 
-    scalp_tp_hit = (
-        (current_price >= scalp_setup["tp"]) if is_bull else (current_price <= scalp_setup["tp"])
-    )
-    scalp_signal_ok = not scalp_chasing and not scalp_tp_hit
+    
 
     # ── Limit zone status ─────────────────────────────────────────────────────
     lz = ob1h or fvg1h or zone1h
@@ -381,11 +354,7 @@ def compute_framework_status(
     limit_out_of_reach = limit_zone_distance > 50
 
     # ── Ready flags ───────────────────────────────────────────────────────────
-    scalp_ready = bool(
-        has_dir and phase_ok and has_1h_zone and has_15m_confirm and
-        has_5m_trigger and scalp_signal_ok and not news_blocked and
-        scalp_setup["rr"] >= 2.5
-    )
+    
     limit_ready = bool(
         has_dir and phase_ok and retrace_gate and has_1h_zone and
         (ob15m_in_zone or fvg15m_in_zone) and
@@ -394,20 +363,13 @@ def compute_framework_status(
     )
 
     return {
-        "scalp_ready":      scalp_ready,
         "limit_ready":      limit_ready,
         "direction":        direction,
-        "scalp_rr":         scalp_setup["rr"],
         "limit_rr":         limit_setup["rr"],
         "phase_good":       phase_ok,
         "has_1h_zone":      has_1h_zone,
-        "has_15m_confirm":  has_15m_confirm,
-        "has_5m_trigger":   has_5m_trigger,
         "news_blocked":     news_blocked,
         "price":            round(current_price, 5),
-        "scalp_entry":      scalp_setup["entry"],
-        "scalp_sl":         scalp_setup["sl"],
-        "scalp_tp":         scalp_setup["tp"],
         "limit_entry":      limit_setup["entry"],
         "limit_sl":         limit_setup["sl"],
         "limit_tp":         limit_setup["tp"],

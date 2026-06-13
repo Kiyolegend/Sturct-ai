@@ -218,9 +218,7 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
             broker_ts=broker_ts, sr_levels=sr_levels, news_blocked=news_blocked,
         )
         narrative["framework"] = {
-            "scalp_ready": fw["scalp_ready"],
             "limit_ready": fw["limit_ready"],
-            "scalp_rr":    fw.get("scalp_rr", 0),
             "limit_rr":    fw.get("limit_rr", 0),
         }
     except Exception:
