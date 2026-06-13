@@ -367,7 +367,15 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
         "mode":      active_mode,
     })
 
-    if active_mode:
+        # R:R gate — SL must not exceed 2× TP
+    MAX_SL_RATIO = 2.0
+    if active_mode and sl_pips > tp_pips * MAX_SL_RATIO:
+        out["status"] = "yellow"
+        out["reason"] = (
+            f"{direction.capitalize()} · Mode {active_mode} setup valid "
+            f"but SL {sl_pips:.0f}p too wide vs TP {tp_pips}p — waiting for tighter entry"
+        )
+    elif active_mode:
         out["status"] = "green"
         out["reason"] = (
             f"{direction.capitalize()} · Mode {active_mode}: {active_msg} · {sess_msg}"
