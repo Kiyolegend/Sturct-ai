@@ -21,10 +21,11 @@ TP: 8 pips for EUR/USD, GBP/USD, AUD/USD, USD/CHF  |  6 pips for USD/JPY
 from __future__ import annotations
 
 import asyncio
+import httpx
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-import httpx
+
 from fastapi import APIRouter
 
 from services.data_service import fetch_ohlc
@@ -33,13 +34,14 @@ from services.structure_engine import classify_structure
 from services.trend_engine import detect_trend
 from services.choch_engine import detect_choch
 from services.mt5_store import get_latest_timestamp
+from services.structure_cache import get_result as _cache_get, set_result as _cache_set
 
 router = APIRouter()
 
 SYMBOLS       = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"]
 TP_PIPS_JPY   = 6
 TP_PIPS_OTHER = 8
-STRUCT_API    = "http://localhost:8001/trading-api"
+
 
 
 def _pip(price: float) -> float:
@@ -101,14 +103,7 @@ async def _news_clear(symbol: str) -> tuple[bool, str]:
         return True, "News service offline — clear"
 
 
-# ── MTF bias fetch ─────────────────────────────────────────────────────────────
-async def _get_mtf_bias(symbol: str) -> dict:
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            r = await client.get(f"{STRUCT_API}/mtf-bias", params={"symbol": symbol})
-            return r.json()
-    except Exception:
-        return {}
+
 
 
 # ── Entry Mode A: Momentum candle ──────────────────────────────────────────────
@@ -275,48 +270,62 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
         out["reason"] = sess_msg
         return out
 
-    # 2. Parallel fetch: 5M data + MTF bias + news
-    gathered = await asyncio.gather(
-        fetch_ohlc(symbol=symbol, interval="5m", outputsize=100),
-        _get_mtf_bias(symbol),
-        _news_clear(symbol),
-        return_exceptions=True,
-    )
-    df_res, mtf_bias_res, news_res = gathered
-
-    if isinstance(df_res, Exception):
-        out["reason"] = f"No MT5 data: {df_res}"
-        return out
-
-    df       = df_res
-    mtf_bias = mtf_bias_res if not isinstance(mtf_bias_res, Exception) else {}
-    news_ok, news_msg = news_res if not isinstance(news_res, Exception) else (True, "News check error — clear")
+        # 2. News check (async) + cache reads (instant)
+    news_ok, news_msg = await _news_clear(symbol)
 
     out["checks"]["news"] = {"ok": news_ok, "msg": news_msg}
     if not news_ok:
         out["reason"] = news_msg
         return out
 
-    candles = [
-        {
-            "time":  int(row["time"].timestamp()),
-            "open":  float(row["open"]),
-            "high":  float(row["high"]),
-            "low":   float(row["low"]),
-            "close": float(row["close"]),
-        }
-        for _, row in df.iterrows()
-    ]
-    price = candles[-1]["close"] if candles else 0.0
+    # Read 5M structure from cache (written by /structure or /analysis route)
+    r5m = _cache_get(symbol, "5m")
+    if r5m is None:
+        # Cache miss — compute once and store
+        try:
+            df = await fetch_ohlc(symbol=symbol, interval="5m", outputsize=100)
+        except Exception as e:
+            out["reason"] = f"No MT5 data: {e}"
+            return out
+        swings           = detect_swings(df, fractal_n=5)
+        structure_labels = classify_structure(swings)
+        trend_data       = detect_trend(structure_labels)
+        choch_events     = detect_choch(df, swings, structure_labels, trend_data.get("trend", "neutral"))
+        candles_raw      = [
+            {"time": int(row["time"].timestamp()), "open": float(row["open"]),
+             "high": float(row["high"]), "low": float(row["low"]), "close": float(row["close"])}
+            for _, row in df.iterrows()
+        ]
+        r5m = {"structure_labels": structure_labels, "trend": trend_data,
+               "choch": choch_events, "candles": candles_raw,
+               "price": float(df["close"].iloc[-1]) if len(df) > 0 else 0.0}
+        _cache_set(symbol, "5m", r5m)
+
+    # Read MTF bias from cache — NO HTTP call to self anymore
+    r15m = _cache_get(symbol, "15m") or {}
+    r1h  = _cache_get(symbol, "1h")  or {}
+    r4h  = _cache_get(symbol, "4h")  or {}
+    mtf_bias = {
+        "bias_15m": r15m.get("trend") or {},
+        "bias_1h":  r1h.get("trend")  or {},
+        "bias_4h":  r4h.get("trend")  or {},
+    }
+
+    candles          = r5m.get("candles", [])
+    structure_labels = r5m.get("structure_labels", [])
+    trend_data       = r5m.get("trend", {})
+    choch_events     = r5m.get("choch", [])
+    price            = r5m.get("price") or (candles[-1]["close"] if candles else 0.0)
+
     if not price:
         out["reason"] = "Price is zero"
         return out
+    out["checks"]["news"] = {"ok": news_ok, "msg": news_msg}
+    if not news_ok:
+        out["reason"] = news_msg
+        return out
 
-    # 3. Trend (fractal_n=3 — faster detection, less neutral)
-    swings           = detect_swings(df, fractal_n=5)
-    structure_labels = classify_structure(swings)
-    trend_data       = detect_trend(structure_labels)
-    direction        = trend_data.get("trend", "neutral")
+    direction = trend_data.get("trend", "neutral")
 
     if direction == "neutral":
         out["checks"]["trend"] = {"ok": False, "msg": "Neutral — no bias"}

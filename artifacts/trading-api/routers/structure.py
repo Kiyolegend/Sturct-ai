@@ -3,6 +3,8 @@ from fastapi import APIRouter, Query, HTTPException
 import asyncio
 import time
 from services.data_service import fetch_ohlc, candles_to_dict
+from services.structure_cache import set_result as _cache_set
+from services.structure_cache import get_result as _cache_get
 from services.zigzag_engine import detect_swings, swings_to_zigzag_lines
 from services.structure_engine import classify_structure
 from services.trend_engine import detect_trend
@@ -16,6 +18,9 @@ from services.session_engine import compute_sessions
 router = APIRouter()
 
 async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
+    cached = _cache_get(symbol, interval)
+    if cached:
+        return cached
     df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
     swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h") else 5)
     structure_labels = classify_structure(swings)
@@ -52,6 +57,8 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
         "trendlines": trendlines,
         "zones": zones,
     }
+    _cache_set(symbol, interval, result)
+    return result
 
 @router.get("/structure")
 async def get_structure(
@@ -223,6 +230,10 @@ async def get_mtf_bias(
         t15m = _bias(df_15m, fractal_n=5)
         t1h  = _bias(df_1h,  fractal_n=3)
         t4h  = _bias(df_4h,  fractal_n=3)
+
+        _cache_set(symbol, "15m", {"trend": t15m, "price": t15m.get("current_price")})
+        _cache_set(symbol, "1h",  {"trend": t1h,  "price": t1h.get("current_price")})
+        _cache_set(symbol, "4h",  {"trend": t4h,  "price": t4h.get("current_price")})
 
         return {
             "symbol": symbol,
