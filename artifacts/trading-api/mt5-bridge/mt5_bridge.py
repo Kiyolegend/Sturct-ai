@@ -133,20 +133,31 @@ def push_timeframe(api_symbol: str, tf_name: str, candles):
         "candles":  candles
     }
 
-    try:
-        resp = _session.post(PUSH_URL, json=payload, timeout=15)
+    for attempt in range(2):
+        try:
+            resp = _session.post(PUSH_URL, json=payload, timeout=15)
 
-        if resp.status_code == 200:
-            data = resp.json()
-            print(f"OK {tf_name}: {data.get('candles_received', 0)} candles")
-            return True
-        else:
-            print(f"ERROR {tf_name}: HTTP {resp.status_code}")
+            if resp.status_code == 200:
+                data = resp.json()
+                print(f"OK {tf_name}: {data.get('candles_received', 0)} candles")
+                return True
+            else:
+                print(f"ERROR {tf_name}: HTTP {resp.status_code}")
+                return False
+
+        except requests.exceptions.Timeout:
+            if attempt == 0:
+                print(f"  [RETRY] {tf_name} timed out — retrying in 2s...")
+                time.sleep(2)
+            else:
+                print(f"ERROR {tf_name}: timed out after retry")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            print(f"ERROR {tf_name}: {e}")
             return False
 
-    except requests.exceptions.RequestException as e:
-        print(f"ERROR {tf_name}: {e}")
-        return False
+    return False
 
 # ================================
 # MAIN PUSH FUNCTIONS
