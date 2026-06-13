@@ -10,7 +10,7 @@
  * Price used for drift is data5m.current_price (60s refresh) not MTF bias (5min refresh).
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
   useMTFBias,
   useSRLevels,
@@ -177,23 +177,11 @@ export function FrameworkPanel({ symbol }: Props) {
       })[0] ?? null;
   }, [data1h, price, isBull, hasDir, pip]);
 
-  const choch15m = useMemo(() => {
-    if (!data15m?.choch) return null;
-    
-    return data15m.choch
-      .filter((c: any) => c.direction === dir && c.time >= brokerNow - 3 * 3600)
-      .sort((a: any, b: any) => b.time - a.time)[0] ?? null;
-  }, [data15m, dir, brokerNow]);
+  
 
   
 
-  const bos5m = useMemo(() => {
-    if (!data5m?.bos) return null;
-    
-    return data5m.bos
-      .filter((b: any) => b.direction === dir && b.time >= brokerNow - 45 * 60)
-      .sort((a: any, b: any) => b.time - a.time)[0] ?? null;
-  }, [data5m, dir, brokerNow]);
+  
 
   const sl5m = useMemo(() => {
     if (!data5m?.structure_labels?.length || !hasDir) return null;
@@ -269,11 +257,7 @@ export function FrameworkPanel({ symbol }: Props) {
     const hi4h = mtf?.bias_4h.last_high_price as number | undefined;
     const lo4h = mtf?.bias_4h.last_low_price  as number | undefined;
     const fibFallback = (hi4h && lo4h && hi4h > lo4h)
-       ? (() => {
-           const fibRange = hi4h - lo4h;
-           const ext127 = isBull ? hi4h + 0.272 * fibRange : lo4h - 0.272 * fibRange;
-           const ext162 = isBull ? hi4h + 0.618 * fibRange : lo4h - 0.618 * fibRange;
-         })()
+       ? (isBull ? hi4h + 0.618 * (hi4h - lo4h) : lo4h - 0.618 * (hi4h - lo4h))
        : isBull ? entryP + (symbol.includes('JPY') ? 60 : 40) * pip
                 : entryP - (symbol.includes('JPY') ? 60 : 40) * pip;
     const tpP = tpLevel ? tpLevel.price : fibFallback;
@@ -322,7 +306,7 @@ export function FrameworkPanel({ symbol }: Props) {
 
   const fmt  = (p: number) => p > 50 ? p.toFixed(3) : p.toFixed(5);
   const pips = (a: number, b: number) => Math.round(Math.abs(a - b) / pip);
-  const ago  = (t: number) => Math.round((brokerNow - t) / 60);
+  
 
   const invalidReason: string | null = useMemo(() => {
     if (limit_zone_status === "blown") return "ZONE BLOWN — price passed through zone, setup invalidated";
