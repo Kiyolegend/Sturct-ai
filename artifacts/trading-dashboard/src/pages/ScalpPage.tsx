@@ -209,11 +209,11 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/5 bg-[#0a0f1a] shrink-0">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => window.close()}
           className="flex items-center gap-1.5 text-white/40 hover:text-white/70 transition-colors text-xs"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Chart
+          Close
         </button>
 
         <div className="w-px h-4 bg-white/10" />
