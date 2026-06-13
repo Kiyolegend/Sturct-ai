@@ -71,7 +71,7 @@ function Step({ num, tf, title, met, children }: {
 }
 
 export function FrameworkPanel({ symbol }: Props) {
-  const [mode, setMode] = useState<Mode>("scalp");
+  const mode = "limit" as const;
 
   const { data: mtf }      = useMTFBias(symbol);
   const { data: srData }   = useSRLevels(symbol);
@@ -185,13 +185,7 @@ export function FrameworkPanel({ symbol }: Props) {
       .sort((a: any, b: any) => b.time - a.time)[0] ?? null;
   }, [data15m, dir, brokerNow]);
 
-  const bos15m = useMemo(() => {
-    if (!data15m?.bos) return null;
-    
-    return data15m.bos
-      .filter((b: any) => b.direction === dir && b.time >= brokerNow - 2 * 3600)
-      .sort((a: any, b: any) => b.time - a.time)[0] ?? null;
-  }, [data15m, dir, brokerNow]);
+  
 
   const bos5m = useMemo(() => {
     if (!data5m?.bos) return null;
@@ -279,7 +273,6 @@ export function FrameworkPanel({ symbol }: Props) {
            const fibRange = hi4h - lo4h;
            const ext127 = isBull ? hi4h + 0.272 * fibRange : lo4h - 0.272 * fibRange;
            const ext162 = isBull ? hi4h + 0.618 * fibRange : lo4h - 0.618 * fibRange;
-           return mode === 'scalp' ? ext127 : ext162;
          })()
        : isBull ? entryP + (symbol.includes('JPY') ? 60 : 40) * pip
                 : entryP - (symbol.includes('JPY') ? 60 : 40) * pip;
@@ -293,18 +286,7 @@ export function FrameworkPanel({ symbol }: Props) {
 
   // ── STALE PRICE / INVALIDATION GUARDS ────────────────────────────────────────
 
-  const scalp_drift = useMemo(() => {
-    if (!bos5m || !livePrice) return 0;
-    return Math.round(Math.abs(livePrice - bos5m.price) / pip);
-  }, [bos5m, livePrice, pip]);
-
-  const scalp_chasing = scalp_drift > 20;
-
-  const scalp_tp_hit = useMemo(() => {
-    if (!setup || !livePrice) return false;
-    return isBull ? livePrice >= setup.tp : livePrice <= setup.tp;
-  }, [setup, livePrice, isBull]);
-
+  
   const limit_zone_status = useMemo((): ZoneStatus => {
     if (mode !== "limit" || !livePrice) return "none";
     const zone = ob1h ?? fvg1h ?? zone1h;
@@ -332,32 +314,21 @@ export function FrameworkPanel({ symbol }: Props) {
 
   const limit_out_of_reach = limit_zone_distance > 50;
 
-  // ── READY FLAGS ───────────────────────────────────────────────────────────────
-  const scalp_signal_ok = !scalp_chasing && !scalp_tp_hit;
-  const scalp_ready = hasDir && phase.good && (ob1h !== null || fvg1h !== null || zone1h !== null) &&
-    (choch15m !== null || bos15m !== null) && bos5m !== null && scalp_signal_ok && !newsBlocked && (setup?.rr ?? 0) >= 2.5;
-
+    // ── READY FLAGS ───────────────────────────────────────────────────────────────
   const limit_ready = hasDir && phase.good && retraceGate && (ob1h !== null || fvg1h !== null || zone1h !== null) &&
     (ob15mInZone || fvg15mInZone) && limit_zone_status !== "blown" && !limit_out_of_reach && !newsBlocked && (setup?.rr ?? 0) >= 2.5;
 
-  const ready = mode === "scalp" ? scalp_ready : limit_ready;
+  const ready = limit_ready;
 
   const fmt  = (p: number) => p > 50 ? p.toFixed(3) : p.toFixed(5);
   const pips = (a: number, b: number) => Math.round(Math.abs(a - b) / pip);
   const ago  = (t: number) => Math.round((brokerNow - t) / 60);
 
   const invalidReason: string | null = useMemo(() => {
-    if (mode === "scalp") {
-      if (scalp_tp_hit)   return "SETUP MISSED — TP level already reached before entry";
-      if (scalp_chasing)  return `DO NOT TRADE — price drifted ${scalp_drift}p from signal, chasing`;
-    }
-    if (mode === "limit") {
-      if (limit_zone_status === "blown") return "ZONE BLOWN — price passed through zone, setup invalidated";
-      if (limit_out_of_reach) return `ZONE OUT OF REACH — price moved ${limit_zone_distance}p from zone, do not chase`;
-    }
+    if (limit_zone_status === "blown") return "ZONE BLOWN — price passed through zone, setup invalidated";
+    if (limit_out_of_reach) return `ZONE OUT OF REACH — price moved ${limit_zone_distance}p from zone, do not chase`;
     return null;
-  }, [mode, scalp_tp_hit, scalp_chasing, scalp_drift, limit_zone_status, limit_out_of_reach, limit_zone_distance]);
-
+  }, [limit_zone_status, limit_out_of_reach, limit_zone_distance]);
   return (
     <div style={{
       background: "#0a0e17",
@@ -370,17 +341,6 @@ export function FrameworkPanel({ symbol }: Props) {
         <span style={{ fontSize: 7.5, fontWeight: 700, color: "#475569", letterSpacing: "0.1em" }}>
           FRAMEWORK
         </span>
-        <div style={{ display: "flex", gap: 3 }}>
-          {(["scalp", "limit"] as Mode[]).map(m => (
-            <button key={m} onClick={() => setMode(m)} style={{
-              padding: "2px 7px", borderRadius: 3, cursor: "pointer",
-              border:   `1px solid ${mode === m ? "#3b82f6" : "rgba(255,255,255,0.08)"}`,
-              background: mode === m ? "rgba(59,130,246,0.2)" : "transparent",
-              color:    mode === m ? "#93c5fd" : "#374151",
-              fontSize: 7, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const,
-            }}>{m}</button>
-          ))}
-        </div>
       </div>
 
       {newsBlocked && (
@@ -399,102 +359,8 @@ export function FrameworkPanel({ symbol }: Props) {
 
       {hasDir && (
         <>
-          {/* ── SCALP ─────────────────────────────── */}
-          {mode === "scalp" && (
-            <>
-              <Step num={1} tf="4H" title="DIRECTION" met={true}>
-                <div style={{ fontSize: 8.5, fontWeight: 700, color: dirColor }}>
-                  {isBull ? "BULLISH" : "BEARISH"}
-                  <span style={{ color: strength.color, fontWeight: 400, fontSize: 7.5 }}>
-                    {" "}— {strength.label}
-                  </span>
-                </div>
-                <div style={{ fontSize: 7, color: phase.color, marginTop: 2 }}>{phase.label}</div>
-                {retraceInfo && (
-                  <div style={{ fontSize: 6.5, color: retraceInfo.color, marginTop: 1 }}>
-                    {retraceInfo.text}
-                  </div>
-                )}
-                {strength.caution && (
-                  <div style={{ fontSize: 6.5, color: "#f59e0b", marginTop: 2 }}>
-                    ⚠ Extended — reduce position size
-                  </div>
-                )}
-              </Step>
-
-              <Step num={2} tf="1H" title="LOCATION" met={ob1h !== null || fvg1h !== null || zone1h !== null}>
-                {ob1h && (
-                  <div style={{ fontSize: 7.5, color: "#26a69a" }}>
-                    OB {fmt(ob1h.bottom)}–{fmt(ob1h.top)}
-                    <span style={{ color: "#374151", fontSize: 7 }}> {pips((ob1h.top + ob1h.bottom) / 2, price)}p away</span>
-                  </div>
-                )}
-                {fvg1h && (
-                  <div style={{ fontSize: 7.5, color: "#4ade80" }}>
-                    FVG {fmt(fvg1h.bottom)}–{fmt(fvg1h.top)}
-                  </div>
-                )}
-                {zone1h && (
-                  <div style={{ fontSize: 7.5, color: "#a78bfa" }}>
-                    S/D {fmt(zone1h.bottom)}–{fmt(zone1h.top)}
-                    <span style={{ color: "#374151", fontSize: 7 }}> {zone1h.touches} touches</span>
-                  </div>
-                )}
-                {/* Fix 3 — Zone freshness warning */}
-                {zone1h && zone1h.touches >= 3 && (
-                  <div style={{ fontSize: 6.5, color: "#f59e0b", marginTop: 2 }}>
-                    ⚠ Zone tested {zone1h.touches}× — weaker, reduce size
-                  </div>
-                )}
-                {!ob1h && !fvg1h && !zone1h && (
-                  <div style={{ fontSize: 7, color: "#374151" }}>No 1H zone nearby — wait</div>
-                )}
-              </Step>
-
-              <Step num={3} tf="15M" title="CONFIRMATION" met={choch15m !== null || bos15m !== null}>
-                {choch15m ? (
-                  <div style={{ fontSize: 7.5, color: "#26a69a" }}>
-                    CHoCH {choch15m.direction} — {ago(choch15m.time)}m ago ✓
-                  </div>
-                ) : bos15m ? (
-                  <div style={{ fontSize: 7.5, color: "#4ade80" }}>
-                    BOS {bos15m.direction} — {ago(bos15m.time)}m ago ✓
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 7, color: "#374151" }}>Waiting for 15M CHoCH or BOS…</div>
-                )}
-              </Step>
-
-              <Step num={4} tf="5M" title="ENTRY TRIGGER" met={bos5m !== null && !scalp_chasing && !scalp_tp_hit}>
-                {bos5m ? (
-                  <>
-                    <div style={{ fontSize: 7.5, color: scalp_chasing ? "#ef5350" : scalp_tp_hit ? "#f59e0b" : "#26a69a" }}>
-                      BOS {bos5m.direction} — {ago(bos5m.time)}m ago
-                      {" "}
-                      {scalp_chasing
-                        ? `⚠ +${scalp_drift}p drift`
-                        : scalp_tp_hit
-                        ? "⚠ TP hit"
-                        : "✓"}
-                    </div>
-                    <div style={{ fontSize: 6.5, color: "#374151", marginTop: 2 }}>
-                      Triggered @ {fmt(bos5m.price)} · SL anchored to {sl5m ? "5M" : "15M"} swing {isBull ? "low" : "high"}
-                    </div>
-                    {scalp_chasing && (
-                      <div style={{ fontSize: 6.5, color: "#ef5350", marginTop: 2 }}>
-                        Price moved {scalp_drift}p since trigger — do not chase
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div style={{ fontSize: 7, color: "#374151" }}>Waiting for 5M BOS…</div>
-                )}
-              </Step>
-            </>
-          )}
 
           {/* ── LIMIT ─────────────────────────────── */}
-          {mode === "limit" && (
             <>
               <Step num={1} tf="4H" title="STORY" met={true}>
                 <div style={{ fontSize: 8.5, fontWeight: 700, color: dirColor }}>
@@ -603,7 +469,6 @@ export function FrameworkPanel({ symbol }: Props) {
                 )}
               </Step>
             </>
-          )}
 
           {/* ── Trade Setup Box ───────────────────────── */}
           {setup && (
@@ -637,7 +502,7 @@ export function FrameworkPanel({ symbol }: Props) {
                   : "Setup developing — conditions incomplete"}
               </div>
 
-              {!invalidReason && mode === "limit" && limit_zone_status === "entering" && (
+              {!invalidReason && limit_zone_status === "entering" && (
                 <div style={{
                   fontSize: 6.5, color: "#4ade80", fontWeight: 700,
                   marginBottom: 5, letterSpacing: "0.06em",
@@ -651,7 +516,7 @@ export function FrameworkPanel({ symbol }: Props) {
                 opacity: invalidReason ? 0.35 : 1,
               }}>
                 {[
-                  { label: mode === "limit" ? "LIMIT" : "ENTRY", value: fmt(setup.entry), color: dirColor  },
+                  { label: "LIMIT", value: fmt(setup.entry), color: dirColor  },
                   { label: "SL",                                  value: fmt(setup.sl),    color: "#ef5350" },
                   { label: "TP",                                  value: fmt(setup.tp),    color: "#26a69a" },
                 ].map(({ label, value, color }) => (
