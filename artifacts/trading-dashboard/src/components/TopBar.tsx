@@ -38,7 +38,7 @@ interface TopBarProps {
   bias4h?: TrendDir;
   activeSetups?: ActiveSetup[];
 }
-const [, navigate] = useLocation();
+
 
 const SYMBOLS = [
   { display: "USDJPY",  api: "USD/JPY" },
@@ -211,6 +211,7 @@ function SymbolSelector({ symbol, setSymbol }: { symbol: string; setSymbol: (s: 
 }
 
 export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, activeSetups = [] }: TopBarProps) {
+  const [, navigate] = useLocation();
   const [soundMuted, setSoundMuted] = useState(() => localStorage.getItem("struct_sound_muted") === "true");
   const timeframes = ["5M", "15M", "1H", "4H"];
 
@@ -386,7 +387,7 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
         >
           ⊞ Analysis
         </a>
-        const [, navigate] = useLocation();   // add near top of TopBar function
+        
 
         <button
           onClick={() => navigate("/scalp")}
