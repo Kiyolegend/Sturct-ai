@@ -16,11 +16,10 @@ import {
   useSRLevels,
   useTradingAnalysis,
   useNewsStatus,
-  useBrokerTime,
 } from "@/hooks/use-trading-api";
 import { detectOrderBlocks, detectFVGs, pipSize } from "@/components/TradingChart";
 
-type Mode = "scalp" | "limit";
+type Mode =  "limit";
 type Bias = "bullish" | "bearish" | "neutral";
 type ZoneStatus = "approaching" | "entering" | "blown" | "none";
 
@@ -80,8 +79,7 @@ export function FrameworkPanel({ symbol }: Props) {
   const { data: data15m }  = useTradingAnalysis(symbol, "15m", 200);
   const { data: data5m }   = useTradingAnalysis(symbol, "5m",  100);
 
-  const { data: brokerTimeData } = useBrokerTime();
-  const brokerNow = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
+  
 
   const bias4h  = (mtf?.bias_4h.trend  ?? "neutral") as Bias;
   const bias1h  = (mtf?.bias_1h.trend  ?? "neutral") as Bias;
