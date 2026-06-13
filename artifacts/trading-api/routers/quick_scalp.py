@@ -301,10 +301,37 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
                "price": float(df["close"].iloc[-1]) if len(df) > 0 else 0.0}
         _cache_set(symbol, "5m", r5m)
 
-    # Read MTF bias from cache — NO HTTP call to self anymore
-    r15m = _cache_get(symbol, "15m") or {}
-    r1h  = _cache_get(symbol, "1h")  or {}
-    r4h  = _cache_get(symbol, "4h")  or {}
+        # Read MTF bias from cache — fall back to computing if cache empty
+    r15m = _cache_get(symbol, "15m")
+    if r15m is None:
+        try:
+            df15 = await fetch_ohlc(symbol=symbol, interval="15m", outputsize=100)
+            sw15 = detect_swings(df15, fractal_n=5)
+            r15m = {"trend": detect_trend(classify_structure(sw15))}
+            _cache_set(symbol, "15m", r15m)
+        except Exception:
+            r15m = {}
+
+    r1h = _cache_get(symbol, "1h")
+    if r1h is None:
+        try:
+            df1h = await fetch_ohlc(symbol=symbol, interval="1h", outputsize=100)
+            sw1h = detect_swings(df1h, fractal_n=3)
+            r1h = {"trend": detect_trend(classify_structure(sw1h))}
+            _cache_set(symbol, "1h", r1h)
+        except Exception:
+            r1h = {}
+
+    r4h = _cache_get(symbol, "4h")
+    if r4h is None:
+        try:
+            df4h = await fetch_ohlc(symbol=symbol, interval="4h", outputsize=80)
+            sw4h = detect_swings(df4h, fractal_n=3)
+            r4h = {"trend": detect_trend(classify_structure(sw4h))}
+            _cache_set(symbol, "4h", r4h)
+        except Exception:
+            r4h = {}
+
     mtf_bias = {
         "bias_15m": r15m.get("trend") or {},
         "bias_1h":  r1h.get("trend")  or {},
