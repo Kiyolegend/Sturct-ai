@@ -35,6 +35,24 @@ _env_history: dict[str, deque] = {}
 _env_lock = threading.Lock()
 SCAN_SYMBOLS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"]
 
+# ── Timeframe analysis cache (25s TTL) ───────────────────────────────────────
+_tf_cache: dict[str, tuple[float, dict]] = {}
+TF_CACHE_TTL = 25
+
+def _tf_cache_get(symbol: str, interval: str):
+    key = f"{symbol}_{interval}"
+    entry = _tf_cache.get(key)
+    if entry is None:
+        return None
+    ts, result = entry
+    if time.time() - ts > TF_CACHE_TTL:
+        return None
+    return result
+
+def _tf_cache_set(symbol: str, interval: str, result: dict) -> None:
+    key = f"{symbol}_{interval}"
+    _tf_cache[key] = (time.time(), result)
+
 
 def _get_news_status(symbol: str, broker_ts: int = 0) -> tuple[bool, str]:
     """Returns (blocked, reason) from the news service. Fails silently."""
@@ -52,6 +70,9 @@ def _get_news_status(symbol: str, broker_ts: int = 0) -> tuple[bool, str]:
 
 async def _analyse_timeframe(symbol: str, interval: str, outputsize: int) -> dict:
     """Fetch + run the full analysis pipeline for one timeframe. Returns a result dict."""
+    cached = _tf_cache_get(symbol, interval)
+    if cached:
+        return cached
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
         if df is None or len(df) < 5:
@@ -89,7 +110,7 @@ async def _analyse_timeframe(symbol: str, interval: str, outputsize: int) -> dic
         trend["last_high_price"] = last_high_price
         trend["last_low_price"]  = last_low_price
 
-        return {
+        result = {
             "df":               df,
             "trend":            trend,
             "bos":              bos,
@@ -98,6 +119,8 @@ async def _analyse_timeframe(symbol: str, interval: str, outputsize: int) -> dic
             "price":            float(df["close"].iloc[-1]),
             "structure_labels": labels_out,
         }
+        _tf_cache_set(symbol, interval, result)
+        return result
     except Exception:
         return {}
 
