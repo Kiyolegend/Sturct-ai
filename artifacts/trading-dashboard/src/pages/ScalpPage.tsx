@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useLocation } from "wouter";
 import { ArrowLeft, RefreshCw, Loader2, Zap } from "lucide-react";
-import { useQuickScalpScan, type QuickScalpSignal, useBrokerTime } from "@/hooks/use-trading-api";
+import { useQuickScalpScan, type QuickScalpSignal, useBrokerTime, useDailyPnl } from "@/hooks/use-trading-api";
 import { TradePanel } from "@/components/TradePanel";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -137,7 +136,6 @@ function SignalCard({
 }
 
 export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
-  const [, navigate]  = useLocation();
   const { toast }     = useToast();
   const [scalpMode, setScalpMode] = useState<"auto" | "notify">("notify");
   const [prefill, setPrefill]     = useState<{
@@ -149,7 +147,7 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
 
   const { data, isLoading, refetch, dataUpdatedAt } = useQuickScalpScan(20_000);
   const { data: brokerTimeData } = useBrokerTime();
-
+  const { data: pnlData } = useDailyPnl();
   const signals     = data?.signals ?? [];
   const greenCount  = signals.filter(s => s.status === "green").length;
   const yellowCount = signals.filter(s => s.status === "yellow").length;
@@ -251,6 +249,27 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
         >
           {scalpMode === "auto" ? "⚡ AUTO" : "🔔 NOTIFY"}
         </button>
+
+        {/* Daily P&L bar */}
+        {pnlData !== undefined && (
+          <div className="flex items-center gap-2 px-3 py-1 rounded bg-white/5 border border-white/10">
+            <span className={`text-[11px] font-bold font-mono ${
+             pnlData.total_profit >= 4 ? "text-yellow-400" : pnlData.total_profit > 0 ? "text-emerald-400" : "text-white/40"
+            }`}>
+              {pnlData.total_profit >= 0 ? "+" : ""}${pnlData.total_profit.toFixed(2)}
+            </span>
+            <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${pnlData.total_profit >= 4 ? "bg-yellow-400" : "bg-emerald-400"}`}
+                style={{ width: `${Math.min((pnlData.total_profit / 4) * 100, 100)}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-white/25">$4</span>
+            {pnlData.total_profit >= 4 && (
+              <span className="text-[10px] text-yellow-400 font-bold">🎯 STOP</span>
+            )}
+          </div>
+        )}
 
         {isLoading
           ? <Loader2 className="w-3.5 h-3.5 animate-spin text-white/30" />

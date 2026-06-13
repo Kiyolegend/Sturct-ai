@@ -461,3 +461,20 @@ export function useQuickScalpScan(intervalMs = 20_000) {
   });
 }
 
+export function useDailyPnl() {
+  return useQuery({
+    queryKey: ["daily-pnl"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/daily-pnl`);
+      if (!res.ok) throw new Error("daily-pnl failed");
+      return res.json() as Promise<{
+        total_profit: number;
+        trade_count:  number;
+        win_count:    number;
+        loss_count:   number;
+      }>;
+    },
+    refetchInterval: 15_000,
+  });
+}
+
