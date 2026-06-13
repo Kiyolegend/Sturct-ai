@@ -5,9 +5,18 @@
  * fires a browser notification + an in-app toast.
  * Also fires when 4H direction flips (bullish ↔ bearish) — the one
  * signal that justifies cancelling a pending limit order.
+ * Also fires when a zone is blown while limit_ready was active —
+ * signals to cancel the pending limit order immediately.
  *
  * All timestamps displayed use broker time from MT5 candles.
  * Requests notification permission on first mount.
+ *
+ * limit_ready now fires on 4 hard conditions only:
+ *   1. 4H direction clear
+ *   2. Valid 1H zone exists
+ *   3. Zone not blown
+ *   4. No news block + R:R >= 2.5
+ * phase_good, retrace_pct, has_15m_confluence shown as bonus indicators in toast.
  */
 
 import { useEffect, useRef } from "react";
@@ -60,13 +69,14 @@ interface Props {
   onSwitchSymbol: (pair: string) => void;
 }
 
-export function FrameworkMonitor({ onActiveSetups,onSwitchSymbol }: Props) {
+export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
   const { data } = useFrameworkStatus(30_000);
   const { toast } = useToast();
-  // CHANGE 1: added `direction: string` to prevState shape
-  prevState.current[pair] = { scalp: s.scalp_ready, limit: s.limit_ready, direction: s.direction };
+
+  const prevState = useRef<Record<string, { limit: boolean; direction: string; zone_status: string }>>({});
+
   const permRequested = useRef(false);
-  const initialized = useRef(false);
+  const initialized   = useRef(false);
 
   useEffect(() => {
     if (!permRequested.current && typeof Notification !== "undefined" && Notification.permission === "default") {
@@ -78,14 +88,18 @@ export function FrameworkMonitor({ onActiveSetups,onSwitchSymbol }: Props) {
   useEffect(() => {
     if (!data?.pairs) return;
     if (!initialized.current) {
-     initialized.current = true;
-     for (const pair of PAIRS) {
-       const s = data.pairs[pair];
-       if (!s || s.error) continue;
-        prevState.current[pair] = { limit: s.limit_ready, direction: s.direction };
+      initialized.current = true;
+      for (const pair of PAIRS) {
+        const s = data.pairs[pair];
+        if (!s || s.error) continue;
+        prevState.current[pair] = {
+          limit:       s.limit_ready,
+          direction:   s.direction,
+          zone_status: (s as any).limit_zone_status ?? "",
+        };
+      }
+      return;
     }
-    return;
-  }
 
     const brokerTime = data.broker_time;
     const ts = fmtBrokerTime(brokerTime);
@@ -95,29 +109,33 @@ export function FrameworkMonitor({ onActiveSetups,onSwitchSymbol }: Props) {
       const status = data.pairs[pair];
       if (!status || status.error) continue;
 
-      // CHANGE 2: added `direction: ""` as default fallback
-      const prev = prevState.current[pair] ?? { limit: false, direction: "" };
+      const prev = prevState.current[pair] ?? { limit: false, direction: "", zone_status: "" };
       const cur  = { limit: status.limit_ready };
 
-     
+      const curZoneStatus = (status as any).limit_zone_status ?? "";
 
       // ── limit: false → true ───────────────────────────────────────────────
       if (!prev.limit && cur.limit) {
-        const dir = status.direction.toUpperCase();
-        const rr  = status.limit_rr;
-        const p   = status.price;
+        const dir      = status.direction.toUpperCase();
+        const rr       = status.limit_rr;
         const entryStr = status.limit_entry ? fmt(status.limit_entry) : "zone";
         const tpStr    = status.limit_tp    ? fmt(status.limit_tp)    : "—";
         const slStr    = status.limit_sl    ? fmt(status.limit_sl)    : "—";
 
+        const bonuses: string[] = [];
+        if ((status as any).has_15m_confluence) bonuses.push("15M ✓");
+        if (status.phase_good)                  bonuses.push("Phase ✓");
+        if ((status as any).retrace_pct != null) bonuses.push(`Retr ${(status as any).retrace_pct}%`);
+        const bonusStr = bonuses.length > 0 ? ` · ${bonuses.join(" · ")}` : "";
+
         playAlert();
         fireSystemNotification(
           `📍 LIMIT READY — ${pair}`,
-          `${dir} · RR ${rr}:1 · Zone entry ${entryStr} · TP ${tpStr} · SL ${slStr} · ${ts}`
+          `${dir} · RR ${rr}:1 · Zone entry ${entryStr} · TP ${tpStr} · SL ${slStr}${bonusStr} · ${ts}`
         );
         toast({
           title:       `📍 LIMIT READY — ${pair}`,
-          description: `${dir} · RR ${rr}:1 · Zone entry ${entryStr} · TP ${tpStr} · ${ts}`,
+          description: `${dir} · RR ${rr}:1 · Zone entry ${entryStr} · TP ${tpStr}${bonusStr} · ${ts}`,
           duration:    20_000,
           action: (
             <ToastAction altText={`Switch to ${pair}`} onClick={() => onSwitchSymbol(pair)}>
@@ -127,7 +145,31 @@ export function FrameworkMonitor({ onActiveSetups,onSwitchSymbol }: Props) {
         });
       }
 
-      // CHANGE 3: HTF direction flip — fires when 4H bias reverses ──────────
+      // ── Zone blown while limit was active — cancel alert ──────────────────
+      if (
+        prev.zone_status !== "" &&
+        prev.zone_status !== "blown" &&
+        curZoneStatus === "blown" &&
+        prev.limit
+      ) {
+        playAlert();
+        fireSystemNotification(
+          `⛔ ZONE BLOWN — ${pair}`,
+          `The ${status.direction.toUpperCase()} entry zone on ${pair} was violated. Cancel your pending limit order.`
+        );
+        toast({
+          title:       `⛔ ZONE BLOWN — ${pair}`,
+          description: `The ${status.direction.toUpperCase()} entry zone was violated. Cancel your pending limit order on ${pair} now.`,
+          duration:    60_000,
+          action: (
+            <ToastAction altText={`Go to ${pair}`} onClick={() => onSwitchSymbol(pair)}>
+              GO TO {pair.replace("/", "")}
+            </ToastAction>
+          ),
+        });
+      }
+
+      // ── HTF direction flip — cancel alert ─────────────────────────────────
       if (
         prev.direction !== "" &&
         prev.direction !== "neutral" &&
@@ -146,10 +188,13 @@ export function FrameworkMonitor({ onActiveSetups,onSwitchSymbol }: Props) {
         });
       }
 
-      // CHANGE 4: persist direction alongside scalp/limit flags ─────────────
-      prevState.current[pair] = { ...cur, direction: status.direction };
+      // Persist current state for next scan
+      prevState.current[pair] = {
+        ...cur,
+        direction:   status.direction,
+        zone_status: curZoneStatus,
+      };
 
-      
       if (cur.limit) active.push({
         pair, mode: "limit", direction: status.direction, rr: status.limit_rr,
         entry: status.limit_entry, tp: status.limit_tp, sl: status.limit_sl,

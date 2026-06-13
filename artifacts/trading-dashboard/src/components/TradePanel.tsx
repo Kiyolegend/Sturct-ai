@@ -46,6 +46,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   const [resultMsg,        setResultMsg]        = useState("");
   const [resultOk,         setResultOk]         = useState(false);
   const [positions,        setPositions]        = useState<Position[]>([]);
+  const [beTickets, setBeTickets] = useState<Set<number>>(new Set());
   const [chartClickTarget, setChartClickTarget] = useState<'entry' | 'sl' | 'tp' | null>(null);
   const [wasPrefilled,     setWasPrefilled]     = useState(false);
   // BUG 7 fix: state-based close confirmation replaces window.confirm (blocked in sandboxed iframes)
@@ -59,6 +60,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   // Now uses numeric 0→1 transition (same single-fire on load) plus orderType so switching
   // MARKET↔LIMIT recalculates defaults from the correct reference price.
   useEffect(() => {
+    if (wasPrefilled) return;
     const p = orderType === "LIMIT" ? parseFloat(limitPrice) : currentPrice;
     setSL(defaultSL(p, direction).toFixed(DEC(p)));
     setTP(defaultTP(p, direction).toFixed(DEC(p)));

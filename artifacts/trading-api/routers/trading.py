@@ -28,6 +28,7 @@ _pending_orders: list[dict] = []
 _in_flight:      dict[str, dict] = {}   # FIX 1: order_id → order, awaiting bridge result
 _order_results:  list[dict] = []
 _last_positions: list[dict] = []
+_breakeven_moved: set[int] = set()
 _order_event = asyncio.Event()
 
 # FIX 3 — valid symbols (must match what the MT5 bridge knows how to map)
@@ -46,6 +47,9 @@ class OrderRequest(BaseModel):
     tp:         float
     lots:       float = 0.02
     comment:    str   = "STRUCT.ai"
+
+class BreakevenMovedRequest(BaseModel):
+    ticket: int    
 
 
 class CloseRequest(BaseModel):
@@ -186,3 +190,13 @@ async def get_inflight_orders():
     check MT5 directly before placing another order on the same symbol.
     """
     return {"in_flight": list(_in_flight.values()), "count": len(_in_flight)}
+
+
+@router.post("/trade/breakeven-moved")
+async def post_breakeven_moved(req: BreakevenMovedRequest):
+    _breakeven_moved.add(req.ticket)
+    return {"received": True}
+
+@router.get("/trade/breakeven-status")
+async def get_breakeven_status():
+    return {"tickets": list(_breakeven_moved)}

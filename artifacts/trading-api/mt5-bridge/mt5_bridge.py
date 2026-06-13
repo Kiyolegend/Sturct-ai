@@ -213,6 +213,12 @@ def _get_filling_mode(mt5_sym: str):
 RESULT_URL    = f"{API_BASE_URL}/trading-api/trade/result"
 POSITIONS_URL = f"{API_BASE_URL}/trading-api/trade/positions/sync"
 
+BREAKEVEN_URL = f"{API_BASE_URL}/trading-api/trade/breakeven-moved"
+_breakeven_tracker: dict[int, dict] = {}
+
+def _pip(price: float) -> float:
+    return 0.01 if price > 50 else 0.0001
+
 
 def _report(order_id, ticket, status, message, fill_price=None):
     try:
@@ -274,7 +280,7 @@ def _execute_order(order: dict):
         "price":        price,
         "sl":           sl,
         "tp":           tp,
-        "deviation":    5,
+        "deviation":    10,
         "comment":      order.get("comment", "STRUCT.ai"),
         "type_time":    mt5.ORDER_TIME_GTC,
         "type_filling": _get_filling_mode(mt5_sym),
@@ -283,10 +289,59 @@ def _execute_order(order: dict):
     if result and result.retcode == mt5.TRADE_RETCODE_DONE:
         print(f"  [TRADE] FILLED: {direction} {lots} {order['symbol']} @ {result.price} ticket={result.order}")
         _report(order_id, result.order, "FILLED", "OK", fill_price=result.price)
+
+        if order.get("comment", "") == "STRUCT.ai-Framework":
+            _breakeven_tracker[result.order] = {
+                "symbol": mt5_sym, "direction": direction,
+                "entry": result.price, "sl_orig": sl, "tp": tp, "moved": False,
+            }
     else:
         msg = result.comment if result else str(mt5.last_error())
         print(f"  [TRADE] REJECTED: {order['symbol']} {msg}")
         _report(order_id, None, "REJECTED", msg)
+
+
+
+def _check_breakeven_all():
+    for ticket, info in list(_breakeven_tracker.items()):
+        if info["moved"]:
+            continue
+        if not mt5.positions_get(ticket=ticket):
+            del _breakeven_tracker[ticket]
+            continue
+        entry  = info["entry"]
+        sl_orig = info["sl_orig"]
+        one_r  = abs(entry - sl_orig)
+        pip    = _pip(entry)
+        if one_r <= 0:
+            continue
+        rates = mt5.copy_rates_from_pos(info["symbol"], mt5.TIMEFRAME_M15, 1, 1)
+        if not rates:
+            continue
+        close = float(rates[0]["close"])
+        if info["direction"] == "BUY":
+            if close < entry + 1.5 * one_r:
+                continue
+            new_sl = round(entry + pip, 5)
+        else:
+            if close > entry - 1.5 * one_r:
+                continue
+            new_sl = round(entry - pip, 5)
+        pos    = mt5.positions_get(ticket=ticket)[0]
+        result = mt5.order_send({
+            "action": mt5.TRADE_ACTION_SLTP,
+            "symbol": info["symbol"],
+            "position": ticket,
+            "sl": new_sl,
+            "tp": pos.tp if pos.tp > 0 else info["tp"],
+        })
+        if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+            info["moved"] = True
+            print(f"  [BE] ✅ ticket={ticket} SL moved to {new_sl}")
+            try:
+                _session.post(BREAKEVEN_URL, json={"ticket": ticket}, timeout=5)
+            except Exception:
+                pass        
 
 
 def _execute_close(order: dict):
@@ -359,6 +414,8 @@ def check_pending_orders():
     except Exception as e:
         print(f"  [TRADE] poll error: {e}")
 
+
+
 # ================================
 # ORDER POLL THREAD
 # ================================
@@ -411,6 +468,7 @@ def run():
 
         t0      = time.time()
         success = push_all()
+        _check_breakeven_all()
         expected = len(SYMBOLS) * len(TIMEFRAME_MAP)
 
         if success == 0:

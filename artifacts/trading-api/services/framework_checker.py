@@ -1,12 +1,38 @@
 """
-Framework Checker — computes scalp_ready / limit_ready for all pairs.
+Framework Checker — computes limit_ready for all pairs.
 
 Ports the FrameworkPanel.tsx logic to Python so the backend can evaluate
 all 5 pairs at once and return a compact status dict.
 
 This is the source-of-truth for the notification system:
-  scalp_ready and limit_ready match the exact same conditions as
+  limit_ready matches the exact same conditions as
   FrameworkPanel.tsx to prevent false positives / missed alerts.
+
+limit_ready hard requirements (all must pass):
+  1. 4H direction clear (not neutral)
+  2. Valid 1H zone exists (OB or FVG or S/D zone)
+  3. Zone not blown
+  4. No news block active
+  5. R:R >= 2.5
+
+Bonus indicators (computed and returned, do NOT gate limit_ready):
+  - phase_good          — 1H/15M in pullback phase relative to 4H
+  - retrace_pct         — how far price has retraced into last 4H swing
+  - has_15m_confluence  — 15M OB/FVG overlaps the 1H zone
+  - zone_freshness      — 0=fresh (never tested), 1=tested once, 2+=stale
+
+Auto-cancel signals (returned for FrameworkMonitor to act on):
+  - limit_zone_status — "approaching" / "entering" / "blown" / "none"
+  - HTF flip is detected in FrameworkMonitor from direction changes
+
+Improvements (v2):
+  1. Zone freshness — OBs track touch_count; fresh zones (0 touches) preferred
+     over tested zones; among equals, strongest displacement wins.
+  2. TP improvement — limit mode TP uses the 4H swing origin (the high/low
+     price came FROM before this pullback) for maximum reward; falls back to
+     S/R or Fib only when swing origin unavailable.
+  3. Displacement strength scoring — OBs scored by displacement_candle / avg_range;
+     strongest fresh zone chosen over nearest zone.
 """
 from __future__ import annotations
 from typing import Optional
@@ -17,6 +43,7 @@ def _pip(price: float) -> float:
 
 
 # ── Port of detectOrderBlocks() from TradingChart.tsx ─────────────────────────
+# v2 additions: touch_count (freshness) and strength_score (displacement quality)
 
 def detect_order_blocks(candles: list[dict], current_price: float) -> list[dict]:
     n = len(candles)
@@ -40,14 +67,29 @@ def detect_order_blocks(candles: list[dict], current_price: float) -> list[dict]
             future_high = max(x["close"] for x in slice_)
             if future_high > c["high"] and c["high"] - c["low"] >= min_size:
                 break_c = max(slice_, key=lambda x: x["high"] - x["low"])
-                if avg_range > 0 and (break_c["high"] - break_c["low"]) >= 1.5 * avg_range:
+                disp = break_c["high"] - break_c["low"]
+                if avg_range > 0 and disp >= 1.5 * avg_range:
                     center = (c["high"] + c["low"]) / 2
                     dist = abs(center - current_price) / current_price
                     if dist <= proximity:
-                        mitigated = any(fc["close"] < c["low"] - 2 * pip for fc in candles[i + 1:])
+                        future = candles[i + 1:]
+                        mitigated = any(fc["close"] < c["low"] - 2 * pip for fc in future)
                         if not mitigated:
-                            results.append({"type": "bullish", "top": c["high"], "bottom": c["low"],
-                                            "dist": dist, "time": c.get("time", 0)})
+                            # Count how many times price has entered the zone without mitigating
+                            touch_count = sum(
+                                1 for fc in future
+                                if fc["low"] <= c["high"] and fc["high"] >= c["low"]
+                            )
+                            strength_score = disp / avg_range if avg_range > 0 else 1.0
+                            results.append({
+                                "type":           "bullish",
+                                "top":            c["high"],
+                                "bottom":         c["low"],
+                                "dist":           dist,
+                                "time":           c.get("time", 0),
+                                "touch_count":    touch_count,
+                                "strength_score": round(strength_score, 2),
+                            })
 
         # Bearish OB: bullish candle followed by impulsive bearish displacement
         if c["close"] > c["open"]:
@@ -57,24 +99,58 @@ def detect_order_blocks(candles: list[dict], current_price: float) -> list[dict]
             future_low = min(x["close"] for x in slice_)
             if future_low < c["low"] and c["high"] - c["low"] >= min_size:
                 break_c = max(slice_, key=lambda x: x["high"] - x["low"])
-                if avg_range > 0 and (break_c["high"] - break_c["low"]) >= 1.5 * avg_range:
+                disp = break_c["high"] - break_c["low"]
+                if avg_range > 0 and disp >= 1.5 * avg_range:
                     center = (c["high"] + c["low"]) / 2
                     dist = abs(center - current_price) / current_price
                     if dist <= proximity:
-                        mitigated = any(fc["close"] > c["high"] + 2 * pip for fc in candles[i + 1:])
+                        future = candles[i + 1:]
+                        mitigated = any(fc["close"] > c["high"] + 2 * pip for fc in future)
                         if not mitigated:
-                            results.append({"type": "bearish", "top": c["high"], "bottom": c["low"],
-                                            "dist": dist, "time": c.get("time", 0)})
+                            touch_count = sum(
+                                1 for fc in future
+                                if fc["low"] <= c["high"] and fc["high"] >= c["low"]
+                            )
+                            strength_score = disp / avg_range if avg_range > 0 else 1.0
+                            results.append({
+                                "type":           "bearish",
+                                "top":            c["high"],
+                                "bottom":         c["low"],
+                                "dist":           dist,
+                                "time":           c.get("time", 0),
+                                "touch_count":    touch_count,
+                                "strength_score": round(strength_score, 2),
+                            })
 
-    bull = sorted(
-        [r for r in results if r["type"] == "bullish" and (r["top"] + r["bottom"]) / 2 <= current_price],
-        key=lambda x: x["dist"])[:1]
-    bear = sorted(
-        [r for r in results if r["type"] == "bearish" and (r["top"] + r["bottom"]) / 2 >= current_price],
-        key=lambda x: x["dist"])[:1]
+    def _best(candidates: list[dict]) -> list[dict]:
+        """
+        Prefer fresh zones (touch_count == 0) over tested zones.
+        Among equals, prefer strongest displacement score.
+        Falls back to tested zones if no fresh zones exist.
+        """
+        fresh  = sorted([r for r in candidates if r["touch_count"] == 0],
+                        key=lambda x: -x["strength_score"])
+        tested = sorted([r for r in candidates if r["touch_count"] > 0],
+                        key=lambda x: -x["strength_score"])
+        return (fresh or tested)[:1]
 
-    return [{"type": r["type"], "top": round(r["top"], 5), "bottom": round(r["bottom"], 5),
-             "time": r.get("time", 0)} for r in bull + bear]
+    bull_cands = [r for r in results
+                  if r["type"] == "bullish" and (r["top"] + r["bottom"]) / 2 <= current_price]
+    bear_cands = [r for r in results
+                  if r["type"] == "bearish" and (r["top"] + r["bottom"]) / 2 >= current_price]
+
+    chosen = _best(bull_cands) + _best(bear_cands)
+    return [
+        {
+            "type":           r["type"],
+            "top":            round(r["top"], 5),
+            "bottom":         round(r["bottom"], 5),
+            "time":           r.get("time", 0),
+            "touch_count":    r["touch_count"],
+            "strength_score": r["strength_score"],
+        }
+        for r in chosen
+    ]
 
 
 # ── Port of detectFVGs() from TradingChart.tsx ────────────────────────────────
@@ -168,15 +244,26 @@ def compute_framework_status(
     news_blocked: bool,
 ) -> dict:
     """
-    Compute scalp_ready and limit_ready for one symbol.
-    Matches FrameworkPanel.tsx logic exactly.
+    Compute limit_ready for one symbol.
+
+    limit_ready fires on 4 hard conditions only:
+      1. 4H direction clear
+      2. Valid 1H zone
+      3. Zone not blown
+      4. No news block + R:R >= 2.5
+
+    phase_good, retrace_pct, has_15m_confluence, zone_freshness are bonus
+    indicators — returned in the response for display but do NOT gate the signal.
+
+    v2: zone freshness + displacement strength drive OB selection;
+        limit TP uses 4H swing origin for maximum reward.
     """
     current_price = (
         r5m.get("price") or r15m.get("price") or
         r1h.get("price") or r4h.get("price") or 0.0
     )
     if not current_price:
-        return {"scalp_ready": False, "limit_ready": False, "error": "no data"}
+        return {"limit_ready": False, "error": "no data"}
 
     pip = _pip(current_price)
 
@@ -184,10 +271,15 @@ def compute_framework_status(
     bias_1h  = (r1h.get("trend")  or {}).get("trend",  "neutral")
     bias_15m = (r15m.get("trend") or {}).get("trend",  "neutral")
 
-    has_dir = bias_4h != "neutral"
-    is_bull = bias_4h == "bullish"
+    has_dir   = bias_4h != "neutral"
+    is_bull   = bias_4h == "bullish"
     direction = bias_4h
-    phase_ok = _phase_good(bias_4h, bias_1h, bias_15m)
+    phase_ok  = _phase_good(bias_4h, bias_1h, bias_15m)
+
+    # ── 4H swing origin (used as limit TP — the high/low price came FROM) ──────
+    trend_4h = r4h.get("trend") or {}
+    hi_price = trend_4h.get("last_high_price")
+    lo_price = trend_4h.get("last_low_price")
 
     # ── 1H OBs / FVGs / zones ─────────────────────────────────────────────────
     ob1h = fvg1h = zone1h = None
@@ -211,7 +303,10 @@ def compute_framework_status(
 
     has_1h_zone = ob1h is not None or fvg1h is not None or zone1h is not None
 
-    # ── 15M OBs / FVGs (for limit mode) ──────────────────────────────────────
+    # Zone freshness — from OB touch_count (0 = never tested = strongest)
+    zone_freshness: Optional[int] = ob1h.get("touch_count") if ob1h else None
+
+    # ── 15M OBs / FVGs (bonus confluence indicator) ───────────────────────────
     ob15m = fvg15m = None
     candles_15m = _df_to_candles(r15m.get("df"))
     if candles_15m:
@@ -220,7 +315,6 @@ def compute_framework_status(
         fvgs15 = detect_fvgs(candles_15m, current_price)
         fvg15m = next((f for f in fvgs15 if f["type"] == direction), None)
 
-    # Fix #4 — Per-zone overlap: 15M must align with a specific 1H zone, not a merged box
     def _overlaps(a: dict, b: dict) -> bool:
         return a["top"] >= b["bottom"] and a["bottom"] <= b["top"]
 
@@ -228,7 +322,7 @@ def compute_framework_status(
     ob15m_in_zone  = ob15m  is not None and any(_overlaps(ob15m,  h) for h in _1h_zones)
     fvg15m_in_zone = fvg15m is not None and any(_overlaps(fvg15m, h) for h in _1h_zones)
 
-    
+    has_15m_confluence = ob15m_in_zone or fvg15m_in_zone
 
     # ── sl5m from 5M structure labels ─────────────────────────────────────────
     sl5m: Optional[float] = None
@@ -243,7 +337,7 @@ def compute_framework_status(
     except Exception:
         sl5m = None
 
-    # ── sl15m from 15M structure labels (FrameworkPanel.tsx slLow / slHigh) ───
+    # ── sl15m from 15M structure labels ───────────────────────────────────────
     sl15m: Optional[float] = None
     try:
         labels_15m = r15m.get("structure_labels") or []
@@ -256,11 +350,8 @@ def compute_framework_status(
     except Exception:
         sl15m = None
 
-    # ── Retrace % gate (38–70% of last 4H swing) ─────────────────────────────
-    trend_4h  = r4h.get("trend") or {}
-    hi_price  = trend_4h.get("last_high_price")
-    lo_price  = trend_4h.get("last_low_price")
-    retrace_gate = True  # default: pass when data unavailable
+    # ── Retrace % (bonus indicator only — does NOT gate limit_ready) ──────────
+    retrace_pct: Optional[int] = None
     if hi_price and lo_price and current_price and has_dir:
         leg_size = hi_price - lo_price
         if leg_size > 0:
@@ -269,9 +360,8 @@ def compute_framework_status(
                 else ((current_price - lo_price) / leg_size * 100)
             )
             retrace_pct = round(raw_pct)
-            retrace_gate = 38 <= retrace_pct <= 70
 
-    # ── Setup (entry / SL / TP / RR) ─────────────────────────────────────────
+    # ── Setup (entry / SL / TP / RR) ──────────────────────────────────────────
     def _setup(mode: str) -> dict:
         zone = (ob1h or fvg1h or zone1h) if mode == "limit" else None
         zone_width = (zone["top"] - zone["bottom"]) if zone else 0
@@ -280,6 +370,7 @@ def compute_framework_status(
             if zone else current_price
         )
 
+        # ── SL ────────────────────────────────────────────────────────────────
         if mode == "limit" and zone:
             zone15 = ob15m or fvg15m
             sl_buffer = max(10 * pip, zone_width * 0.25)
@@ -305,6 +396,7 @@ def compute_framework_status(
                 if is_bull  and sl_p > zc["bottom"]: sl_p = zc["bottom"] - 3 * pip
                 if not is_bull and sl_p < zc["top"]:  sl_p = zc["top"]   + 3 * pip
 
+        # ── TP ────────────────────────────────────────────────────────────────
         sr_f = [l for l in sr_levels if l.get("timeframe") != "15m"]
         if is_bull:
             tp_cands = sorted(
@@ -314,7 +406,8 @@ def compute_framework_status(
             tp_cands = sorted(
                 [l for l in sr_f if l.get("kind") == "support" and l["price"] < entry_p],
                 key=lambda l: -l["price"])
-        # NEW — Fibonacci extension fallback
+
+        # Fibonacci extension fallback
         if hi_price and lo_price and hi_price > lo_price:
             fib_range = hi_price - lo_price
             ext_127 = (hi_price + 0.272 * fib_range) if is_bull else (lo_price - 0.272 * fib_range)
@@ -323,19 +416,29 @@ def compute_framework_status(
         else:
             fb_pips = 60 if "JPY" in symbol else (40 if ("GBP" in symbol or "EUR" in symbol) else 30)
             fib_tp = entry_p + fb_pips * pip if is_bull else entry_p - fb_pips * pip
-        tp_p = tp_cands[0]["price"] if tp_cands else fib_tp
+
+        if mode == "limit":
+            # v2: Use the 4H swing origin as primary TP — price came FROM there,
+            # it is the natural return target and produces the highest R:R.
+            # Pick whichever is farther: swing origin vs nearest S/R level.
+            sr_tp = tp_cands[0]["price"] if tp_cands else fib_tp
+            origin_tp = hi_price if is_bull else lo_price
+            if origin_tp and ((is_bull and origin_tp > entry_p) or
+                              (not is_bull and origin_tp < entry_p)):
+                tp_p = max(origin_tp, sr_tp) if is_bull else min(origin_tp, sr_tp)
+            else:
+                tp_p = sr_tp
+        else:
+            tp_p = tp_cands[0]["price"] if tp_cands else fib_tp
 
         risk   = abs(entry_p - sl_p)
         reward = abs(tp_p - entry_p)
         rr     = round(reward / risk, 1) if risk > 0 else 0.0
         return {"entry": round(entry_p, 5), "sl": round(sl_p, 5), "tp": round(tp_p, 5), "rr": rr}
 
-    
     limit_setup = _setup("limit")
 
-    
-
-    # ── Limit zone status ─────────────────────────────────────────────────────
+    # ── Limit zone status (for auto-cancel monitoring) ─────────────────────────
     lz = ob1h or fvg1h or zone1h
     limit_zone_status   = "none"
     limit_zone_distance = 0
@@ -351,26 +454,33 @@ def compute_framework_status(
             else:                                          limit_zone_status = "approaching"
             limit_zone_distance = round((lz["bottom"] - current_price) / pip)
 
-    limit_out_of_reach = limit_zone_distance > 50
-
-    # ── Ready flags ───────────────────────────────────────────────────────────
-    
+    # ── Ready flags ────────────────────────────────────────────────────────────
     limit_ready = bool(
-        has_dir and phase_ok and retrace_gate and has_1h_zone and
-        (ob15m_in_zone or fvg15m_in_zone) and
-        limit_zone_status != "blown" and not limit_out_of_reach and
-        not news_blocked and limit_setup["rr"] >= 2.5
+        has_dir and
+        has_1h_zone and
+        limit_zone_status != "blown" and
+        not news_blocked and
+        limit_setup["rr"] >= 2.5
     )
 
     return {
-        "limit_ready":      limit_ready,
-        "direction":        direction,
-        "limit_rr":         limit_setup["rr"],
-        "phase_good":       phase_ok,
-        "has_1h_zone":      has_1h_zone,
-        "news_blocked":     news_blocked,
-        "price":            round(current_price, 5),
-        "limit_entry":      limit_setup["entry"],
-        "limit_sl":         limit_setup["sl"],
-        "limit_tp":         limit_setup["tp"],
+        "limit_ready":         limit_ready,
+        "direction":           direction,
+        "limit_rr":            limit_setup["rr"],
+        # Bonus indicators — shown in UI / toast but do not block the signal
+        "phase_good":          phase_ok,
+        "retrace_pct":         retrace_pct,
+        "has_15m_confluence":  has_15m_confluence,
+        "zone_freshness":      zone_freshness,   # 0=fresh, 1+=tested; None if not OB
+        "ob_strength":         ob1h.get("strength_score") if ob1h else None,
+        # Zone state — returned so FrameworkMonitor can fire auto-cancel alerts
+        "limit_zone_status":   limit_zone_status,
+        "limit_zone_distance": limit_zone_distance,
+        # Standard fields
+        "has_1h_zone":         has_1h_zone,
+        "news_blocked":        news_blocked,
+        "price":               round(current_price, 5),
+        "limit_entry":         limit_setup["entry"],
+        "limit_sl":            limit_setup["sl"],
+        "limit_tp":            limit_setup["tp"],
     }
