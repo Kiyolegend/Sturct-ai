@@ -68,7 +68,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const [clickedPrice, setClickedPrice] = useState<number | null>(null);
   const [slLine,       setSlLine]       = useState<number | null>(null);
   const [tpLine,       setTpLine]       = useState<number | null>(null);
-  const [prefill, setPrefill] = useState<{ direction: "BUY"|"SELL"; sl: number; tp: number; entry?: number; orderType?: "MARKET"|"LIMIT" } | null>(null);
+  const [prefill, setPrefill] = useState<{ direction: "BUY"|"SELL"; sl: number; tp: number; entry?: number; orderType?: "MARKET"|"LIMIT"; comment?: string } | null>(null);
 
   const symbolRef       = useRef(symbol);
   const lastPrefillRef  = useRef<string>("");
@@ -96,6 +96,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
         tp:        setup.tp,
         entry:     setup.entry ?? undefined,
         orderType: setup.mode === "limit" ? "LIMIT" : "MARKET",
+        comment:   "STRUCT.ai-Framework",
       });
     }
   }, [activeSetups, symbol]);

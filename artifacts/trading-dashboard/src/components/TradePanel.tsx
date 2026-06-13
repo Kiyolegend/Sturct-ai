@@ -16,7 +16,7 @@ interface TradePanelProps {
   onClickedPriceConsumed?:  () => void;
   onSLChange?:  (v: number | null) => void;
   onTPChange?:  (v: number | null) => void;
-  prefill?:     { direction: "BUY" | "SELL"; sl: number; tp: number; entry?: number; orderType?: "MARKET" | "LIMIT" } | null;
+  prefill?:     { direction: "BUY" | "SELL"; sl: number; tp: number; entry?: number; orderType?: "MARKET" | "LIMIT"; comment?: string } | null;
   onPrefillConsumed?: () => void;
 }
 
@@ -204,6 +204,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
           sl:         parseFloat(sl),
           tp:         parseFloat(tp),
           lots:       parseFloat(lots),
+          comment:    prefill?.comment ?? "STRUCT.ai",
         }),
       });
       if (!resp.ok) {
