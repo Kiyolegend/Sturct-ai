@@ -320,11 +320,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
     if not price:
         out["reason"] = "Price is zero"
         return out
-    out["checks"]["news"] = {"ok": news_ok, "msg": news_msg}
-    if not news_ok:
-        out["reason"] = news_msg
-        return out
-
+    
     direction = trend_data.get("trend", "neutral")
 
     if direction == "neutral":
@@ -336,7 +332,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
         "msg": f"{direction.capitalize()} (conf {trend_data.get('confidence', 0):.0f}%)",
     }
 
-    choch_events = detect_choch(df, swings, structure_labels, direction)
+    
     pip          = _pip(price)
 
     # 4. Entry modes — all evaluated, any one = GREEN

@@ -45,7 +45,7 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
     zones = detect_zones(swings, interval, current_price)
     candles = candles_to_dict(df)
-    return {
+    result = {
         "current_price": current_price,
         "candles": candles,
         "swings": swings,
