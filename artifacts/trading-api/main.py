@@ -17,7 +17,7 @@ from routers.mt5 import router as mt5_router
 from routers.trading import router as trading_router
 from routers.news import router as news_router
 from routers.narrative import router as narrative_router
-app.include_router(daily_pnl_router, prefix=PREFIX)
+from routers.daily_pnl import router as daily_pnl_router
 
 app = FastAPI(
     title="Trading Market Structure API",
@@ -42,6 +42,7 @@ app.include_router(mt5_router, prefix=PREFIX)
 app.include_router(news_router, prefix=PREFIX)
 app.include_router(narrative_router, prefix=PREFIX)
 app.include_router(quick_scalp_router, prefix=PREFIX)
+app.include_router(daily_pnl_router, prefix=PREFIX)
 
 
 @app.get(f"{PREFIX}/health")
