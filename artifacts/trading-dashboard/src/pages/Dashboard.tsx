@@ -99,7 +99,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const handleNewGreenSignal = (signal: QuickScalpSignal) => {
     if (!signal.direction || !signal.sl || !signal.tp) return;
     const isBuy = signal.direction === "BUY";
-    const mode  = (signal as any).mode as string | undefined;
+    const mode  = signal.mode;
 
     if (scalpMode === "auto") {
       // Auto mode: immediately switch pair + prefill trade panel

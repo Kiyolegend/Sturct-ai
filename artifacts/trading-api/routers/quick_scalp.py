@@ -313,7 +313,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
         return out
 
     # 3. Trend (fractal_n=3 — faster detection, less neutral)
-    swings           = detect_swings(df, fractal_n=3)
+    swings           = detect_swings(df, fractal_n=5)
     structure_labels = classify_structure(swings)
     trend_data       = detect_trend(structure_labels)
     direction        = trend_data.get("trend", "neutral")
