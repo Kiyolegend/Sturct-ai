@@ -30,6 +30,7 @@ function SignalCard({
   signal:   QuickScalpSignal;
   isActive: boolean;
   onUse:    () => void;
+  locked?:   boolean;
 }) {
   const isBuy = signal.direction === "BUY";
   const isGreen  = signal.status === "green";
@@ -120,15 +121,18 @@ function SignalCard({
 
       {/* Use Setup button — green only */}
       {isGreen && signal.sl && signal.tp && (
-        <button
-          onClick={onUse}
-          className={`mt-1 w-full py-2 rounded-lg text-sm font-bold transition-all ${
-            isBuy
-              ? "bg-emerald-500 hover:bg-emerald-400 text-white"
-              : "bg-red-500 hover:bg-red-400 text-white"
-          }`}
-        >
-          {isBuy ? "▲" : "▼"} Use Setup → {signal.symbol.replace("/", "")}
+       <button
+         onClick={locked ? undefined : onUse}
+         disabled={locked}
+         className={`mt-1 w-full py-2 rounded-lg text-sm font-bold transition-all ${
+          locked
+            ? "bg-white/5 text-white/20 cursor-not-allowed"
+            : isBuy
+            ? "bg-emerald-500 hover:bg-emerald-400 text-white"
+            : "bg-red-500 hover:bg-red-400 text-white"
+        }`}
+      >
+        {locked ? "🎯 Daily target reached" : `${isBuy ? "▲" : "▼"} Use Setup → ${signal.symbol.replace("/", "")}`}
         </button>
       )}
     </div>
@@ -151,6 +155,7 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
   const signals     = data?.signals ?? [];
   const greenCount  = signals.filter(s => s.status === "green").length;
   const yellowCount = signals.filter(s => s.status === "yellow").length;
+  const targetHit   = (pnlData?.total_profit ?? 0) >= 4; 
 
   const lastUpdate = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -296,6 +301,7 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
                 signal={sig}
                 isActive={sig.symbol === symbol}
                 onUse={() => handleUse(sig)}
+                locked={targetHit}
               />
             ))
           )}
