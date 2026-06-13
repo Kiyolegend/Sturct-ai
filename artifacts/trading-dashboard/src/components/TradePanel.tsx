@@ -136,6 +136,17 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    const poll = () =>
+      fetch(`${API}/trade/breakeven-status`)
+        .then(r => r.json())
+        .then(d => setBeTickets(new Set<number>(d.tickets || [])))
+        .catch(() => {});
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, []);
+
   // FIX 3 — Poll for execution results with 30s timeout
   useEffect(() => {
     if (stage !== "sending") return;
@@ -439,6 +450,11 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
               <div className="flex items-center gap-1">
                 <span className={p.type === "BUY" ? "text-emerald-400" : "text-red-400"}>{p.type}</span>
                 <span className="text-white/60 flex-1">{p.symbol.replace("m","")} {p.volume}</span>
+                {beTickets.has(p.ticket) && (
+                  <span className="text-xs font-bold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded">
+                    BE ✅
+                  </span>
+                )}
                 <span className={p.profit >= 0 ? "text-emerald-400" : "text-red-400"}>{p.profit >= 0 ? "+" : ""}{p.profit.toFixed(2)}</span>
                 <button onClick={() => closePosition(p.ticket)}
                   className="ml-1 text-white/20 hover:text-red-400 transition-colors">
