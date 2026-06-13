@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ArrowLeft, RefreshCw, Loader2, Zap } from "lucide-react";
-import { useQuickScalpScan, type QuickScalpSignal, useBrokerTime, useDailyPnl } from "@/hooks/use-trading-api";
+import { useQuickScalpScan, type QuickScalpSignal,  useDailyPnl } from "@/hooks/use-trading-api";
 import { TradePanel } from "@/components/TradePanel";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -26,6 +26,7 @@ function SignalCard({
   signal,
   isActive,
   onUse,
+  locked = false,
 }: {
   signal:   QuickScalpSignal;
   isActive: boolean;
@@ -150,7 +151,6 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
   } | null>(null);
 
   const { data, isLoading, refetch, dataUpdatedAt } = useQuickScalpScan(20_000);
-  const { data: brokerTimeData } = useBrokerTime();
   const { data: pnlData } = useDailyPnl();
   const signals     = data?.signals ?? [];
   const greenCount  = signals.filter(s => s.status === "green").length;
@@ -181,6 +181,7 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
     for (const sig of data.signals) {
       const prev = prevStatusRef.current[sig.symbol];
       if (sig.status === "green" && prev !== undefined && prev !== "green") {
+        if (targetHit) return;
         if (scalpMode === "auto") {
           handleUse(sig);
         } else {
@@ -204,7 +205,6 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
     prevStatusRef.current = Object.fromEntries(data.signals.map(s => [s.symbol, s.status]));
   }, [data]);
 
-  const currentPrice = brokerTimeData?.broker_time ?? 0;
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#0a0e17] text-white overflow-hidden font-sans">
