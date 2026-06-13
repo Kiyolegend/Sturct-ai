@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Activity, BarChart2, ChevronDown, Bell, Volume2, VolumeX } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -37,6 +38,7 @@ interface TopBarProps {
   bias4h?: TrendDir;
   activeSetups?: ActiveSetup[];
 }
+const [, navigate] = useLocation();
 
 const SYMBOLS = [
   { display: "USDJPY",  api: "USD/JPY" },
@@ -384,6 +386,14 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
         >
           ⊞ Analysis
         </a>
+        const [, navigate] = useLocation();   // add near top of TopBar function
+
+        <button
+          onClick={() => navigate("/scalp")}
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider bg-yellow-500/10 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-colors"
+        >
+          ⚡ Scalp
+        </button>
 
         <div className="hidden lg:flex items-center gap-1">
           <BiasBadge label="15M" trend={bias15m} />

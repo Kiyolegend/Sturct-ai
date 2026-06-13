@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Dashboard } from "@/pages/Dashboard";
 import { AnalysisPage } from "@/pages/AnalysisPage";
+import { ScalpPage } from "@/pages/ScalpPage";
 import { FrameworkMonitor } from "@/components/FrameworkMonitor";
 import { type ActiveSetup } from "@/hooks/use-trading-api";
 import NotFound from "@/pages/not-found";
@@ -27,6 +28,7 @@ function Router({ activeSetups, symbol, setSymbol }: {
     <Switch>
       <Route path="/">{() => <Dashboard activeSetups={activeSetups} symbol={symbol} setSymbol={setSymbol} />}</Route>
       <Route path="/analysis" component={AnalysisPage} />
+      <Route path="/scalp">{() => <ScalpPage symbol={symbol} setSymbol={setSymbol} />}</Route>
       <Route component={NotFound} />
     </Switch>
   );
