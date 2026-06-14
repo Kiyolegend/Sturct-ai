@@ -174,11 +174,10 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
 
       // ── HTF direction flip — cancel alert ─────────────────────────────────
       if (
-        prev.limit && 
-        prev.direction !== "" &&
-        prev.direction !== "neutral" &&
+        prev.limit &&
+        prev.lastNonNeutralDir !== "" &&
         status.direction !== "neutral" &&
-        prev.direction !== status.direction
+        prev.lastNonNeutralDir !== status.direction
       ) {
         playAlert();
         fireSystemNotification(
@@ -187,7 +186,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
         );
         toast({
           title:       `🔄 HTF BIAS FLIPPED — ${pair}`,
-          description: `Direction reversed ${prev.direction.toUpperCase()} → ${status.direction.toUpperCase()}. Cancel pending limit orders on ${pair}.`,
+          description: `Direction reversed ${prev.lastNonNeutralDir.toUpperCase()} → ${status.direction.toUpperCase()}. Cancel pending limit orders on ${pair}.`,
           duration:    60_000,
         });
       }
