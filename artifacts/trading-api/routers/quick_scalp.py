@@ -6,14 +6,14 @@ Hard guards (instant red if ANY fails):
   2. News clear       — no high-impact event on this pair (Repo 3, fallback=clear)
   3. Clear trend      — 5M trend is bullish or bearish (fractal_n=3, not neutral)
 
-Entry modes — GREEN if ANY ONE passes:
-  A. Momentum candle   — last completed 5M candle body ≥ 45% range, in direction
+Entry modes — A or E = GREEN (momentum confirmed), B/C/D = YELLOW (setup building):
+  A. Momentum candle   — last completed 5M candle body ≥ 67% range, in direction
                          + no adverse CHoCH in last 10 min
-  B. Fibonacci pullback — price within 5 pips of 38.2/50/61.8% fib of last swing
-                          + current 5M candle bouncing back in direction
-  C. HTF pullback       — H1 bias matches direction + last 2 candles retracing
-                          + current candle bouncing back in direction
-  D. Narrative          — H4 + H1 + 15M all agree on direction (full alignment)
+  B. Fibonacci pullback — last completed candle bounced at 38.2/50/61.8% fib
+  C. Session open push  — within 45 min of London/NY open (DST-aware), last
+                          completed candle pushed strongly (≥55% body) in direction
+  D. Narrative          — 4H + 1H + 15M all agree on direction (3/3 required)
+  E. BOS confirmation   — 5M Break of Structure in trend direction within last 10 min
 
 SL: last structural swing + 2-pip buffer (min 10p, max 35p, fallback 15p)
 TP: 8 pips for EUR/USD, GBP/USD, AUD/USD, USD/CHF  |  6 pips for USD/JPY
@@ -141,6 +141,8 @@ def _mode_a(candles: list[dict], direction: str,
 # ── Entry Mode B: Fibonacci pullback ───────────────────────────────────────────
 def _mode_b(structure_labels: list[dict], candles: list[dict],
             direction: str, price: float) -> tuple[bool, str]:
+    if len(candles) < 3:
+        return False, "Insufficient candles"
     pip = _pip(price)
     highs = [s for s in structure_labels if s.get("label") in ("HH", "LH", "EQH")]
     lows  = [s for s in structure_labels if s.get("label") in ("HL", "LL", "EQL")]
