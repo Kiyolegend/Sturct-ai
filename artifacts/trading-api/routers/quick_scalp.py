@@ -437,9 +437,9 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
         "mode":      active_mode,
     })
 
-        # R:R gate — SL must not exceed 2× TP
-    MAX_SL_RATIO = 35
-    if active_mode and signal_ready and sl_pips <= tp_pips * MAX_SL_RATIO:
+        # SL gate — structural SL must not exceed 35 pips
+    MAX_SL_PIPS = 35
+    if active_mode and signal_ready and sl_pips <= MAX_SL_PIPS:
         out["status"] = "green"
         out["reason"] = (
             f"{direction.capitalize()} · Mode {active_mode}: {active_msg} · {sess_msg}"
