@@ -191,8 +191,12 @@ def _mode_c(candles: list[dict], direction: str, now_ts: float) -> tuple[bool, s
         return False, "Insufficient candles"
     now = datetime.fromtimestamp(now_ts, tz=timezone.utc)
     h = now.hour + now.minute / 60.0
-    in_ldn_open = 8.0 <= h < 8.75
-    in_ny_open = 13.0 <= h < 13.75
+    lo_off = int(now.astimezone(ZoneInfo("Europe/London")).utcoffset().total_seconds() // 3600)
+    ny_off = int(now.astimezone(ZoneInfo("America/New_York")).utcoffset().total_seconds() // 3600)
+    ldn_open_utc = 8 - lo_off
+    ny_open_utc  = 8 - ny_off
+    in_ldn_open = ldn_open_utc <= h < ldn_open_utc + 0.75
+    in_ny_open  = ny_open_utc  <= h < ny_open_utc  + 0.75
     if not in_ldn_open and not in_ny_open:
         return False, "Not within 45 min of London or NY open"
     sess = "LDN open" if in_ldn_open else "NY open"
@@ -218,8 +222,8 @@ def _mode_d(mtf_bias: dict, direction: str) -> tuple[bool, str]:
     aligned  = sum(1 for b in [bias_4h, bias_1h, bias_15m] if b == direction)
     if aligned >= 3:
         return True, f"Narrative: 4H+1H+15M all {direction}"
-    if aligned >= 2:
-        return True, f"Narrative: 2/3 HTF {direction} ({bias_4h}/{bias_1h}/{bias_15m})"
+    if aligned >= 3:
+        return True, f"Narrative: 4H+1H+15M all {direction}"
     return False, f"HTF not aligned ({bias_4h}/{bias_1h}/{bias_15m})"
 
 
