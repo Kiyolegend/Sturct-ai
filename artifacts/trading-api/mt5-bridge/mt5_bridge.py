@@ -316,6 +316,8 @@ def _execute_order(order: dict):
 def _check_breakeven_all():
     for ticket, info in list(_breakeven_tracker.items()):
         if info["moved"]:
+            if not mt5.positions_get(ticket=ticket):
+                del _breakeven_tracker[ticket]
             continue
         if not mt5.positions_get(ticket=ticket):
             del _breakeven_tracker[ticket]
@@ -338,7 +340,11 @@ def _check_breakeven_all():
             if close > entry - 1.5 * one_r:
                 continue
             new_sl = round(entry - pip, 5)
-        pos    = mt5.positions_get(ticket=ticket)[0]
+        pos_list = mt5.positions_get(ticket=ticket)
+        if not pos_list:
+           del _breakeven_tracker[ticket]
+           continue
+        pos = pos_list[0]
         result = mt5.order_send({
             "action": mt5.TRADE_ACTION_SLTP,
             "symbol": info["symbol"],
