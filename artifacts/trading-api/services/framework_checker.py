@@ -459,6 +459,7 @@ def compute_framework_status(
         has_dir and
         has_1h_zone and
         limit_zone_status != "blown" and
+        limit_zone_distance <= 50 and 
         not news_blocked and
         limit_setup["rr"] >= 2.5
     )

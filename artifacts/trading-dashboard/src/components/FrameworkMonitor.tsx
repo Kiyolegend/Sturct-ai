@@ -171,6 +171,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
 
       // ── HTF direction flip — cancel alert ─────────────────────────────────
       if (
+        prev.limit && 
         prev.direction !== "" &&
         prev.direction !== "neutral" &&
         status.direction !== "neutral" &&
