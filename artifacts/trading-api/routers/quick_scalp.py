@@ -250,29 +250,33 @@ def _mode_e(bos_events: list[dict], direction: str,
 
 
 # ── SL calculator ─────────────────────────────────────────────────────────────
-def _structural_sl(structure_labels: list[dict], direction: str, price: float) -> float:
+def _structural_sl(structure_labels: list[dict], direction: str, price: float) -> float | None:
     pip   = _pip(price)
     buf   = 2 * pip
     min_p = 10
     max_p = 35
     if direction == "bullish":
-        lows = [s for s in structure_labels if s.get("label") in ("HL",  "EQL") and s["price"] < price]
-        if lows:
-            swing = lows[-1]["price"]
-            sl    = swing - buf
-            d     = (price - sl) / pip
+        candidates = [
+            s for s in structure_labels
+            if s.get("label") in ("HL", "EQL") and s["price"] < price
+        ]
+        for sp in reversed(candidates):
+            sl = sp["price"] - buf
+            d  = (price - sl) / pip
             if min_p <= d <= max_p:
                 return _r(sl, price)
-        return _r(price - 15 * pip, price)
+        return None
     else:
-        highs = [s for s in structure_labels if s.get("label") in ("LH", "EQH") and s["price"] > price]
-        if highs:
-            swing = highs[-1]["price"]
-            sl    = swing + buf
-            d     = (sl - price) / pip
+        candidates = [
+            s for s in structure_labels
+            if s.get("label") in ("LH", "EQH") and s["price"] > price
+        ]
+        for sp in reversed(candidates):
+            sl = sp["price"] + buf
+            d  = (sl - price) / pip
             if min_p <= d <= max_p:
                 return _r(sl, price)
-        return _r(price + 15 * pip, price)
+        return None
 
 
 # ── Per-symbol scan ────────────────────────────────────────────────────────────
@@ -425,7 +429,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
     # 5. SL / TP
     sl      = _structural_sl(structure_labels, direction, price)
     tp      = _r(price + tp_pips * pip if direction == "bullish" else price - tp_pips * pip, price)
-    sl_pips = round(abs(price - sl) / pip, 1)
+    sl_pips = round(abs(price - sl) / pip, 1) if sl is not None else None
 
     out.update({
         "direction": "BUY" if direction == "bullish" else "SELL",
@@ -439,23 +443,29 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
 
         # SL gate — structural SL must not exceed 35 pips
     MAX_SL_PIPS = 35
-    if active_mode and signal_ready and sl_pips <= MAX_SL_PIPS:
+    no_structural_sl = sl is None
+    if active_mode and signal_ready and not no_structural_sl and sl_pips <= MAX_SL_PIPS:
         out["status"] = "green"
         out["reason"] = (
             f"{direction.capitalize()} · Mode {active_mode}: {active_msg} · {sess_msg}"
         )
     elif active_mode:
         out["status"] = "yellow"
-        out["reason"] = (
-            f"{direction.capitalize()} · Mode {active_mode}: {active_msg} — awaiting momentum candle"
-            if not signal_ready
-            else f"{direction.capitalize()} · Mode {active_mode} — SL {sl_pips:.0f}p too wide vs TP {tp_pips}p"
-        )
+        if no_structural_sl:
+            out["reason"] = (
+                f"{direction.capitalize()} · Mode {active_mode} — no structural HL/LH within 10–35p, skip"
+            )
+        elif not signal_ready:
+            out["reason"] = (
+                f"{direction.capitalize()} · Mode {active_mode}: {active_msg} — awaiting momentum candle"
+            )
+        else:
+            out["reason"] = (
+                f"{direction.capitalize()} · Mode {active_mode} — SL {sl_pips:.0f}p too wide vs TP {tp_pips}p"
+            )
     else:
         out["status"] = "yellow"
         out["reason"] = f"Trend {direction} clear — no entry trigger yet"
-
-    return out
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
