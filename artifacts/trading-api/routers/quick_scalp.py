@@ -220,6 +220,27 @@ def _mode_d(mtf_bias: dict, direction: str) -> tuple[bool, str]:
     return False, f"HTF not aligned ({bias_4h}/{bias_1h}/{bias_15m})"
 
 
+# ── Entry Mode E: Recent 5M BOS confirmation ──────────────────────────────────
+def _mode_e(bos_events: list[dict], direction: str,
+            latest_time: float) -> tuple[bool, str]:
+    """
+    Checks for a recent Break of Structure on 5M in the trend direction.
+    Must be within the last 10 minutes (2 candles).
+    This is the strongest momentum confirmation — structure actually broke.
+    """
+    if not bos_events:
+        return False, "No BOS events"
+    lookback = latest_time - (2 * 5 * 60)   # 10 minutes
+    recent = [
+        e for e in bos_events
+        if e.get("time", 0) >= lookback and e.get("direction") == direction
+    ]
+    if not recent:
+        return False, "No recent BOS in direction"
+    latest_bos = recent[-1]
+    return True, f"5M BOS {direction} @ {latest_bos.get('price', '?')}"
+
+
 # ── SL calculator ─────────────────────────────────────────────────────────────
 def _structural_sl(structure_labels: list[dict], direction: str, price: float) -> float:
     pip   = _pip(price)
@@ -342,6 +363,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
     structure_labels = r5m.get("structure_labels", [])
     trend_data       = r5m.get("trend", {})
     choch_events     = r5m.get("choch", [])
+    bos_events       = r5m.get("bos", [])
     price            = r5m.get("price") or (candles[-1]["close"] if candles else 0.0)
 
     if not price:
@@ -367,22 +389,30 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
     b_ok, b_msg = _mode_b(structure_labels, candles, direction, price)
     c_ok, c_msg = _mode_c(mtf_bias, candles, direction)
     d_ok, d_msg = _mode_d(mtf_bias, direction)
+    e_ok, e_msg = _mode_e(bos_events, direction, candles[-1]["time"] if candles else 0)
 
     out["checks"]["mode_a"] = {"ok": a_ok, "msg": a_msg}
     out["checks"]["mode_b"] = {"ok": b_ok, "msg": b_msg}
     out["checks"]["mode_c"] = {"ok": c_ok, "msg": c_msg}
     out["checks"]["mode_d"] = {"ok": d_ok, "msg": d_msg}
+    out["checks"]["mode_e"] = {"ok": e_ok, "msg": e_msg}
 
-    if a_ok:
-        active_mode, active_msg = "A", a_msg
-    elif b_ok:
-        active_mode, active_msg = "B", b_msg
-    elif c_ok:
-        active_mode, active_msg = "C", c_msg
-    elif d_ok:
-        active_mode, active_msg = "D", d_msg
+        # Mode A is the momentum trigger — required for GREEN
+    # B/C/D are context modes — produce YELLOW only (conditions building)
+        # Modes A and E are momentum triggers — either one = GREEN (with context from B/C/D)
+    # B/C/D alone = YELLOW
+    momentum_ok   = a_ok or e_ok
+    momentum_mode = ("A" if a_ok else "E") if momentum_ok else None
+    momentum_msg  = (a_msg if a_ok else e_msg) if momentum_ok else None
+
+    if momentum_ok:
+        active_mode, active_msg, signal_ready = momentum_mode, momentum_msg, True
+    elif b_ok or c_ok or d_ok:
+        active_mode  = "B" if b_ok else ("C" if c_ok else "D")
+        active_msg   = b_msg if b_ok else (c_msg if c_ok else d_msg)
+        signal_ready = False
     else:
-        active_mode, active_msg = None, None
+        active_mode, active_msg, signal_ready = None, None, False
 
     # 5. SL / TP
     sl      = _structural_sl(structure_labels, direction, price)
@@ -401,16 +431,17 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
 
         # R:R gate — SL must not exceed 2× TP
     MAX_SL_RATIO = 2.0
-    if active_mode and sl_pips > tp_pips * MAX_SL_RATIO:
-        out["status"] = "yellow"
-        out["reason"] = (
-            f"{direction.capitalize()} · Mode {active_mode} setup valid "
-            f"but SL {sl_pips:.0f}p too wide vs TP {tp_pips}p — waiting for tighter entry"
-        )
-    elif active_mode:
+    if active_mode and signal_ready and sl_pips <= tp_pips * MAX_SL_RATIO:
         out["status"] = "green"
         out["reason"] = (
             f"{direction.capitalize()} · Mode {active_mode}: {active_msg} · {sess_msg}"
+        )
+    elif active_mode:
+        out["status"] = "yellow"
+        out["reason"] = (
+            f"{direction.capitalize()} · Mode {active_mode}: {active_msg} — awaiting momentum candle"
+            if not signal_ready
+            else f"{direction.capitalize()} · Mode {active_mode} — SL {sl_pips:.0f}p too wide vs TP {tp_pips}p"
         )
     else:
         out["status"] = "yellow"

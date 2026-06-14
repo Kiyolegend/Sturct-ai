@@ -117,6 +117,7 @@ function SignalCard({
           {signal.checks.mode_b  && <CheckRow label="Mode B"  ok={signal.checks.mode_b.ok}  msg={signal.checks.mode_b.msg}  />}
           {signal.checks.mode_c  && <CheckRow label="Mode C"  ok={signal.checks.mode_c.ok}  msg={signal.checks.mode_c.msg}  />}
           {signal.checks.mode_d  && <CheckRow label="Mode D"  ok={signal.checks.mode_d.ok}  msg={signal.checks.mode_d.msg}  />}
+          {signal.checks.mode_e  && <CheckRow label="Mode E"  ok={signal.checks.mode_e.ok}  msg={signal.checks.mode_e.msg}  />}
         </div>
       )}
 

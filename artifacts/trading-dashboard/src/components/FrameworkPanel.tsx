@@ -297,8 +297,8 @@ export function FrameworkPanel({ symbol }: Props) {
   const limit_out_of_reach = limit_zone_distance > 50;
 
     // ── READY FLAGS ───────────────────────────────────────────────────────────────
-  const limit_ready = hasDir && phase.good && retraceGate && (ob1h !== null || fvg1h !== null || zone1h !== null) &&
-    (ob15mInZone || fvg15mInZone) && limit_zone_status !== "blown" && !limit_out_of_reach && !newsBlocked && (setup?.rr ?? 0) >= 2.5;
+  const limit_ready = hasDir && (ob1h !== null || fvg1h !== null || zone1h !== null) &&
+  limit_zone_status !== "blown" && !limit_out_of_reach && !newsBlocked && (setup?.rr ?? 0) >= 2.5;
 
   const ready = limit_ready;
 
