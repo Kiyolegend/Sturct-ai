@@ -94,7 +94,7 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
   // PRIORITY 1 — cap proximity at 60 pips so JPY pairs don't get a 200+ pip window
   const proximity = Math.min(0.015, (60 * pip) / currentPrice);
 
-  const results: (OrderBlockData & { dist: number })[] = [];
+  const results: (OrderBlockData & { dist: number; touchCount: number; strengthScore: number })[] = [];
 
   for (let i = 1; i < n - 3; i++) {
     const c = candles[i];
@@ -128,7 +128,7 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
             const touchCount    = candles.slice(i + 1).filter((fc: any) => fc.low <= c.high && fc.high >= c.low).length;
             const strengthScore = avgRange > 0 ? (breakCandle.high - breakCandle.low) / avgRange : 1.0;
             results.push({ type: 'bullish', top: c.high, bottom: c.low, dist, time: c.time, touchCount, strengthScore });
-    }
+          }
         }
       }
     }
