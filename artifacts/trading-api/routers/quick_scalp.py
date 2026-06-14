@@ -186,27 +186,29 @@ def _mode_b(structure_labels: list[dict], candles: list[dict],
 
 # ── Entry Mode C: HTF pullback + bounce ────────────────────────────────────────
 def _mode_c(candles: list[dict], direction: str, now_ts: float) -> tuple[bool, str]:
-    if len(candles) < 4:
+    """Session open push within 45 min of London or NY open."""
+    if len(candles) < 2:
         return False, "Insufficient candles"
-    bias_1h = (mtf_bias.get("bias_1h") or {}).get("trend", "neutral")
-    if bias_1h != direction:
-        return False, f"H1 bias {bias_1h} ≠ {direction}"
-    # Last 2 completed candles must be retracing against direction
-    c1, c2 = candles[-3], candles[-2]
-    if direction == "bullish":
-        retracing = (c1["close"] < c1["open"]) or (c2["close"] < c2["open"])
-    else:
-        retracing = (c1["close"] > c1["open"]) or (c2["close"] > c2["open"])
-    if not retracing:
-        return False, "H1 bullish but no 5M pullback"
-    # Current candle must be bouncing back in direction
+    now = datetime.fromtimestamp(now_ts, tz=timezone.utc)
+    h = now.hour + now.minute / 60.0
+    in_ldn_open = 8.0 <= h < 8.75
+    in_ny_open = 13.0 <= h < 13.75
+    if not in_ldn_open and not in_ny_open:
+        return False, "Not within 45 min of London or NY open"
+    sess = "LDN open" if in_ldn_open else "NY open"
     cur = candles[-1]
+    cr = cur["high"] - cur["low"]
+    if cr == 0:
+        return False, "Zero-range candle"
+    body = abs(cur["close"] - cur["open"])
+    ratio = body / cr
+    if ratio < 0.55:
+        return False, f"{sess} — weak candle ({ratio:.0%} body)"
     if direction == "bullish" and cur["close"] <= cur["open"]:
-        return False, "Pullback present — waiting for bounce candle"
+        return False, f"{sess} — bearish push, need bullish"
     if direction == "bearish" and cur["close"] >= cur["open"]:
-        return False, "Pullback present — waiting for bounce candle"
-    return True, f"H1 {direction} pullback + 5M bounce"
-
+        return False, f"{sess} — bullish push, need bearish"
+    return True, f"{sess} momentum push {ratio:.0%} body"
 
 # ── Entry Mode D: Full HTF narrative alignment ─────────────────────────────────
 def _mode_d(mtf_bias: dict, direction: str) -> tuple[bool, str]:
