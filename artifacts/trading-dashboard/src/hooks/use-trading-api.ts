@@ -437,8 +437,8 @@ export interface QuickScalpSignal {
   tp:        number | null;
   sl_pips:   number | null;
   tp_pips:   number;
-  mode:      "A" | "B" | "C" | "D" | null;
-  checks:    Partial<Record<"session" | "trend" | "news" | "mode_a" | "mode_b" | "mode_c" | "mode_d", QuickScalpCheck>>;
+  mode:      "A" | "B" | "C" | "D" | "E" | null;
+  checks:    Partial<Record<"session" | "trend" | "news" | "mode_a" | "mode_b" | "mode_c" | "mode_d"| "mode_e", QuickScalpCheck>>;
   reason:    string;
 }
 

@@ -35,6 +35,7 @@ from services.trend_engine import detect_trend
 from services.choch_engine import detect_choch
 from services.mt5_store import get_latest_timestamp
 from services.structure_cache import get_result as _cache_get, set_result as _cache_set
+from services.bos_engine import detect_bos
 
 router = APIRouter()
 
@@ -317,8 +318,9 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
              "high": float(row["high"]), "low": float(row["low"]), "close": float(row["close"])}
             for _, row in df.iterrows()
         ]
+        bos_raw          = detect_bos(df, swings, structure_labels, trend_data.get("trend", "neutral"))
         r5m = {"structure_labels": structure_labels, "trend": trend_data,
-               "choch": choch_events, "candles": candles_raw,
+               "choch": choch_events, "bos": bos_raw, "candles": candles_raw,
                "price": float(df["close"].iloc[-1]) if len(df) > 0 else 0.0}
         _cache_set(symbol, "5m", r5m)
 
@@ -397,8 +399,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
     out["checks"]["mode_d"] = {"ok": d_ok, "msg": d_msg}
     out["checks"]["mode_e"] = {"ok": e_ok, "msg": e_msg}
 
-        # Mode A is the momentum trigger — required for GREEN
-    # B/C/D are context modes — produce YELLOW only (conditions building)
+        
         # Modes A and E are momentum triggers — either one = GREEN (with context from B/C/D)
     # B/C/D alone = YELLOW
     momentum_ok   = a_ok or e_ok
