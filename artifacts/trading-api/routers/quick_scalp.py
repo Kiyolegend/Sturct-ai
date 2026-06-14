@@ -438,7 +438,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
     })
 
         # R:R gate — SL must not exceed 2× TP
-    MAX_SL_RATIO = 5.0
+    MAX_SL_RATIO = 35
     if active_mode and signal_ready and sl_pips <= tp_pips * MAX_SL_RATIO:
         out["status"] = "green"
         out["reason"] = (

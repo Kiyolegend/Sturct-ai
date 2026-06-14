@@ -73,7 +73,9 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
   const { data } = useFrameworkStatus(30_000);
   const { toast } = useToast();
 
-  const prevState = useRef<Record<string, { limit: boolean; direction: string; zone_status: string }>>({});
+  const prevState = useRef<Record<string, { limit: boolean; direction: string; zone_status: string; lastNonNeutralDir: string }>>({});
+
+
 
   const permRequested = useRef(false);
   const initialized   = useRef(false);
@@ -95,7 +97,8 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
         prevState.current[pair] = {
           limit:       s.limit_ready,
           direction:   s.direction,
-          zone_status: (s as any).limit_zone_status ?? "",
+          zone_status:        (s as any).limit_zone_status ?? "",
+          lastNonNeutralDir:  s.direction !== "neutral" ? s.direction : "",
         };
       }
       return;
@@ -109,7 +112,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
       const status = data.pairs[pair];
       if (!status || status.error) continue;
 
-      const prev = prevState.current[pair] ?? { limit: false, direction: "", zone_status: "" };
+      const prev = prevState.current[pair] ?? { limit: false, direction: "", zone_status: "", lastNonNeutralDir: "" };
       const cur  = { limit: status.limit_ready };
 
       const curZoneStatus = (status as any).limit_zone_status ?? "";
@@ -180,7 +183,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
         playAlert();
         fireSystemNotification(
           `🔄 HTF BIAS FLIPPED — ${pair}`,
-          `Direction changed ${prev.direction.toUpperCase()} → ${status.direction.toUpperCase()}. Cancel any pending limit orders on ${pair}.`
+          `Direction changed ${prev.lastNonNeutralDir.toUpperCase()} → ${status.direction.toUpperCase()}. Cancel any pending limit orders on ${pair}.`
         );
         toast({
           title:       `🔄 HTF BIAS FLIPPED — ${pair}`,
@@ -194,6 +197,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
         ...cur,
         direction:   status.direction,
         zone_status: curZoneStatus,
+        lastNonNeutralDir:  status.direction !== "neutral" ? status.direction : prev.lastNonNeutralDir ?? "",
       };
 
       if (cur.limit) active.push({
