@@ -163,9 +163,9 @@ def _mode_b(structure_labels: list[dict], candles: list[dict],
         hit = next((lbl for lbl, lvl in levels.items() if abs(price - lvl) <= tolerance), None)
         if not hit:
             return False, "Price not at fib level"
-        cur = candles[-1]
+        cur = candles[-2]
         if cur["close"] <= cur["open"]:
-            return False, f"At fib {hit} — waiting for bullish bounce"
+            return False, f"At fib {hit} —  no bullish bounce on completed candle"
         return True, f"Fib {hit} pullback bounce ↑"
 
     else:  # bearish
@@ -178,9 +178,9 @@ def _mode_b(structure_labels: list[dict], candles: list[dict],
         hit = next((lbl for lbl, lvl in levels.items() if abs(price - lvl) <= tolerance), None)
         if not hit:
             return False, "Price not at fib level"
-        cur = candles[-1]
+        cur = candles[-2]
         if cur["close"] >= cur["open"]:
-            return False, f"At fib {hit} — waiting for bearish bounce"
+            return False, f"At fib {hit} — no bearish bounce on completed candle"
         return True, f"Fib {hit} pullback bounce ↓"
 
 
@@ -200,7 +200,7 @@ def _mode_c(candles: list[dict], direction: str, now_ts: float) -> tuple[bool, s
     if not in_ldn_open and not in_ny_open:
         return False, "Not within 45 min of London or NY open"
     sess = "LDN open" if in_ldn_open else "NY open"
-    cur = candles[-1]
+    cur = candles[-2]
     cr = cur["high"] - cur["low"]
     if cr == 0:
         return False, "Zero-range candle"
@@ -222,8 +222,7 @@ def _mode_d(mtf_bias: dict, direction: str) -> tuple[bool, str]:
     aligned  = sum(1 for b in [bias_4h, bias_1h, bias_15m] if b == direction)
     if aligned >= 3:
         return True, f"Narrative: 4H+1H+15M all {direction}"
-    if aligned >= 3:
-        return True, f"Narrative: 4H+1H+15M all {direction}"
+    
     return False, f"HTF not aligned ({bias_4h}/{bias_1h}/{bias_15m})"
 
 

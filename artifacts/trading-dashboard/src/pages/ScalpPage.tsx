@@ -179,13 +179,15 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
 
   useEffect(() => {
     if (!data?.signals) return;
+    let autoFired = false;
     for (const sig of data.signals) {
       const prev = prevStatusRef.current[sig.symbol];
       if (sig.status === "green" && prev !== undefined && prev !== "green") {
-        if (targetHit) return;
-        if (scalpMode === "auto") {
+        if (targetHit) break;
+        if (scalpMode === "auto" && !autoFired) {
           handleUse(sig);
-        } else {
+          autoFired = true;
+        } else if (scalpMode !== "auto") {
           const isBuy = sig.direction === "BUY";
           toast({
             title: `⚡ ${sig.symbol.replace("/", "")} ${sig.direction}${sig.mode ? ` · Mode ${sig.mode}` : ""}`,
