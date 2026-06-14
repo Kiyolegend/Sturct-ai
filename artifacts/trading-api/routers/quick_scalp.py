@@ -118,7 +118,7 @@ def _mode_a(candles: list[dict], direction: str,
         return False, "Zero-range candle"
     body  = abs(c["close"] - c["open"])
     ratio = body / cr
-    if ratio < 0.45:
+    if ratio < 0.67:
         return False, f"Weak candle ({ratio:.0%} body)"
     bullish_candle = c["close"] > c["open"]
     if direction == "bullish" and not bullish_candle:
@@ -185,7 +185,7 @@ def _mode_b(structure_labels: list[dict], candles: list[dict],
 
 
 # ── Entry Mode C: HTF pullback + bounce ────────────────────────────────────────
-def _mode_c(mtf_bias: dict, candles: list[dict], direction: str) -> tuple[bool, str]:
+def _mode_c(candles: list[dict], direction: str, now_ts: float) -> tuple[bool, str]:
     if len(candles) < 4:
         return False, "Insufficient candles"
     bias_1h = (mtf_bias.get("bias_1h") or {}).get("trend", "neutral")
@@ -389,7 +389,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
     # 4. Entry modes — all evaluated, any one = GREEN
     a_ok, a_msg = _mode_a(candles, direction, choch_events)
     b_ok, b_msg = _mode_b(structure_labels, candles, direction, price)
-    c_ok, c_msg = _mode_c(mtf_bias, candles, direction)
+    c_ok, c_msg = _mode_c(candles, direction, now_ts)
     d_ok, d_msg = _mode_d(mtf_bias, direction)
     e_ok, e_msg = _mode_e(bos_events, direction, candles[-1]["time"] if candles else 0)
 
@@ -431,7 +431,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
     })
 
         # R:R gate — SL must not exceed 2× TP
-    MAX_SL_RATIO = 2.0
+    MAX_SL_RATIO = 5.0
     if active_mode and signal_ready and sl_pips <= tp_pips * MAX_SL_RATIO:
         out["status"] = "green"
         out["reason"] = (
