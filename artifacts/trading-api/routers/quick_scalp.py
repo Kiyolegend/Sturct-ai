@@ -256,7 +256,7 @@ def _structural_sl(structure_labels: list[dict], direction: str, price: float) -
     min_p = 10
     max_p = 35
     if direction == "bullish":
-        lows = [s for s in structure_labels if s.get("label") in ("HL", "LL", "EQL") and s["price"] < price]
+        lows = [s for s in structure_labels if s.get("label") in ("HL",  "EQL") and s["price"] < price]
         if lows:
             swing = lows[-1]["price"]
             sl    = swing - buf
@@ -265,7 +265,7 @@ def _structural_sl(structure_labels: list[dict], direction: str, price: float) -
                 return _r(sl, price)
         return _r(price - 15 * pip, price)
     else:
-        highs = [s for s in structure_labels if s.get("label") in ("LH", "HH", "EQH") and s["price"] > price]
+        highs = [s for s in structure_labels if s.get("label") in ("LH", "EQH") and s["price"] > price]
         if highs:
             swing = highs[-1]["price"]
             sl    = swing + buf

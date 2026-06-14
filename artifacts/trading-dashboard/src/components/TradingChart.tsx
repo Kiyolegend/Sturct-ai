@@ -124,7 +124,11 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
           // PRIORITY 3 — mitigation needs a clear close beyond boundary (2-pip buffer)
           //              prevents shallow wick sweeps from killing valid OBs
           const mitigated = candles.slice(i + 1).some((fc: any) => fc.close < c.low - 2 * pip);
-          if (!mitigated) results.push({ type: 'bullish', top: c.high, bottom: c.low, dist, time: c.time });
+          if (!mitigated) {
+            const touchCount    = candles.slice(i + 1).filter((fc: any) => fc.low <= c.high && fc.high >= c.low).length;
+            const strengthScore = avgRange > 0 ? (breakCandle.high - breakCandle.low) / avgRange : 1.0;
+            results.push({ type: 'bullish', top: c.high, bottom: c.low, dist, time: c.time, touchCount, strengthScore });
+    }
         }
       }
     }
@@ -147,27 +151,31 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
         if (dist <= proximity) {
           // PRIORITY 3 — mitigation with 2-pip buffer (symmetric)
           const mitigated = candles.slice(i + 1).some((fc: any) => fc.close > c.high + 2 * pip);
-          if (!mitigated) results.push({ type: 'bearish', top: c.high, bottom: c.low, dist, time: c.time });
+          if (!mitigated) {
+            const touchCount    = candles.slice(i + 1).filter((fc: any) => fc.low <= c.high && fc.high >= c.low).length;
+            const strengthScore = avgRange > 0 ? (breakCandle.high - breakCandle.low) / avgRange : 1.0;
+            results.push({ type: 'bearish', top: c.high, bottom: c.low, dist, time: c.time, touchCount, strengthScore });
+          }
         }
       }
     }
   }
 
-  const bull = results
-    .filter(o => o.type === 'bullish' && (o.top + o.bottom) / 2 <= currentPrice)
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, 1);
-  const bear = results
-    .filter(o => o.type === 'bearish' && (o.top + o.bottom) / 2 >= currentPrice)
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, 1);
+  function _bestOB(candidates: any[]) {
+   const fresh  = candidates.filter(o => o.touchCount === 0).sort((a: any, b: any) => b.strengthScore - a.strengthScore);
+   const tested = candidates.filter(o => o.touchCount  > 0).sort((a: any, b: any) => b.strengthScore - a.strengthScore);
+   return (fresh.length ? fresh : tested).slice(0, 1);
+  }
+
+  const bull = _bestOB(results.filter(o => o.type === 'bullish' && (o.top + o.bottom) / 2 <= currentPrice));
+  const bear = _bestOB(results.filter(o => o.type === 'bearish' && (o.top + o.bottom) / 2 >= currentPrice));
 
   return [...bull, ...bear].map(({ type, top, bottom, time }) => ({
-  type,
-  top:    Math.round(top    * 1e5) / 1e5,
-  bottom: Math.round(bottom * 1e5) / 1e5,
-  time,
-}));
+    type,
+    top:    Math.round(top    * 1e5) / 1e5,
+    bottom: Math.round(bottom * 1e5) / 1e5,
+    time,
+ }));
 }
 
 

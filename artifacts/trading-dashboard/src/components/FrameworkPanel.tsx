@@ -184,8 +184,8 @@ export function FrameworkPanel({ symbol }: Props) {
   const sl5m = useMemo(() => {
     if (!data5m?.structure_labels?.length || !hasDir) return null;
     const labels = isBull
-      ? data5m.structure_labels.filter((s: any) => s.label === "HL" || s.label === "EQL" || s.label === "LL")
-      : data5m.structure_labels.filter((s: any) => s.label === "LH" || s.label === "EQH" || s.label === "HH");
+      ? data5m.structure_labels.filter((s: any) => s.label === "HL" || s.label === "EQL" )
+      : data5m.structure_labels.filter((s: any) => s.label === "LH" || s.label === "EQH" );
 
     if (!labels.length) return null;
     return (labels[labels.length - 1]?.price as number) ?? null;
@@ -258,7 +258,14 @@ export function FrameworkPanel({ symbol }: Props) {
        ? (isBull ? hi4h + 0.618 * (hi4h - lo4h) : lo4h - 0.618 * (hi4h - lo4h))
        : isBull ? entryP + (symbol.includes('JPY') ? 60 : 40) * pip
                 : entryP - (symbol.includes('JPY') ? 60 : 40) * pip;
-    const tpP = tpLevel ? tpLevel.price : fibFallback;
+    const srTp = tpLevel ? tpLevel.price : fibFallback;
+    const originTp = isBull ? hi4h : lo4h;
+    let tpP: number;
+    if (originTp && ((isBull && originTp > entryP) || (!isBull && originTp < entryP))) {
+      tpP = isBull ? Math.max(originTp, srTp) : Math.min(originTp, srTp);
+    } else {
+      tpP = srTp;
+    }
 
     const risk   = Math.abs(entryP - slP);
     const reward = Math.abs(tpP - entryP);
