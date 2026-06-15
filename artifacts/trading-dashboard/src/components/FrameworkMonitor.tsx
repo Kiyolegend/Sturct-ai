@@ -74,6 +74,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
   const { toast } = useToast();
 
   const prevState = useRef<Record<string, { limit: boolean; direction: string; zone_status: string; lastNonNeutralDir: string }>>({});
+  const firedAtMap = useRef<Record<string, number>>({});
 
 
 
@@ -119,6 +120,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
 
       // ── limit: false → true ───────────────────────────────────────────────
       if (!prev.limit && cur.limit) {
+        firedAtMap.current[pair] = brokerTime;
         const dir      = status.direction.toUpperCase();
         const rr       = status.limit_rr;
         const entryStr = status.limit_entry ? fmt(status.limit_entry) : "zone";
@@ -221,6 +223,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
 
       if (cur.limit) active.push({
         pair, mode: "limit", direction: status.direction, rr: status.limit_rr,
+        firedAt: firedAtMap.current[pair] ?? brokerTime,
         entry: status.limit_entry, tp: status.limit_tp, sl: status.limit_sl,
       });
     }

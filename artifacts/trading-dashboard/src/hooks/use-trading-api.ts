@@ -403,6 +403,7 @@ export interface ActiveSetup {
   mode:      "scalp" | "limit";
   direction: string;
   rr:        number;
+  firedAt:   number;
   entry?:    number | null;
   tp?:       number | null;
   sl?:       number | null;

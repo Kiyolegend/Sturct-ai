@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Activity, BarChart2, ChevronDown, Bell, Volume2, VolumeX } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useMT5Status, type ActiveSetup } from "../hooks/use-trading-api";
+import { useMT5Status, useBrokerTime, type ActiveSetup } from "../hooks/use-trading-api";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -211,6 +211,7 @@ function SymbolSelector({ symbol, setSymbol }: { symbol: string; setSymbol: (s: 
 
 export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, activeSetups = [] }: TopBarProps) {
   const [soundMuted, setSoundMuted] = useState(() => localStorage.getItem("struct_sound_muted") === "true");
+  const { data: brokerTimeData } = useBrokerTime();
   const timeframes = ["5M", "15M", "1H", "4H"];
 
   const toggleLayer = (key: keyof ToggleState) => {
@@ -347,32 +348,44 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
               <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5 px-1">
                 Active Setups — click to go to pair
               </p>
-              {activeSetups.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSymbol?.(s.pair)}
-                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-emerald-500/10 hover:border hover:border-emerald-500/20 cursor-pointer text-left transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-[10px] font-bold px-1.5 py-0.5 rounded",
-                      s.mode === "scalp" ? "bg-amber-500/15 text-amber-400" : "bg-blue-500/15 text-blue-400"
-                    )}>
-                      {s.mode.toUpperCase()}
+              {activeSetups.map((s, i) => {
+                const nowBroker = brokerTimeData?.broker_time ?? 0;
+                const ageSecs   = nowBroker > 0 && s.firedAt ? nowBroker - s.firedAt : 0;
+                const ageMins   = Math.floor(ageSecs / 60);
+                const isLate    = ageMins >= 5;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setSymbol?.(s.pair)}
+                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-emerald-500/10 hover:border hover:border-emerald-500/20 cursor-pointer text-left transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                        s.mode === "scalp" ? "bg-amber-500/15 text-amber-400" : "bg-blue-500/15 text-blue-400"
+                      )}>
+                        {s.mode.toUpperCase()}
+                      </span>
+                      <span className="text-xs font-mono text-white/80">{s.pair}</span>
+                      <span className={cn(
+                        "text-[10px]",
+                        s.direction === "bullish" ? "text-emerald-400" : "text-red-400"
+                      )}>
+                        {s.direction === "bullish" ? "▲" : "▼"}
+                      </span>
+                      <span className={cn(
+                        "text-[10px] font-mono",
+                        isLate ? "text-orange-400" : "text-white/40"
+                      )}>
+                        {ageSecs === 0 ? "now" : isLate ? `⚠ ${ageMins}m ago` : ageMins < 1 ? "<1m ago" : `${ageMins}m ago`}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-white/60">
+                      RR {s.rr}:1
                     </span>
-                    <span className="text-xs font-mono text-white/80">{s.pair}</span>
-                    <span className={cn(
-                      "text-[10px]",
-                      s.direction === "bullish" ? "text-emerald-400" : "text-red-400"
-                    )}>
-                      {s.direction === "bullish" ? "▲" : "▼"}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-bold text-white/60">
-                    RR {s.rr}:1
-                  </span>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
