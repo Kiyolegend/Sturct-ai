@@ -95,7 +95,11 @@ export function useFrameworkCheck(symbol: string) {
           .sort((a: any,b: any) => b.price - a.price);
 
     const originTp = isBull ? hi : lo;
-    const srTp = tpCands[0]?.price ?? (isBull ? entryP + 60*pip : entryP - 60*pip);
+    const fibFallback = (hi && lo && hi > lo)
+      ? (isBull ? hi + 0.618 * (hi - lo) : lo - 0.618 * (hi - lo))
+      : isBull ? entryP + (symbol.includes('JPY') ? 60 : 40) * pip
+               : entryP - (symbol.includes('JPY') ? 60 : 40) * pip;
+    const srTp = tpCands[0]?.price ?? fibFallback;           
     let tpP = srTp;
     if (originTp && ((isBull && originTp > entryP) || (!isBull && originTp < entryP))) {
       tpP = isBull ? Math.max(originTp, srTp) : Math.min(originTp, srTp);
