@@ -8,7 +8,6 @@ Rules:
 Only candle close prices are used (wicks are ignored).
 A BOS is confirmed at the candle that closes beyond the level.
 """
-
 import pandas as pd
 from .zigzag_engine import SwingPoint
 
@@ -75,5 +74,9 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
                     })
                 broken_levels.add(level)
                 break
-
-    return bos_events
+    
+            if times_arr: 
+                cutoff = times_arr[-1] - (4 * 3600) 
+                bos_events = [e for e in bos_events if e["time"] >= cutoff]
+            return bos_events
+           

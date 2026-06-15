@@ -74,6 +74,17 @@ def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoi
         else:
             alternating.append(pivot)
 
+    # Filter: remove swings smaller than 5 pips from the previous swing
+    MIN_SWING_PIPS = 5
+    if len(alternating) >= 2:
+        pip = 0.01 if alternating[0]["price"] > 50 else 0.0001
+        min_move = MIN_SWING_PIPS * pip
+        sized = [alternating[0]]
+        for pt in alternating[1:]:
+               if abs(pt["price"] - sized[-1]["price"]) >= min_move:
+                   sized.append(pt)
+        alternating = sized
+
     return alternating
 
 

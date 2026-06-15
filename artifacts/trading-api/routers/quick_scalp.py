@@ -466,6 +466,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
     else:
         out["status"] = "yellow"
         out["reason"] = f"Trend {direction} clear — no entry trigger yet"
+    return out
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
