@@ -25,7 +25,7 @@ import { useFrameworkCheck } from "@/hooks/use-framework-check";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 
-const PAIRS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"];
+const PAIRS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"] as const;
 
 function fmt(p: number): string {
   return p > 50 ? p.toFixed(3) : p.toFixed(5);
@@ -111,7 +111,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
       initialized.current = true;
       for (const pair of PAIRS) {
         const s = data.pairs[pair];
-        if (!s || s.error) continue;
+        if (!s || !('direction' in s)) continue;
         prevState.current[pair] = {
           limit:       s.limit_ready,
           direction:   s.direction,
@@ -128,7 +128,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
 
     for (const pair of PAIRS) {
       const status = data.pairs[pair];
-      if (!status || status.error) continue;
+      if (!status || !('direction' in status)) continue;
 
       const prev = prevState.current[pair] ?? { limit: false, direction: "", zone_status: "", lastNonNeutralDir: "" };
       const cur  = { limit: status.limit_ready };
@@ -246,7 +246,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
     }
 
     onActiveSetups(active);
-  }, [data, toast, onActiveSetups]);
+  }, [data, toast, onActiveSetups, onSwitchSymbol]);
 
   return null;
 }

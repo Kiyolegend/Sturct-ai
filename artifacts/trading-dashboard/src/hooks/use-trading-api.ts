@@ -466,7 +466,7 @@ export function useDailyPnl() {
   return useQuery({
     queryKey: ["daily-pnl"],
     queryFn: async () => {
-      const res = await fetch(`${BASE}/daily-pnl`);
+      const res = await fetch(`/trading-api/daily-pnl`);
       if (!res.ok) throw new Error("daily-pnl failed");
       return res.json() as Promise<{
         total_profit: number;

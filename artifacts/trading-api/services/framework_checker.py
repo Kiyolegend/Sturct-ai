@@ -329,9 +329,9 @@ def compute_framework_status(
     try:
         labels_5m = r5m.get("structure_labels") or []
         if is_bull:
-            candidates = [s for s in labels_5m if s.get("label") in ("HL", "EQL", "LL")]
+            candidates = [s for s in labels_5m if s.get("label") in ("HL", "EQL")]
         else:
-            candidates = [s for s in labels_5m if s.get("label") in ("LH", "EQH", "HH")]
+            candidates = [s for s in labels_5m if s.get("label") in ("LH", "EQH")]
         if candidates:
             sl5m = float(candidates[-1]["price"])
     except Exception:
@@ -342,9 +342,9 @@ def compute_framework_status(
     try:
         labels_15m = r15m.get("structure_labels") or []
         if is_bull:
-            cands_15m = [s for s in labels_15m if s.get("label") in ("HL", "EQL", "LL")]
+            cands_15m = [s for s in labels_15m if s.get("label") in ("HL", "EQL")]
         else:
-            cands_15m = [s for s in labels_15m if s.get("label") in ("LH", "EQH", "HH")]
+            cands_15m = [s for s in labels_15m if s.get("label") in ("LH", "EQH")]
         if cands_15m:
             sl15m = float(cands_15m[-1]["price"])
     except Exception:

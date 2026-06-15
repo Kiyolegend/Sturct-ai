@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useMTFBias, useTradingAnalysis, useNewsStatus } from "./use-trading-api";
+import { useMTFBias, useTradingAnalysis, useNewsStatus, useSRLevels } from "./use-trading-api";
 import { detectOrderBlocks, detectFVGs, pipSize } from "@/components/TradingChart";
 
 function phaseGood(b4h: string, b1h: string, b15: string): boolean {
@@ -16,6 +16,7 @@ export function useFrameworkCheck(symbol: string) {
   const { data: data15m } = useTradingAnalysis(symbol, "15m", 200);
   const { data: data5m }  = useTradingAnalysis(symbol, "5m",  100);
   const { data: news }    = useNewsStatus();
+  const { data: srLevels } = useSRLevels(symbol);
 
   return useMemo(() => {
     const price   = mtf?.bias_4h.current_price ?? 0;
@@ -85,7 +86,7 @@ export function useFrameworkCheck(symbol: string) {
 
     const hi = mtf?.bias_4h.last_high_price as number | undefined;
     const lo = mtf?.bias_4h.last_low_price  as number | undefined;
-    const srData = (data1h as any)?.sr_levels ?? [];
+    const srData = srLevels?.levels ?? [];
     const srFiltered = srData.filter((l: any) => l.timeframe !== "15m");
     const tpCands = isBull
       ? srFiltered.filter((l: any) => l.kind === "resistance" && l.price > entryP)
@@ -129,12 +130,19 @@ export function useFrameworkCheck(symbol: string) {
 
     return {
       limit_ready,
-      direction:   bias4h,
-      limit_rr:    rr,
-      limit_entry: Math.round(entryP * 100000) / 100000,
-      limit_sl:    Math.round(slP    * 100000) / 100000,
-      limit_tp:    Math.round(tpP    * 100000) / 100000,
-      limit_zone_status: zoneStatus,
-    };
-  }, [mtf, data1h, data15m, data5m, news, symbol]);
-}
+      direction:          bias4h,
+      limit_rr:           rr,
+      limit_entry:        Math.round(entryP * 100000) / 100000,
+      limit_sl:           Math.round(slP    * 100000) / 100000,
+      limit_tp:           Math.round(tpP    * 100000) / 100000,
+      limit_zone_status:  zoneStatus,
+      phase_good:         phaseGood(bias4h, bias1h, bias15m),
+      has_15m_confluence: (ob15m !== null && ob15m.type === dir) || (fvg15m !== null && fvg15m.type === dir),
+      retrace_pct: (() => {
+        const leg = (hi ?? 0) - (lo ?? 0);
+        if (!hi || !lo || leg <= 0) return null;
+        const raw = isBull ? ((hi - price) / leg) * 100 : ((price - lo) / leg) * 100;
+        return Math.round(raw);
+      })(),
+};
+}, [mtf, data1h, data15m, data5m, news, srLevels, symbol]);
