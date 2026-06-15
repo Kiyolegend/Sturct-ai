@@ -19,8 +19,9 @@
  * phase_good, retrace_pct, has_15m_confluence shown as bonus indicators in toast.
  */
 
-import { useEffect, useRef } from "react";
-import { useFrameworkStatus, type ActiveSetup } from "@/hooks/use-trading-api";
+import { useEffect, useMemo, useRef } from "react";
+import { type ActiveSetup } from "@/hooks/use-trading-api";
+import { useFrameworkCheck } from "@/hooks/use-framework-check";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 
@@ -70,7 +71,26 @@ interface Props {
 }
 
 export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
-  const { data } = useFrameworkStatus(30_000);
+  const r1 = useFrameworkCheck("USD/JPY");
+  const r2 = useFrameworkCheck("EUR/USD");
+  const r3 = useFrameworkCheck("GBP/USD");
+  const r4 = useFrameworkCheck("AUD/USD");
+  const r5 = useFrameworkCheck("USD/CHF");
+
+  const data = useMemo(() => ({
+    pairs: {
+      "USD/JPY": r1,
+      "EUR/USD": r2,
+      "GBP/USD": r3,
+      "AUD/USD": r4,
+      "USD/CHF": r5,
+    },
+    broker_time: Math.floor(Date.now() / 1000),
+  }), [r1, r2, r3, r4, r5]);
+const data = {
+  pairs: results,
+  broker_time: Math.floor(Date.now() / 1000),
+};
   const { toast } = useToast();
 
   const prevState = useRef<Record<string, { limit: boolean; direction: string; zone_status: string; lastNonNeutralDir: string }>>({});

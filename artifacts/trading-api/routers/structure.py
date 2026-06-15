@@ -231,9 +231,7 @@ async def get_mtf_bias(
         t1h  = _bias(df_1h,  fractal_n=3)
         t4h  = _bias(df_4h,  fractal_n=3)
 
-        _cache_set(symbol, "15m", {"trend": t15m, "price": t15m.get("current_price")})
-        _cache_set(symbol, "1h",  {"trend": t1h,  "price": t1h.get("current_price")})
-        _cache_set(symbol, "4h",  {"trend": t4h,  "price": t4h.get("current_price")})
+        
 
         return {
             "symbol": symbol,
