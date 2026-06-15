@@ -111,12 +111,12 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
       initialized.current = true;
       for (const pair of PAIRS) {
         const s = data.pairs[pair];
-        if (!s || !('direction' in s)) continue;
+        if (!s || !s.direction) continue;
         prevState.current[pair] = {
           limit:       s.limit_ready,
           direction:   s.direction,
           zone_status:        (s as any).limit_zone_status ?? "",
-          lastNonNeutralDir:  s.direction !== "neutral" ? s.direction : "",
+          lastNonNeutralDir:  s.direction,
         };
       }
       return;
@@ -128,7 +128,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
 
     for (const pair of PAIRS) {
       const status = data.pairs[pair];
-      if (!status || !('direction' in status)) continue;
+      if (!status || !status.direction) continue;
 
       const prev = prevState.current[pair] ?? { limit: false, direction: "", zone_status: "", lastNonNeutralDir: "" };
       const cur  = { limit: status.limit_ready };
@@ -195,7 +195,6 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
       if (
         prev.limit &&
         prev.lastNonNeutralDir !== "" &&
-        status.direction !== "neutral" &&
         prev.lastNonNeutralDir !== status.direction
       ) {
         playAlert();
@@ -216,7 +215,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
         playAlert();
         fireSystemNotification(
           `⚠️ SETUP CANCELLED — ${pair}`,
-          `The ${(prev.direction || status.direction).toUpperCase()} limit setup on ${pair} is no longer valid. Check before placing.`
+          `The ${(prev.direction || status.direction || "").toUpperCase()} limit setup on ${pair} is no longer valid. Check before placing.`
         );
         toast({
           title:       `⚠️ SETUP CANCELLED — ${pair}`,
@@ -235,7 +234,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
         ...cur,
         direction:   status.direction,
         zone_status: curZoneStatus,
-        lastNonNeutralDir:  status.direction !== "neutral" ? status.direction : prev.lastNonNeutralDir ?? "",
+        lastNonNeutralDir:  status.direction,
       };
 
       if (cur.limit) active.push({

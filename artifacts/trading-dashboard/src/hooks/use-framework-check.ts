@@ -146,3 +146,4 @@ export function useFrameworkCheck(symbol: string) {
       })(),
 };
 }, [mtf, data1h, data15m, data5m, news, srLevels, symbol]);
+}
