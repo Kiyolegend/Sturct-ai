@@ -157,7 +157,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
         );
         toast({
           title:       `📍 LIMIT READY — ${pair}`,
-          description: `${dir} · RR ${rr}:1 · Zone entry ${entryStr} · TP ${tpStr}${bonusStr} · ${ts}`,
+          description: `${dir} · RR ${rr}:1 · Entry ${entryStr} · SL ${slStr} · TP ${tpStr}${bonusStr} · ${ts}`,
           duration:    20_000,
           action: (
             <ToastAction altText={`Switch to ${pair}`} onClick={() => onSwitchSymbol(pair)}>

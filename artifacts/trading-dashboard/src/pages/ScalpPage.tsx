@@ -154,6 +154,7 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
   const { data, isLoading, refetch, dataUpdatedAt } = useQuickScalpScan(20_000);
   const { data: pnlData } = useDailyPnl();
   const signals     = data?.signals ?? [];
+  const livePrice   = signals.find(s => s.symbol === symbol)?.entry ?? 0;
   const greenCount  = signals.filter(s => s.status === "green").length;
   const yellowCount = signals.filter(s => s.status === "yellow").length;
   const targetHit   = (pnlData?.total_profit ?? 0) >= 4; 
@@ -206,7 +207,7 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
       }
     }
     prevStatusRef.current = Object.fromEntries(data.signals.map(s => [s.symbol, s.status]));
-  }, [data]);
+  }, [data, scalpMode, targetHit]);
 
 
   return (
@@ -314,7 +315,7 @@ export function ScalpPage({ symbol, setSymbol }: ScalpPageProps) {
         <div className="w-72 shrink-0 border-l border-white/5 overflow-y-auto">
           <TradePanel
             symbol={symbol}
-            currentPrice={0}
+            currentPrice={livePrice}
             clickedPrice={null}
             onClickedPriceConsumed={() => {}}
             onSLChange={() => {}}
