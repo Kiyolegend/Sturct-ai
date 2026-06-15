@@ -75,8 +75,8 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
                 broken_levels.add(level)
                 break
     
-            if times_arr: 
-                cutoff = times_arr[-1] - (4 * 3600) 
-                bos_events = [e for e in bos_events if e["time"] >= cutoff]
-            return bos_events
+    if times_arr: 
+        cutoff = times_arr[-1] - (4 * 3600) 
+        bos_events = [e for e in bos_events if e["time"] >= cutoff]
+    return bos_events
            
