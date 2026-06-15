@@ -370,6 +370,9 @@ def _execute_close(order: dict):
         _report(order_id, ticket, "ERROR", f"Position {ticket} not found")
         return
     tick  = mt5.symbol_info_tick(pos.symbol)
+    if not tick:
+        _report(order_id, ticket, "ERROR", "No tick price for close — MT5 disconnected, retry")
+        return
     price = tick.bid if pos.type == 0 else tick.ask
     req   = {
         "action":       mt5.TRADE_ACTION_DEAL,
