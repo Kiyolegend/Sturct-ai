@@ -191,6 +191,26 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
         });
       }
 
+
+            // ── limit: true → false (silent cancellation) — catch-all alert ──
+      if (prev.limit && !cur.limit && curZoneStatus !== "blown") {
+        playAlert();
+        fireSystemNotification(
+          `⚠️ SETUP CANCELLED — ${pair}`,
+          `The ${(prev.direction || status.direction).toUpperCase()} limit setup on ${pair} is no longer valid. Check before placing.`
+        );
+        toast({
+          title:       `⚠️ SETUP CANCELLED — ${pair}`,
+          description: `Conditions dropped — zone left proximity or RR fell. Do NOT place this order without re-checking the framework panel.`,
+          duration:    30_000,
+          action: (
+            <ToastAction altText={`Go to ${pair}`} onClick={() => onSwitchSymbol(pair)}>
+              CHECK {pair.replace("/", "")}
+            </ToastAction>
+          ),
+        });
+      }
+
       // Persist current state for next scan
       prevState.current[pair] = {
         ...cur,
