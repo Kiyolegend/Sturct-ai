@@ -87,10 +87,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
     },
     broker_time: Math.floor(Date.now() / 1000),
   }), [r1, r2, r3, r4, r5]);
-const data = {
-  pairs: results,
-  broker_time: Math.floor(Date.now() / 1000),
-};
+
   const { toast } = useToast();
 
   const prevState = useRef<Record<string, { limit: boolean; direction: string; zone_status: string; lastNonNeutralDir: string }>>({});
