@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 
 const PAIRS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"] as const;
+const LIMIT_REFIRE_COOLDOWN_SECS = 60 * 60; // 60 min — prevents R/R oscillation re-spam
 
 function fmt(p: number): string {
   return p > 50 ? p.toFixed(3) : p.toFixed(5);
@@ -136,7 +137,9 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
       const curZoneStatus = (status as any).limit_zone_status ?? "";
 
       // ── limit: false → true ───────────────────────────────────────────────
-      if (!prev.limit && cur.limit) {
+      const lastFired = firedAtMap.current[pair] ?? 0;
+      const cooldownExpired = (brokerTime - lastFired) >= LIMIT_REFIRE_COOLDOWN_SECS;
+      if (!prev.limit && cur.limit && cooldownExpired) {
         firedAtMap.current[pair] = brokerTime;
         const dir      = status.direction.toUpperCase();
         const rr       = status.limit_rr;
@@ -210,24 +213,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
       }
 
 
-            // ── limit: true → false (silent cancellation) — catch-all alert ──
-      if (prev.limit && !cur.limit && curZoneStatus !== "blown") {
-        playAlert();
-        fireSystemNotification(
-          `⚠️ SETUP CANCELLED — ${pair}`,
-          `The ${(prev.direction || status.direction || "").toUpperCase()} limit setup on ${pair} is no longer valid. Check before placing.`
-        );
-        toast({
-          title:       `⚠️ SETUP CANCELLED — ${pair}`,
-          description: `Conditions dropped — zone left proximity or RR fell. Do NOT place this order without re-checking the framework panel.`,
-          duration:    30_000,
-          action: (
-            <ToastAction altText={`Go to ${pair}`} onClick={() => onSwitchSymbol(pair)}>
-              CHECK {pair.replace("/", "")}
-            </ToastAction>
-          ),
-        });
-      }
+            
 
       // Persist current state for next scan
       prevState.current[pair] = {
