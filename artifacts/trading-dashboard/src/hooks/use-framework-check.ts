@@ -28,6 +28,14 @@ export function useFrameworkCheck(symbol: string) {
     const isBull  = bias4h === "bullish";
     const dir     = bias4h;
     const hasDir  = bias4h !== "neutral";
+    const ENTRY_DEPTH: Record<string, number> = {
+      "USD/JPY": 0.65,
+      "GBP/USD": 0.60,
+      "EUR/USD": 0.55,
+      "AUD/USD": 0.50,
+      "USD/CHF": 0.50,
+    };
+    const depth = ENTRY_DEPTH[symbol] ?? 0.55;
 
     if (!hasDir || !price) return { limit_ready: false };
 
@@ -66,7 +74,7 @@ export function useFrameworkCheck(symbol: string) {
     const zone = ob1h ?? fvg1h ?? zone1h;
     const zoneWidth = zone ? zone.top - zone.bottom : 0;
     const entryP = zone
-      ? (isBull ? zone.bottom + zoneWidth * 0.30 : zone.top - zoneWidth * 0.30)
+      ? (isBull ? zone.bottom + zoneWidth * depth : zone.top - zoneWidth * depth)
       : price;
 
     const ob15m = data15m?.candles?.length
