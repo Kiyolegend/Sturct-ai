@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useMTFBias, useTradingAnalysis, useNewsStatus, useSRLevels } from "./use-trading-api";
 import { detectOrderBlocks, detectFVGs, pipSize } from "@/components/TradingChart";
 
@@ -17,8 +17,9 @@ export function useFrameworkCheck(symbol: string) {
   const { data: data5m }  = useTradingAnalysis(symbol, "5m",  100);
   const { data: news }    = useNewsStatus();
   const { data: srLevels } = useSRLevels(symbol);
+  const [stickyReady, setStickyReady] = useState(false);
 
-  return useMemo(() => {
+  const status = useMemo(() => {
     const price   = mtf?.bias_4h.current_price ?? 0;
     const bias4h  = mtf?.bias_4h.trend  ?? "neutral";
     const bias1h  = mtf?.bias_1h.trend  ?? "neutral";
@@ -130,7 +131,7 @@ export function useFrameworkCheck(symbol: string) {
       zoneStatus !== "blown" &&
       zoneDistance <= 50 &&
       !newsBlocked &&
-      rr >= 2.5;
+      rr >= (stickyReady ? 2.0 : 2.5);
 
     return {
       limit_ready,
@@ -149,5 +150,9 @@ export function useFrameworkCheck(symbol: string) {
         return Math.round(raw);
       })(),
 };
-}, [mtf, data1h, data15m, data5m, news, srLevels, symbol]);
+}, [mtf, data1h, data15m, data5m, news, srLevels, symbol, stickyReady]);
+useEffect(() => {
+  setStickyReady(status.limit_ready);
+}, [status.limit_ready]);
+  return status;
 }
