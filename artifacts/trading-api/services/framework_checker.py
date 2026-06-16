@@ -362,11 +362,20 @@ def compute_framework_status(
             retrace_pct = round(raw_pct)
 
     # ── Setup (entry / SL / TP / RR) ──────────────────────────────────────────
+    _ENTRY_DEPTH: dict[str, float] = {
+        "USD/JPY": 0.65,
+        "GBP/USD": 0.60,
+        "EUR/USD": 0.55,
+        "AUD/USD": 0.50,
+        "USD/CHF": 0.50,
+    }
+
     def _setup(mode: str) -> dict:
         zone = (ob1h or fvg1h or zone1h) if mode == "limit" else None
         zone_width = (zone["top"] - zone["bottom"]) if zone else 0
+        depth = _ENTRY_DEPTH.get(symbol, 0.55)
         entry_p = (
-            (zone["bottom"] + zone_width * 0.30 if is_bull else zone["top"] - zone_width * 0.30)
+            (zone["bottom"] + zone_width * depth if is_bull else zone["top"] - zone_width * depth)
             if zone else current_price
         )
 
