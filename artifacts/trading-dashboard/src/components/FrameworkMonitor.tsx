@@ -192,6 +192,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
             </ToastAction>
           ),
         });
+        firedAtMap.current[pair] = 0; // reset cooldown — new setup can alert again
       }
 
       // ── HTF direction flip — cancel alert ─────────────────────────────────
@@ -210,6 +211,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
           description: `Direction reversed ${prev.lastNonNeutralDir.toUpperCase()} → ${status.direction.toUpperCase()}. Cancel pending limit orders on ${pair}.`,
           duration:    60_000,
         });
+        firedAtMap.current[pair] = 0; // reset cooldown — new direction, fresh alert allowed
       }
 
 
