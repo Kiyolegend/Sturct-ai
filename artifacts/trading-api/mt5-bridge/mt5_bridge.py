@@ -226,6 +226,7 @@ POSITIONS_URL = f"{API_BASE_URL}/trading-api/trade/positions/sync"
 
 BREAKEVEN_URL = f"{API_BASE_URL}/trading-api/trade/breakeven-moved"
 _breakeven_tracker: dict[int, dict] = {}
+_pending_be:        dict[int, dict] = {}   # LIMIT framework orders waiting to fill
 
 def _pip(price: float) -> float:
     return 0.01 if price > 50 else 0.0001
@@ -302,10 +303,17 @@ def _execute_order(order: dict):
         _report(order_id, result.order, "FILLED", "OK", fill_price=result.price)
 
         if order.get("comment", "") == "STRUCT.ai-Framework":
-            _breakeven_tracker[result.order] = {
-                "symbol": mt5_sym, "direction": direction,
-                "entry": result.price, "sl_orig": sl, "tp": tp, "moved": False,
-            }
+            if o_type == "MARKET":
+                _breakeven_tracker[result.order] = {
+                    "symbol": mt5_sym, "direction": direction,
+                    "entry": result.price, "sl_orig": sl, "tp": tp, "moved": False,
+                }
+            else:
+                # LIMIT — fill price unknown at placement; promote when position opens
+                _pending_be[result.order] = {
+                    "symbol": mt5_sym, "direction": direction,
+                    "sl_orig": sl, "tp": tp,
+                }
     else:
         msg = result.comment if result else str(mt5.last_error())
         print(f"  [TRADE] REJECTED: {order['symbol']} {msg}")
@@ -314,6 +322,24 @@ def _execute_order(order: dict):
 
 
 def _check_breakeven_all():
+    # Promote pending LIMIT framework orders that have now filled
+    for ticket in list(_pending_be.keys()):
+        pos_list = mt5.positions_get(ticket=ticket)
+        if pos_list:
+            # Position opened — actual fill price now available
+            info = _pending_be.pop(ticket)
+            _breakeven_tracker[ticket] = {
+                "symbol":    info["symbol"],
+                "direction": info["direction"],
+                "entry":     pos_list[0].price_open,
+                "sl_orig":   info["sl_orig"],
+                "tp":        info["tp"],
+                "moved":     False,
+            }
+        elif not mt5.orders_get(ticket=ticket):
+            # Not a position AND not a pending order — cancelled or expired
+            del _pending_be[ticket]
+
     for ticket, info in list(_breakeven_tracker.items()):
         if info["moved"]:
             if not mt5.positions_get(ticket=ticket):
