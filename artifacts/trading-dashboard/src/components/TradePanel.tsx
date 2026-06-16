@@ -53,6 +53,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   const [confirmCloseTicket, setConfirmCloseTicket] = useState<number | null>(null);
   // BUG 2 fix: store order_id from POST /trade/open response to correlate with polling results
   const orderIdRef = useRef<string | null>(null);
+  const commentRef  = useRef<string>("STRUCT.ai");
 
   // Auto-update SL/TP when direction, symbol, orderType change, or price first loads
   // BUG 4 fix: was `currentPrice > 0 ? "loaded" : ""` — a string that locked to "loaded" and
@@ -74,6 +75,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     setTP(prefill.tp.toFixed(DEC(prefill.tp)));
     if (prefill.orderType) setOrderType(prefill.orderType);
     if (prefill.entry)     setLimitPrice(prefill.entry.toFixed(DEC(prefill.entry)));
+    commentRef.current = prefill.comment ?? "STRUCT.ai";
     setWasPrefilled(true);
     onPrefillConsumed?.();
   }, [prefill]);
@@ -204,7 +206,8 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
           sl:         parseFloat(sl),
           tp:         parseFloat(tp),
           lots:       parseFloat(lots),
-          comment:    prefill?.comment ?? "STRUCT.ai",
+          comment:    commentRef.current,
+
         }),
       });
       if (!resp.ok) {
@@ -235,6 +238,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
     setWasPrefilled(false);
     // BUG 2 fix: clear stored order_id so a new trade starts fresh
     orderIdRef.current = null;
+    commentRef.current = "STRUCT.ai";
   };
 
   // BUG 7+8 fix: replaced window.confirm (blocked/auto-dismissed in sandboxed iframes)
