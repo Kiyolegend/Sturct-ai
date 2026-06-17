@@ -83,6 +83,20 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     }
     return null;
   }, [fibLevels, data?.candles, biasData?.bias_4h?.trend]);
+    const pipsToZone = useMemo((): number | null => {
+    if (goldenZoneAlert !== null) return null;
+    if (!fibLevels.length || !data?.candles?.length) return null;
+    const candles = data.candles as any[];
+    const price = candles[candles.length - 1]?.close as number | undefined;
+    if (!price) return null;
+    const level382 = fibLevels.find(f => f.pct === 38.2)?.price;
+    const level618 = fibLevels.find(f => f.pct === 61.8)?.price;
+    if (!level382 || !level618) return null;
+    const pip = price > 50 ? 0.01 : 0.0001;
+    if (price > level382) return Math.round((price - level382) / pip);
+    if (price < level618) return Math.round((level618 - price) / pip);
+    return null;
+  }, [goldenZoneAlert, fibLevels, data?.candles]);
 
   const [wsConnected,  setWsConnected]  = useState(false);
   const [clickedPrice, setClickedPrice] = useState<number | null>(null);
@@ -228,7 +242,12 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
               />
 
 
-              
+              {!goldenZoneAlert && pipsToZone !== null && pipsToZone <= 80 && (
+                <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full flex items-center gap-2 backdrop-blur-md border border-white/10 bg-white/5 font-mono text-xs text-slate-400 tracking-wide pointer-events-none">
+                  <span className="text-yellow-400 animate-pulse">◎</span>
+                  {pipsToZone} pips to golden zone
+                </div>
+              )}
               {goldenZoneAlert && (
                 <div className={`absolute top-14 left-1/2 -translate-x-1/2 z-50 px-5 py-2 rounded-full flex items-center gap-2 backdrop-blur-md border font-mono text-xs font-bold tracking-widest uppercase shadow-xl pointer-events-none
                   ${goldenZoneAlert === "BUY"
