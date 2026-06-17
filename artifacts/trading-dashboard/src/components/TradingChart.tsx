@@ -495,31 +495,43 @@ containerRef.current?.addEventListener('click', handleChartClick);
     });
   }, [srLevels, data, toggles.sr15m, toggles.sr1h, toggles.sr4h]);
 
-  // ── Effect 4: BOS / CHOCH lines ───────────────────────────────────────────
+    // ── Effect 4: BOS / CHOCH lines (current timeframe) ──────────────────────
   useEffect(() => {
     if (!candleSeriesRef.current) return;
     bosChochLinesRef.current.forEach(line => { try { candleSeriesRef.current?.removePriceLine(line); } catch {} });
     bosChochLinesRef.current = [];
 
-    if (!toggles.bos || !bosChochData?.levels?.length) return;
+    if (!toggles.bos) return;
 
-    const levels = bosChochData.levels;
-    const significantChoch = levels.filter(l => l.type === 'CHOCH').slice(-1);
-    const significantBos   = levels.filter(l => l.type === 'BOS').slice(-2);
+    const recentBos   = ((data?.bos   ?? []) as any[]).slice(-2);
+    const recentChoch = ((data?.choch ?? []) as any[]).slice(-1);
 
-    [...significantBos, ...significantChoch].forEach(level => {
-      const isChoch = level.type === 'CHOCH';
+    recentBos.forEach((event: any) => {
+      const dir = event.direction as 'bullish' | 'bearish';
       const line = candleSeriesRef.current!.createPriceLine({
-        price: level.price,
-        color: isChoch ? CHOCH_COLOR : BOS_COLORS[level.direction],
-        lineWidth: isChoch ? 2 : 1,
-        lineStyle: LineStyle.Dashed,
+        price:            event.price,
+        color:            BOS_COLORS[dir],
+        lineWidth:        1,
+        lineStyle:        LineStyle.Dashed,
         axisLabelVisible: true,
-        title: `${level.type} ${level.direction === 'bullish' ? '↑' : '↓'}`,
+        title:            `BOS ${dir === 'bullish' ? '↑' : '↓'}`,
       });
       bosChochLinesRef.current.push(line);
     });
-  }, [bosChochData, toggles.bos]);
+
+    recentChoch.forEach((event: any) => {
+      const dir = event.direction as 'bullish' | 'bearish';
+      const line = candleSeriesRef.current!.createPriceLine({
+        price:            event.price,
+        color:            CHOCH_COLOR,
+        lineWidth:        2,
+        lineStyle:        LineStyle.Dashed,
+        axisLabelVisible: true,
+        title:            `CHOCH ${dir === 'bullish' ? '↑' : '↓'}`,
+      });
+      bosChochLinesRef.current.push(line);
+    });
+  }, [data?.bos, data?.choch, toggles.bos]);
 
    // ── Effect 5: Live SL / TP price lines ────────────────────────────────────
   useEffect(() => {
