@@ -399,16 +399,6 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
           ⊞ Analysis
         </a>
         
-
-        <a
-          href="/scalp"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider bg-yellow-500/10 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-colors"
->         
-         ⚡ Scalp
-        </a>
-
         <div className="hidden lg:flex items-center gap-1">
           <BiasBadge label="15M" trend={bias15m} />
           <BiasBadge label="1H"  trend={bias1h}  />

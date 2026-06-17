@@ -68,6 +68,10 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
                 })
                 break
 
+    if times_arr:
+        cutoff = times_arr[-1] - (24 * 3600)
+        choch_events = [e for e in choch_events if e["time"] >= cutoff]
     return choch_events
+
 
     
