@@ -64,6 +64,26 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     ].map(r => ({ ...r, price: hi - (r.pct / 100) * range }));
   }, [biasData?.bias_4h]);
 
+  
+  const goldenZoneAlert = useMemo((): "BUY" | "SELL" | "WATCH" | null => {
+    if (!fibLevels.length || !data?.candles?.length) return null;
+    const candles = data.candles as any[];
+    const price = candles[candles.length - 1]?.close as number | undefined;
+    if (!price) return null;
+    const level382 = fibLevels.find(f => f.pct === 38.2)?.price;
+    const level618 = fibLevels.find(f => f.pct === 61.8)?.price;
+    if (!level382 || !level618) return null;
+    const zoneTop    = level382;
+    const zoneBottom = level618;
+    if (price >= zoneBottom && price <= zoneTop) {
+      const trend = biasData?.bias_4h?.trend;
+      if (trend === "bullish") return "BUY";
+      if (trend === "bearish") return "SELL";
+      return "WATCH";
+    }
+    return null;
+  }, [fibLevels, data?.candles, biasData?.bias_4h?.trend]);
+
   const [wsConnected,  setWsConnected]  = useState(false);
   const [clickedPrice, setClickedPrice] = useState<number | null>(null);
   const [slLine,       setSlLine]       = useState<number | null>(null);
@@ -206,6 +226,24 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                 tpLine={tpLine}
                 fibLevels={fibLevels}
               />
+
+
+              
+              {goldenZoneAlert && (
+                <div className={`absolute top-14 left-1/2 -translate-x-1/2 z-50 px-5 py-2 rounded-full flex items-center gap-2 backdrop-blur-md border font-mono text-xs font-bold tracking-widest uppercase shadow-xl pointer-events-none
+                  ${goldenZoneAlert === "BUY"
+                    ? "bg-green-500/15 border-green-400/40 text-green-300"
+                    : goldenZoneAlert === "SELL"
+                    ? "bg-red-500/15 border-red-400/40 text-red-300"
+                    : "bg-yellow-500/15 border-yellow-400/40 text-yellow-300"
+                  }`}>
+                  <span className="animate-pulse">⚡</span>
+                  {goldenZoneAlert === "BUY"   && "GOLDEN ZONE — BUY SETUP"}
+                  {goldenZoneAlert === "SELL"  && "GOLDEN ZONE — SELL SETUP"}
+                  {goldenZoneAlert === "WATCH" && "GOLDEN ZONE — WATCH"}
+                  <span className="opacity-40 text-[10px] ml-1">38.2–61.8% · 4H</span>
+                </div>
+              )}
 
               <div className={`absolute bottom-6 right-6 px-3 py-1.5 backdrop-blur-md border rounded-full flex items-center space-x-2 shadow-lg z-50 ${wsConnected ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30"}`}>
                 <div className={`w-2 h-2 rounded-full ${wsConnected ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />

@@ -51,7 +51,7 @@ def detect_order_blocks(candles: list[dict], current_price: float) -> list[dict]
         return []
     pip = _pip(current_price)
     min_size = 5 * pip
-    proximity = min(0.015, (60 * pip) / current_price)
+    proximity = min(0.015, (70 * pip) / current_price)
     results: list[dict] = []
 
     for i in range(1, n - 3):
