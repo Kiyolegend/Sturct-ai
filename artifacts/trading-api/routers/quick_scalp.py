@@ -34,7 +34,7 @@ from services.structure_engine import classify_structure
 from services.trend_engine import detect_trend
 from services.choch_engine import detect_choch
 from services.mt5_store import get_latest_timestamp
-from services.structure_cache import get_result as _cache_get, set_result as _cache_set
+from services.structure_cache import get_result as _cache_get,
 from services.bos_engine import detect_bos
 
 router = APIRouter()
@@ -333,7 +333,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
         r5m = {"structure_labels": structure_labels, "trend": trend_data,
                "choch": choch_events, "bos": bos_raw, "candles": candles_raw,
                "price": float(df["close"].iloc[-1]) if len(df) > 0 else 0.0}
-        _cache_set(symbol, "5m", r5m)
+        
 
         # Read MTF bias from cache — fall back to computing if cache empty
     r15m = _cache_get(symbol, "15m")
@@ -342,7 +342,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
             df15 = await fetch_ohlc(symbol=symbol, interval="15m", outputsize=100)
             sw15 = detect_swings(df15, fractal_n=5)
             r15m = {"trend": detect_trend(classify_structure(sw15))}
-            _cache_set(symbol, "15m", r15m)
+            
         except Exception:
             r15m = {}
 
@@ -352,7 +352,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
             df1h = await fetch_ohlc(symbol=symbol, interval="1h", outputsize=100)
             sw1h = detect_swings(df1h, fractal_n=3)
             r1h = {"trend": detect_trend(classify_structure(sw1h))}
-            _cache_set(symbol, "1h", r1h)
+            
         except Exception:
             r1h = {}
 
@@ -362,7 +362,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
             df4h = await fetch_ohlc(symbol=symbol, interval="4h", outputsize=80)
             sw4h = detect_swings(df4h, fractal_n=3)
             r4h = {"trend": detect_trend(classify_structure(sw4h))}
-            _cache_set(symbol, "4h", r4h)
+            
         except Exception:
             r4h = {}
 
