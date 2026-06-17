@@ -34,7 +34,6 @@ from services.structure_engine import classify_structure
 from services.trend_engine import detect_trend
 from services.choch_engine import detect_choch
 from services.mt5_store import get_latest_timestamp
-from services.structure_cache import get_result as _cache_get,
 from services.bos_engine import detect_bos
 
 router = APIRouter()
@@ -312,9 +311,9 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
         return out
 
     # Read 5M structure from cache (written by /structure or /analysis route)
-    r5m = _cache_get(symbol, "5m")
-    if r5m is None:
-        # Cache miss — compute once and store
+    
+    
+        
         try:
             df = await fetch_ohlc(symbol=symbol, interval="5m", outputsize=100)
         except Exception as e:
@@ -336,7 +335,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
         
 
         # Read MTF bias from cache — fall back to computing if cache empty
-    r15m = _cache_get(symbol, "15m")
+    
     if r15m is None:
         try:
             df15 = await fetch_ohlc(symbol=symbol, interval="15m", outputsize=100)
@@ -346,7 +345,7 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
         except Exception:
             r15m = {}
 
-    r1h = _cache_get(symbol, "1h")
+    
     if r1h is None:
         try:
             df1h = await fetch_ohlc(symbol=symbol, interval="1h", outputsize=100)
