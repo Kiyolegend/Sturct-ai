@@ -310,60 +310,60 @@ async def _scan_symbol(symbol: str, now_ts: float) -> dict:
         out["reason"] = news_msg
         return out
 
-    # Read 5M structure from cache (written by /structure or /analysis route)
+    
     
     
         
-        try:
-            df = await fetch_ohlc(symbol=symbol, interval="5m", outputsize=100)
-        except Exception as e:
-            out["reason"] = f"No MT5 data: {e}"
-            return out
-        swings           = detect_swings(df, fractal_n=5)
-        structure_labels = classify_structure(swings)
-        trend_data       = detect_trend(structure_labels)
-        choch_events     = detect_choch(df, swings, structure_labels, trend_data.get("trend", "neutral"))
-        candles_raw      = [
-            {"time": int(row["time"].timestamp()), "open": float(row["open"]),
-             "high": float(row["high"]), "low": float(row["low"]), "close": float(row["close"])}
-            for _, row in df.iterrows()
-        ]
-        bos_raw          = detect_bos(df, swings, structure_labels, trend_data.get("trend", "neutral"))
-        r5m = {"structure_labels": structure_labels, "trend": trend_data,
-               "choch": choch_events, "bos": bos_raw, "candles": candles_raw,
-               "price": float(df["close"].iloc[-1]) if len(df) > 0 else 0.0}
+    try:
+        df = await fetch_ohlc(symbol=symbol, interval="5m", outputsize=100)
+    except Exception as e:
+        out["reason"] = f"No MT5 data: {e}"
+        return out
+    swings           = detect_swings(df, fractal_n=5)
+    structure_labels = classify_structure(swings)
+    trend_data       = detect_trend(structure_labels)
+    choch_events     = detect_choch(df, swings, structure_labels, trend_data.get("trend", "neutral"))
+    candles_raw      = [
+        {"time": int(row["time"].timestamp()), "open": float(row["open"]),
+         "high": float(row["high"]), "low": float(row["low"]), "close": float(row["close"])}
+        for _, row in df.iterrows()
+    ]
+    bos_raw          = detect_bos(df, swings, structure_labels, trend_data.get("trend", "neutral"))
+    r5m = {"structure_labels": structure_labels, "trend": trend_data,
+            "choch": choch_events, "bos": bos_raw, "candles": candles_raw,
+            "price": float(df["close"].iloc[-1]) if len(df) > 0 else 0.0}
         
 
-        # Read MTF bias from cache — fall back to computing if cache empty
+        
     
-    if r15m is None:
-        try:
-            df15 = await fetch_ohlc(symbol=symbol, interval="15m", outputsize=100)
-            sw15 = detect_swings(df15, fractal_n=5)
-            r15m = {"trend": detect_trend(classify_structure(sw15))}
+    
+    try:
+        df15 = await fetch_ohlc(symbol=symbol, interval="15m", outputsize=100)
+        sw15 = detect_swings(df15, fractal_n=5)
+        r15m = {"trend": detect_trend(classify_structure(sw15))}
             
-        except Exception:
-            r15m = {}
+    except Exception:
+        r15m = {}
 
     
-    if r1h is None:
-        try:
-            df1h = await fetch_ohlc(symbol=symbol, interval="1h", outputsize=100)
-            sw1h = detect_swings(df1h, fractal_n=3)
-            r1h = {"trend": detect_trend(classify_structure(sw1h))}
+    
+    try:
+        df1h = await fetch_ohlc(symbol=symbol, interval="1h", outputsize=100)
+        sw1h = detect_swings(df1h, fractal_n=3)
+        r1h = {"trend": detect_trend(classify_structure(sw1h))}
             
-        except Exception:
-            r1h = {}
+    except Exception:
+        r1h = {}
 
-    r4h = _cache_get(symbol, "4h")
-    if r4h is None:
-        try:
-            df4h = await fetch_ohlc(symbol=symbol, interval="4h", outputsize=80)
-            sw4h = detect_swings(df4h, fractal_n=3)
-            r4h = {"trend": detect_trend(classify_structure(sw4h))}
+    
+    
+    try:
+        df4h = await fetch_ohlc(symbol=symbol, interval="4h", outputsize=80)
+        sw4h = detect_swings(df4h, fractal_n=3)
+        r4h = {"trend": detect_trend(classify_structure(sw4h))}
             
-        except Exception:
-            r4h = {}
+    except Exception:
+        r4h = {}
 
     mtf_bias = {
         "bias_15m": r15m.get("trend") or {},
