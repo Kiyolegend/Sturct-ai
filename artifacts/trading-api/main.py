@@ -12,7 +12,6 @@ from ws_manager import active_connections, broadcast
 
 from routers.data import router as data_router
 from routers.structure import router as structure_router
-from routers.quick_scalp import router as quick_scalp_router
 from routers.mt5 import router as mt5_router
 from routers.trading import router as trading_router
 from routers.news import router as news_router
@@ -41,7 +40,6 @@ app.include_router(trading_router, prefix=PREFIX)
 app.include_router(mt5_router, prefix=PREFIX)
 app.include_router(news_router, prefix=PREFIX)
 app.include_router(narrative_router, prefix=PREFIX)
-app.include_router(quick_scalp_router, prefix=PREFIX)
 app.include_router(daily_pnl_router, prefix=PREFIX)
 
 
