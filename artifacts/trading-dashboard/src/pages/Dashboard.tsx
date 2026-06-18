@@ -108,6 +108,15 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     return rem > 0 ? `${hrs}h ${rem}m ago` : `${hrs}h ago`;
   }, [biasData?.bias_4h, brokerNow]);
 
+    const swingAgeColor = useMemo((): string => {
+    const t = (biasData?.bias_4h as any)?.last_swing_time as number | undefined;
+    if (!t || !brokerNow) return "text-slate-600";
+    const mins = Math.round((brokerNow - t) / 60);
+    if (mins <= 480) return "text-slate-500";
+    if (mins <= 960) return "text-yellow-500/70";
+    return "text-red-500/70";
+  }, [biasData?.bias_4h, brokerNow]);
+
   const [wsConnected,  setWsConnected]  = useState(false);
   const [clickedPrice, setClickedPrice] = useState<number | null>(null);
   const [slLine,       setSlLine]       = useState<number | null>(null);
@@ -257,7 +266,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                   <span className="text-yellow-400 animate-pulse">◎</span>
                   {pipsToZone} pips to golden zone
                   {swingAge && (
-                   <span className="text-slate-600 text-[10px] ml-1">· 4H swing {swingAge}</span>
+                   <span className={`${swingAgeColor} text-[10px] ml-1`}>· 4H swing {swingAge}</span>
                    )}
                 </div>
          )}
