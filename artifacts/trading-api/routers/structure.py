@@ -209,22 +209,30 @@ async def get_mtf_bias(
             current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
 
             last_high_price = None
-            last_low_price = None
+            last_low_price  = None
+            last_high_time  = None
+            last_low_time   = None
             for item in reversed(labels):
                 lbl = item["label"]
                 if lbl in ("HH", "LH", "EQH") and last_high_price is None:
                     last_high_price = float(item["price"])
+                    last_high_time  = item.get("time")
                 if lbl in ("HL", "LL", "EQL") and last_low_price is None:
                     last_low_price = float(item["price"])
+                    last_low_time  = item.get("time")
                 if last_high_price is not None and last_low_price is not None:
                     break
 
+            times = [t for t in (last_high_time, last_low_time) if t is not None]
+            last_swing_time = max(times) if times else None
+
             return {
-                "trend": trend_data["trend"],
-                "confidence": trend_data["confidence"],
-                "current_price": current_price,
+                "trend":           trend_data["trend"],
+                "confidence":      trend_data["confidence"],
+                "current_price":   current_price,
                 "last_high_price": last_high_price,
-                "last_low_price": last_low_price,
+                "last_low_price":  last_low_price,
+                "last_swing_time": last_swing_time,
             }
 
         t15m = _bias(df_15m, fractal_n=5)
