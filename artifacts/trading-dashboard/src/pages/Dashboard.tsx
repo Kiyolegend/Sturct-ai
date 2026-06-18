@@ -98,6 +98,16 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     return null;
   }, [goldenZoneAlert, fibLevels, data?.candles]);
 
+    const swingAge = useMemo((): string | null => {
+    const t = (biasData?.bias_4h as any)?.last_swing_time as number | undefined;
+    if (!t || !brokerNow) return null;
+    const mins = Math.round((brokerNow - t) / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    const rem = mins % 60;
+    return rem > 0 ? `${hrs}h ${rem}m ago` : `${hrs}h ago`;
+  }, [biasData?.bias_4h, brokerNow]);
+
   const [wsConnected,  setWsConnected]  = useState(false);
   const [clickedPrice, setClickedPrice] = useState<number | null>(null);
   const [slLine,       setSlLine]       = useState<number | null>(null);
@@ -246,8 +256,11 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                 <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full flex items-center gap-2 backdrop-blur-md border border-white/10 bg-white/5 font-mono text-xs text-slate-400 tracking-wide pointer-events-none">
                   <span className="text-yellow-400 animate-pulse">◎</span>
                   {pipsToZone} pips to golden zone
+                  {swingAge && (
+                   <span className="text-slate-600 text-[10px] ml-1">· 4H swing {swingAge}</span>
+                   )}
                 </div>
-              )}
+         )}
               {goldenZoneAlert && (
                 <div className={`absolute top-14 left-1/2 -translate-x-1/2 z-50 px-5 py-2 rounded-full flex items-center gap-2 backdrop-blur-md border font-mono text-xs font-bold tracking-widest uppercase shadow-xl pointer-events-none
                   ${goldenZoneAlert === "BUY"
