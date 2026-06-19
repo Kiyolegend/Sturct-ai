@@ -282,7 +282,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                   {goldenZoneAlert === "BUY"   && "GOLDEN ZONE — BUY SETUP"}
                   {goldenZoneAlert === "SELL"  && "GOLDEN ZONE — SELL SETUP"}
                   {goldenZoneAlert === "WATCH" && "GOLDEN ZONE — WATCH"}
-                  <span className="opacity-40 text-[10px] ml-1">38.2–61.8% · 4H</span>
+                  <span className={`${swingAgeColor} text-[10px] ml-1 opacity-60`}>38.2–61.8% · 4H</span>
                 </div>
               )}
 

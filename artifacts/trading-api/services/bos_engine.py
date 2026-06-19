@@ -12,7 +12,7 @@ import pandas as pd
 from .zigzag_engine import SwingPoint
 
 
-def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict], trend: str = "neutral") -> list[dict]:
+def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict], trend: str = "neutral", lookback_hours: int = 48) -> list[dict]:
     """
     Detect Break of Structure events.
     Returns list of BOS events: {time, price, direction, level_broken}
@@ -76,7 +76,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
                 break
     
     if times_arr: 
-        cutoff = times_arr[-1] - (4 * 3600) 
+        cutoff = times_arr[-1] - (lookback_hours * 3600) 
         bos_events = [e for e in bos_events if e["time"] >= cutoff]
     return bos_events
            
