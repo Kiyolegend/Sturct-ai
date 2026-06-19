@@ -278,7 +278,7 @@ async def get_bos_choch(
         choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"], lookback_hours=72)
 
         now = int(df.iloc[-1]["time"].timestamp())
-        max_age = 48 * 3600  # 48 hours in seconds
+        max_age = 72 * 3600  # 48 hours in seconds
 
         tagged_bos = [{"type": "BOS", **e} for e in bos_events[-4:] if now - e["time"] <= max_age]
         tagged_choch = [{"type": "CHOCH", **e} for e in choch_events[-2:] if now - e["time"] <= max_age]

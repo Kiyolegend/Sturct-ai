@@ -17,7 +17,7 @@ from .zigzag_engine import SwingPoint
 #   CLUSTER_PIPS * 0.01 = 0.015  (was CLUSTER_THRESHOLD = 0.015)
 #   ZONE_WIDTH_PIPS * 0.01 = 0.008  (was ZONE_WIDTH = 0.008)
 CLUSTER_PIPS    = 1.5   # pip-neutral cluster tolerance
-ZONE_WIDTH_PIPS = 0.8   # pip-neutral half-width of zone around center
+ZONE_WIDTH_PIPS = 3.0  # pip-neutral half-width of zone around center
 
 
 def _pip_size(price: float) -> float:
