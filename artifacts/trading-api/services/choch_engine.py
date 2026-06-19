@@ -13,7 +13,9 @@ import pandas as pd
 from .zigzag_engine import SwingPoint
 
 
-def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict], trend: str) -> list[dict]:
+def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict], trend: str, lookback_hours: int = 24) -> list[dict]:
+
+
     """
     Detect Change of Character events, filtered by current trend direction.
 
@@ -69,7 +71,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
                 break
 
     if times_arr:
-        cutoff = times_arr[-1] - (24 * 3600)
+        cutoff = times_arr[-1] - (lookback_hours * 3600)
         choch_events = [e for e in choch_events if e["time"] >= cutoff]
     return choch_events
 

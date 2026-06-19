@@ -40,7 +40,8 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     trend = trend_data["trend"]
     _bos_hours = {"5m": 8, "15m": 48, "1h": 72, "4h": 336}.get(interval, 48)
     bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours)
-    choch_events = detect_choch(df, swings, structure_labels, trend)
+    _choch_hours = {"5m": 8, "15m": 24, "1h": 72, "4h": 336}.get(interval, 24)
+    choch_events = detect_choch(df, swings, structure_labels, trend, lookback_hours=_choch_hours)
     trendlines = compute_trendlines(structure_labels)
     zigzag_lines = swings_to_zigzag_lines(swings)
     current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
@@ -131,7 +132,8 @@ async def get_choch(
         swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h") else 5)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
-        choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"])
+        _choch_hours = {"5m": 8, "15m": 24, "1h": 72, "4h": 336}.get(interval, 24)
+        choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"], lookback_hours=_choch_hours)
         return {"symbol": symbol, "interval": interval, "choch": choch_events}
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -269,11 +271,11 @@ async def get_bos_choch(
         swings = detect_swings(df, fractal_n=3)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
-        _bos_hours = {"5m": 8, "15m": 48, "1h": 72, "4h": 336}.get(interval, 48)
+        _bos_hours = 72
         bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours)
 
 
-        choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"])
+        choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"], lookback_hours=72)
 
         now = int(df.iloc[-1]["time"].timestamp())
         max_age = 48 * 3600  # 48 hours in seconds
