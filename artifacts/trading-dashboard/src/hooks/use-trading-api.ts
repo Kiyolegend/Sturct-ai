@@ -94,7 +94,7 @@ export interface TradingAnalysisResponse {
 export interface SRLevel {
   price: number;
   kind: "support" | "resistance";
-  timeframe: "15m" | "1h" | "4h";
+  timeframe: "15m" | "1h" | "4h"| "d1";
   touches: number;
   score?: number;
 }

@@ -277,7 +277,7 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
                 ? "text-amber-400 bg-amber-500/15 border border-amber-500/30"
                 : "text-white/40 hover:text-white/70"
             )}
-            title="Toggle BOS / CHOCH structure breaks (1H)">BOS</button>
+            title="Toggle BOS / CHOCH structure breaks (current timeframe)">BOS</button>
 
           <button onClick={() => toggleLayer('ob')} aria-pressed={toggles.ob}
             className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
