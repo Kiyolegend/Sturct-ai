@@ -44,7 +44,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const { data, isLoading, error, refetch, isRefetching } = useTradingAnalysis(symbol, timeframe, 500);
   const { data: srData }       = useSRLevels(symbol);
   const { data: biasData }     = useMTFBias(symbol);
-  const { data: sessionsData } = useSessions(symbol, timeframe);
+  const { data: sessionsData } = useSessions(symbol, timeframe === "d1" ? "5m" : timeframe);
   const { data: bosChochData } = useBosChoch(symbol);
 
   const fibLevels = useMemo((): FibLevel[] => {

@@ -86,15 +86,16 @@ export interface FibLevel {
 }
 
 // ── Exported: Order Block detection ──────────────────────────────────────────
-// ── Exported: Order Block detection ──────────────────────────────────────────
-export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBlockData[] {
+export function detectOrderBlocks(candles: any[], currentPrice: number, isD1 = false): OrderBlockData[] {
   const n = candles.length;
   if (n < 10) return [];
   const pip     = pipSize(currentPrice);
-  const minSize = 5 * pip;
+  const minSize = isD1 ? 20 * pip : 5 * pip;
 
-  // PRIORITY 1 — cap proximity at 60 pips so JPY pairs don't get a 200+ pip window
-  const proximity = Math.min(0.015, (60 * pip) / currentPrice);
+  // PRIORITY 1 — cap proximity at 60 pips intraday, 300 pips on D1
+  const proximity = isD1
+    ? Math.min(0.02, (300 * pip) / currentPrice)
+    : Math.min(0.015, (60 * pip) / currentPrice);
 
   const results: (OrderBlockData & { dist: number; touchCount: number; strengthScore: number })[] = [];
 
@@ -182,12 +183,14 @@ export function detectOrderBlocks(candles: any[], currentPrice: number): OrderBl
 
 
 // ── Exported: Fair Value Gap detection ───────────────────────────────────────
-export function detectFVGs(candles: any[], currentPrice: number): FVGData[] {
+export function detectFVGs(candles: any[], currentPrice: number, isD1 = false): FVGData[] {
   const n = candles.length;
   if (n < 3) return [];
   const pip       = pipSize(currentPrice);
-  const minGap    = 3 * pip;
-  const proximity = Math.min(0.01, (100 * pip) / currentPrice);
+  const minGap    = isD1 ? 10 * pip : 3 * pip;
+  const proximity = isD1
+    ? Math.min(0.02, (400 * pip) / currentPrice)
+    : Math.min(0.01, (100 * pip) / currentPrice);
   const results: (FVGData & { dist: number })[] = [];
 
   for (let i = 1; i < n - 1; i++) {
@@ -260,16 +263,15 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, 
     sortedCandles.length ? (sortedCandles[sortedCandles.length - 1] as any).close as number : null,
   [sortedCandles]);
 
+  const isD1 = timeframe === "d1";
   const computedOBs = useMemo((): OrderBlockData[] => {
     if (!toggles.ob || !sortedCandles.length || currentPrice === null) return [];
-    return detectOrderBlocks(sortedCandles, currentPrice);
-  }, [sortedCandles, currentPrice, toggles.ob]);
-
+    return detectOrderBlocks(sortedCandles, currentPrice, isD1);
+  }, [sortedCandles, currentPrice, toggles.ob, isD1]);
   const computedFVGs = useMemo((): FVGData[] => {
     if (!toggles.fvg || !sortedCandles.length || currentPrice === null) return [];
-    return detectFVGs(sortedCandles, currentPrice);
-  }, [sortedCandles, currentPrice, toggles.fvg]);
-
+    return detectFVGs(sortedCandles, currentPrice, isD1);
+  }, [sortedCandles, currentPrice, toggles.fvg, isD1]);
   // ── Effect 1: Create chart + series once ──────────────────────────────────
   useEffect(() => {
     if (!containerRef.current) return;
@@ -488,7 +490,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
         const line = candleSeriesRef.current!.createPriceLine({
           price: level.price,
           color: SR_COLORS[level.kind],
-          lineWidth: tf === '4h' ? 2 : 1,
+          lineWidth: tf === 'd1' ? 3 : tf === '4h' ? 2 : 1,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
           title: `${TF_LABEL[tf]} ${level.kind === 'resistance' ? 'R' : 'S'}`,
