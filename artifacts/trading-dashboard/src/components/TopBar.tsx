@@ -20,6 +20,7 @@ export interface ToggleState {
   ob: boolean;   // NEW — Order Blocks
   fvg: boolean;  // NEW — Fair Value Gaps
   fib: boolean;  // Fibonacci retracement levels from last 4H swing
+  fibD1: boolean;  // Fibonacci retracement levels from last D1 swing
   d1Zones: boolean; // D1 supply/demand zones (D1 chart only)
   d1SR: boolean;  // D1 S/R levels (cross-timeframe)
 }
@@ -295,13 +296,21 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
             )}
             title="Toggle Fair Value Gaps — price imbalance zones">FVG</button>
 
-          <button onClick={() => toggleLayer('fib')} aria-pressed={toggles.fib}
+                    <button onClick={() => toggleLayer('fib')} aria-pressed={toggles.fib}
             className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
               toggles.fib
                 ? "text-amber-300 bg-amber-400/15 border border-amber-400/30"
                 : "text-white/40 hover:text-white/70"
             )}
             title="Toggle Fibonacci retracement levels (4H swing — shows on all timeframes)">FIB</button>
+
+          <button onClick={() => toggleLayer('fibD1')} aria-pressed={toggles.fibD1}
+            className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+              toggles.fibD1
+                ? "text-sky-300 bg-sky-400/15 border border-sky-400/30"
+                : "text-white/40 hover:text-white/70"
+            )}
+            title="Toggle Fibonacci retracement levels (D1 swing — shows on all timeframes)">D1F</button>
         </div>
 
         <div className="flex items-center gap-1 bg-[#161e2c] rounded-lg p-1 border border-white/5">

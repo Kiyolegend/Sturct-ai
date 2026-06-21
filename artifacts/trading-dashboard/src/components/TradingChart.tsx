@@ -41,6 +41,7 @@ interface TradingChartProps {
   slLine?: number | null;
   tpLine?: number | null;
   fibLevels?: FibLevel[];
+  fibD1Levels?: FibLevel[];
   timeframe: string;
 }
 
@@ -236,7 +237,7 @@ export function detectFVGs(candles: any[], currentPrice: number, isD1 = false): 
   }));
 }
 
-export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine, fibLevels, timeframe }: TradingChartProps) {
+export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine, fibLevels, fibD1Levels, timeframe }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -801,8 +802,82 @@ containerRef.current?.addEventListener('click', handleChartClick);
           </div>
         );
       });
-    }
  
+    }
+
+    // ── D1 Fibonacci retracement levels ────────────────────────────────────────
+    if (toggles.fibD1 && fibD1Levels?.length) {
+      const containerWidth = containerRef.current?.clientWidth ?? 0;
+
+      const d1f382 = fibD1Levels.find(f => f.pct === 38.2);
+      const d1f618 = fibD1Levels.find(f => f.pct === 61.8);
+      if (d1f382 && d1f618) {
+        const y1 = priceSeries.priceToCoordinate(d1f382.price);
+        const y2 = priceSeries.priceToCoordinate(d1f618.price);
+        if (y1 !== null && y2 !== null) {
+          elements.push(
+            <div key="fib-d1-golden-zone" style={{
+              position: 'absolute', left: 0,
+              top: Math.min(y1, y2),
+              width: containerWidth,
+              height: Math.max(Math.abs(y2 - y1), 2),
+              background: 'rgba(56,189,248,0.06)',
+              pointerEvents: 'none',
+            }} />
+          );
+        }
+      }
+
+      fibD1Levels.forEach((fib, idx) => {
+        const y = priceSeries.priceToCoordinate(fib.price);
+        if (y === null) return;
+
+        const isKey  = fib.isKey;
+        const isMid  = fib.pct === 50;
+        const isExt  = fib.isExt ?? false;
+        const lineColor = isExt
+          ? 'rgba(56,189,248,0.35)'
+          : isKey
+          ? 'rgba(56,189,248,0.80)'
+          : isMid
+          ? 'rgba(56,189,248,0.45)'
+          : 'rgba(255,255,255,0.15)';
+        const labelColor = isExt
+          ? 'rgba(56,189,248,0.55)'
+          : isKey
+          ? 'rgba(56,189,248,0.95)'
+          : isMid
+          ? 'rgba(56,189,248,0.60)'
+          : 'rgba(255,255,255,0.28)';
+
+        elements.push(
+          <div key={`fib-d1-${idx}`} style={{
+            position: 'absolute', left: 0, top: y,
+            width: containerWidth, height: 0,
+            borderTop: isExt
+              ? `1px dotted ${lineColor}`
+              : isKey
+              ? `1px solid ${lineColor}`
+              : `1px dashed ${lineColor}`,
+            pointerEvents: 'none',
+          }}>
+            <span style={{
+              position: 'absolute', right: 54, top: -9,
+              fontSize: '7.5px',
+              fontWeight: isKey ? 700 : 400,
+              color: labelColor,
+              fontFamily: 'monospace',
+              userSelect: 'none',
+              letterSpacing: '0.04em',
+              whiteSpace: 'nowrap',
+            }}>
+              D1 {fib.label}
+            </span>
+          </div>
+        );
+      });
+    }
+
     return elements;
   })();
 

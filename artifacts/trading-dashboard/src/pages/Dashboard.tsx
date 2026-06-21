@@ -30,6 +30,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     ob:       false,
     fvg:      false,
     fib:      false,
+    fibD1:    false,
     d1Zones:  false,
     d1SR:     true,
   });
@@ -65,10 +66,82 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
       { pct: 127.2, label: "127.2%",  isKey: false, isExt: true  },
       { pct: 161.8, label: "161.8%",  isKey: false, isExt: true  },
     ].map(r => ({ ...r, price: hi - (r.pct / 100) * range }));
-  }, [biasData?.bias_4h]);
+    }, [biasData?.bias_4h]);
 
-  
-  const goldenZoneAlert = useMemo((): "BUY" | "SELL" | "WATCH" | null => {
+  const fibD1Levels = useMemo((): FibLevel[] => {
+    const hi = biasData?.bias_d1?.last_high_price as number | undefined;
+    const lo = biasData?.bias_d1?.last_low_price  as number | undefined;
+    if (!hi || !lo || hi <= lo) return [];
+    const range = hi - lo;
+    return [
+      { pct: -61.8, label: "+161.8%", isKey: false, isExt: true  },
+      { pct: -27.2, label: "+127.2%", isKey: false, isExt: true  },
+      { pct: 0,     label: "0%",      isKey: false               },
+      { pct: 23.6,  label: "23.6%",   isKey: false               },
+      { pct: 38.2,  label: "38.2%",   isKey: true                },
+      { pct: 50,    label: "50%",     isKey: false               },
+      { pct: 61.8,  label: "61.8%",   isKey: true                },
+      { pct: 78.6,  label: "78.6%",   isKey: false               },
+      { pct: 100,   label: "100%",    isKey: false               },
+      { pct: 127.2, label: "127.2%",  isKey: false, isExt: true  },
+      { pct: 161.8, label: "161.8%",  isKey: false, isExt: true  },
+    ].map(r => ({ ...r, price: hi - (r.pct / 100) * range }));
+  }, [biasData?.bias_d1]);
+
+  const goldenZoneAlertD1 = useMemo((): "BUY" | "SELL" | "WATCH" | null => {
+    if (!fibD1Levels.length || !data?.candles?.length) return null;
+    const candles = data.candles as any[];
+    const price = candles[candles.length - 1]?.close as number | undefined;
+    if (!price) return null;
+    const level382 = fibD1Levels.find(f => f.pct === 38.2)?.price;
+    const level618 = fibD1Levels.find(f => f.pct === 61.8)?.price;
+    if (!level382 || !level618) return null;
+    const zoneTop    = level382;
+    const zoneBottom = level618;
+    if (price >= zoneBottom && price <= zoneTop) {
+      const trend = biasData?.bias_d1?.trend;
+      if (trend === "bullish") return "BUY";
+      if (trend === "bearish") return "SELL";
+      return "WATCH";
+    }
+    return null;
+  }, [fibD1Levels, data?.candles, biasData?.bias_d1?.trend]);
+
+  const pipsToZoneD1 = useMemo((): number | null => {
+    if (goldenZoneAlertD1 !== null) return null;
+    if (!fibD1Levels.length || !data?.candles?.length) return null;
+    const candles = data.candles as any[];
+    const price = candles[candles.length - 1]?.close as number | undefined;
+    if (!price) return null;
+    const level382 = fibD1Levels.find(f => f.pct === 38.2)?.price;
+    const level618 = fibD1Levels.find(f => f.pct === 61.8)?.price;
+    if (!level382 || !level618) return null;
+    const pip = price > 50 ? 0.01 : 0.0001;
+    if (price > level382) return Math.round((price - level382) / pip);
+    if (price < level618) return Math.round((level618 - price) / pip);
+    return null;
+  }, [goldenZoneAlertD1, fibD1Levels, data?.candles]);
+
+  const swingAgeD1 = useMemo((): string | null => {
+    const t = (biasData?.bias_d1 as any)?.last_swing_time as number | undefined;
+    if (!t || !brokerNow) return null;
+    const mins = Math.round((brokerNow - t) / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    const rem = mins % 60;
+    return rem > 0 ? `${hrs}h ${rem}m ago` : `${hrs}h ago`;
+  }, [biasData?.bias_d1, brokerNow]);
+
+  const swingAgeColorD1 = useMemo((): string => {
+    const t = (biasData?.bias_d1 as any)?.last_swing_time as number | undefined;
+    if (!t || !brokerNow) return "text-slate-600";
+    const mins = Math.round((brokerNow - t) / 60);
+    if (mins <= 2880) return "text-slate-500";
+    if (mins <= 5760) return "text-yellow-500/70";
+    return "text-red-500/70";
+  }, [biasData?.bias_d1, brokerNow]);
+
+  const goldenZoneAlert = useMemo((): "BUY" | "SELL" | "WATCH" | null => {  
     if (!fibLevels.length || !data?.candles?.length) return null;
     const candles = data.candles as any[];
     const price = candles[candles.length - 1]?.close as number | undefined;
@@ -261,6 +334,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                 slLine={slLine}
                 tpLine={tpLine}
                 fibLevels={fibLevels}
+                fibD1Levels={fibD1Levels}
                 timeframe={timeframe}
               />
 
@@ -272,6 +346,31 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                   {swingAge && (
                    <span className={`${swingAgeColor} text-[10px] ml-1`}>· 4H swing {swingAge}</span>
                    )}
+                            {!goldenZoneAlertD1 && pipsToZoneD1 !== null && pipsToZoneD1 <= 200 && (
+                <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full flex items-center gap-2 backdrop-blur-md border border-sky-500/20 bg-sky-500/5 font-mono text-xs text-slate-400 tracking-wide pointer-events-none">
+                  <span className="text-sky-400 animate-pulse">◎</span>
+                  {pipsToZoneD1} pips to D1 golden zone
+                  {swingAgeD1 && (
+                    <span className={`${swingAgeColorD1} text-[10px] ml-1`}>· D1 swing {swingAgeD1}</span>
+                  )}
+                </div>
+              )}
+              {goldenZoneAlertD1 && (
+                <div className={`absolute top-28 left-1/2 -translate-x-1/2 z-50 px-5 py-2 rounded-full flex items-center gap-2 backdrop-blur-md border font-mono text-xs font-bold tracking-widest uppercase shadow-xl pointer-events-none
+                  ${goldenZoneAlertD1 === "BUY"
+                    ? "bg-sky-500/15 border-sky-400/40 text-sky-300"
+                    : goldenZoneAlertD1 === "SELL"
+                    ? "bg-blue-500/15 border-blue-400/40 text-blue-300"
+                    : "bg-sky-500/15 border-sky-400/40 text-sky-300"
+                  }`}>
+                  <span className="animate-pulse">⚡</span>
+                  {goldenZoneAlertD1 === "BUY"   && "D1 GOLDEN ZONE — BUY SETUP"}
+                  {goldenZoneAlertD1 === "SELL"  && "D1 GOLDEN ZONE — SELL SETUP"}
+                  {goldenZoneAlertD1 === "WATCH" && "D1 GOLDEN ZONE — WATCH"}
+                  <span className={`${swingAgeColorD1} text-[10px] ml-1 opacity-60`}>38.2–61.8% · D1</span>
+                </div>
+              )}
+
                 </div>
          )}
               {goldenZoneAlert && (
