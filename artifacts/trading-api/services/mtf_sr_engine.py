@@ -53,6 +53,7 @@ from .zigzag_engine import detect_swings
 #   Other pairs (EUR/USD, GBP/USD, etc.)   → price ~0.5–2.0 → pip_size = 0.0001
 # Keys: (cluster_pips, min_touches, max_dist_pips, recency_decay_bars)
 TF_CONFIG = {
+    "d1":  {"cluster_pips": 30, "min_touches": 2, "max_dist_pips": 600, "decay_bars": 20},
     "4h":  {"cluster_pips": 15, "min_touches": 2, "max_dist_pips": 300, "decay_bars": 40},
     "1h":  {"cluster_pips":  7, "min_touches": 3, "max_dist_pips": 200, "decay_bars": 80},
     "15m": {"cluster_pips":  3, "min_touches": 3, "max_dist_pips": 100, "decay_bars": 150},
@@ -202,7 +203,7 @@ def deduplicate_across_timeframes(all_levels: list[dict], current_price: float) 
     highest-timeframe label (4h > 1h > 15m).
     Dedup threshold: 10 pips — pip-aware, works correctly for all 8 pairs.
     """
-    TF_RANK = {"4h": 3, "1h": 2, "15m": 1}
+    TF_RANK = {"d1": 4, "4h": 3, "1h": 2, "15m": 1}
 
     # Pip-aware dedup: always 10 pips regardless of pair
     dedup_threshold = DEDUP_PIPS * _pip_size(current_price)
@@ -236,7 +237,7 @@ def compute_mtf_sr_levels(df_map: dict) -> list[dict]:
     available timeframe so that S/R flip and proximity filter are accurate.
     """
     # Derive current price from smallest available timeframe
-    for tf_key in [ "15m", "1h", "4h"]:
+    for tf_key in [ "15m", "1h", "4h","d1" ]:
         if tf_key in df_map and len(df_map[tf_key]) > 0:
             current_price = float(df_map[tf_key]["close"].iloc[-1])
             break
@@ -245,7 +246,7 @@ def compute_mtf_sr_levels(df_map: dict) -> list[dict]:
 
     all_levels: list[dict] = []
 
-    for tf in ["4h", "1h", "15m"]:
+    for tf in ["d1", "4h", "1h", "15m"]:
         if tf in df_map:
             levels = detect_sr_levels(df_map, tf, current_price)
             all_levels.extend(levels)
