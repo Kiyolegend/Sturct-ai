@@ -339,14 +339,17 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
               />
 
 
-              {!goldenZoneAlert && pipsToZone !== null && pipsToZone <= 80 && (
+                            {!goldenZoneAlert && pipsToZone !== null && pipsToZone <= 80 && (
                 <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full flex items-center gap-2 backdrop-blur-md border border-white/10 bg-white/5 font-mono text-xs text-slate-400 tracking-wide pointer-events-none">
                   <span className="text-yellow-400 animate-pulse">◎</span>
                   {pipsToZone} pips to golden zone
                   {swingAge && (
-                   <span className={`${swingAgeColor} text-[10px] ml-1`}>· 4H swing {swingAge}</span>
-                   )}
-                            {!goldenZoneAlertD1 && pipsToZoneD1 !== null && pipsToZoneD1 <= 200 && (
+                    <span className={`${swingAgeColor} text-[10px] ml-1`}>· 4H swing {swingAge}</span>
+                  )}
+                </div>
+              )}
+
+              {!goldenZoneAlertD1 && pipsToZoneD1 !== null && pipsToZoneD1 <= 200 && (
                 <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full flex items-center gap-2 backdrop-blur-md border border-sky-500/20 bg-sky-500/5 font-mono text-xs text-slate-400 tracking-wide pointer-events-none">
                   <span className="text-sky-400 animate-pulse">◎</span>
                   {pipsToZoneD1} pips to D1 golden zone
@@ -355,6 +358,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                   )}
                 </div>
               )}
+
               {goldenZoneAlertD1 && (
                 <div className={`absolute top-28 left-1/2 -translate-x-1/2 z-50 px-5 py-2 rounded-full flex items-center gap-2 backdrop-blur-md border font-mono text-xs font-bold tracking-widest uppercase shadow-xl pointer-events-none
                   ${goldenZoneAlertD1 === "BUY"
@@ -370,9 +374,6 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                   <span className={`${swingAgeColorD1} text-[10px] ml-1 opacity-60`}>38.2–61.8% · D1</span>
                 </div>
               )}
-
-                </div>
-         )}
               {goldenZoneAlert && (
                 <div className={`absolute top-14 left-1/2 -translate-x-1/2 z-50 px-5 py-2 rounded-full flex items-center gap-2 backdrop-blur-md border font-mono text-xs font-bold tracking-widest uppercase shadow-xl pointer-events-none
                   ${goldenZoneAlert === "BUY"
