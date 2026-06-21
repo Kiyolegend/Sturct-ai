@@ -45,13 +45,13 @@ def _pip(price: float) -> float:
 # ── Port of detectOrderBlocks() from TradingChart.tsx ─────────────────────────
 # v2 additions: touch_count (freshness) and strength_score (displacement quality)
 
-def detect_order_blocks(candles: list[dict], current_price: float) -> list[dict]:
+def detect_order_blocks(candles: list[dict], current_price: float, interval: str = "1h") -> list[dict]:
     n = len(candles)
     if n < 10 or not current_price:
         return []
     pip = _pip(current_price)
-    min_size = 5 * pip
-    proximity = min(0.015, (60 * pip) / current_price)
+    min_size  = 20 * pip  if interval == "d1" else 5 * pip
+    proximity = min(0.02, (300 * pip) / current_price) if interval == "d1" else min(0.015, (60 * pip) / current_price)
     results: list[dict] = []
 
     for i in range(1, n - 3):
@@ -155,13 +155,13 @@ def detect_order_blocks(candles: list[dict], current_price: float) -> list[dict]
 
 # ── Port of detectFVGs() from TradingChart.tsx ────────────────────────────────
 
-def detect_fvgs(candles: list[dict], current_price: float) -> list[dict]:
+def detect_fvgs(candles: list[dict], current_price: float, interval: str = "1h") -> list[dict]:
     n = len(candles)
     if n < 3 or not current_price:
         return []
     pip = _pip(current_price)
-    min_gap = 3 * pip
-    proximity = min(0.01, (100 * pip) / current_price)
+    min_gap   = 10 * pip if interval == "d1" else 3 * pip
+    proximity = min(0.02, (400 * pip) / current_price) if interval == "d1" else min(0.01, (100 * pip) / current_price)
     results: list[dict] = []
 
     for i in range(1, n - 1):

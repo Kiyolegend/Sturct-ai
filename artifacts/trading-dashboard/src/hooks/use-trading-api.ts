@@ -153,6 +153,7 @@ export interface MTFBiasResponse {
   bias_15m: MTFBias;
   bias_1h: MTFBias;
   bias_4h: MTFBias;
+  bias_d1: MTFBias;
 }
 
 export function useMTFBias(symbol: string = "USD/JPY") {
