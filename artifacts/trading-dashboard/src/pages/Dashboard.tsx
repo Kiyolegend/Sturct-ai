@@ -195,6 +195,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
         bias15m={biasData?.bias_15m?.trend}
         bias1h={biasData?.bias_1h?.trend}
         bias4h={biasData?.bias_4h?.trend}
+        biasd1={biasData?.bias_d1?.trend}
         activeSetups={activeSetups}
       />
 

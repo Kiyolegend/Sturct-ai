@@ -37,6 +37,7 @@ interface TopBarProps {
   bias15m?: TrendDir;
   bias1h?: TrendDir;
   bias4h?: TrendDir;
+  biasd1?: TrendDir;
   activeSetups?: ActiveSetup[];
 }
 
@@ -211,7 +212,7 @@ function SymbolSelector({ symbol, setSymbol }: { symbol: string; setSymbol: (s: 
   );
 }
 
-export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, activeSetups = [] }: TopBarProps) {
+export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, biasd1, activeSetups = [] }: TopBarProps) {
   const [soundMuted, setSoundMuted] = useState(() => localStorage.getItem("struct_sound_muted") === "true");
   const { data: brokerTimeData } = useBrokerTime();
   const timeframes = ["5M", "15M", "1H", "4H","D1"];
@@ -415,6 +416,7 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
           <BiasBadge label="15M" trend={bias15m} />
           <BiasBadge label="1H"  trend={bias1h}  />
           <BiasBadge label="4H"  trend={bias4h}  />
+          <BiasBadge label="D1"  trend={biasd1}  />
         </div>
         <ApiBadge />
         <BridgeBadge />
