@@ -13,6 +13,7 @@ const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
   "15m": 20 * 60,
   "1h":  90 * 60,
   "4h":  5 * 60 * 60,
+  "d1":  5 * 24 * 60 * 60,
 };
 
 export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetups?: ActiveSetup[]; symbol: string; setSymbol: (s: string) => void }) {
@@ -261,6 +262,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                 slLine={slLine}
                 tpLine={tpLine}
                 fibLevels={fibLevels}
+                timeframe={timeframe}
               />
 
 

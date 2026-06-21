@@ -41,6 +41,7 @@ interface TradingChartProps {
   slLine?: number | null;
   tpLine?: number | null;
   fibLevels?: FibLevel[];
+  timeframe: string;
 }
 
 // ── Exported so TradeTeller can reuse them without duplicating logic ──────────
@@ -59,13 +60,14 @@ const BOS_COLORS = {
 const CHOCH_COLOR = '#f59e0b';
 
 const TF_LABEL: Record<string, string> = {
-  "4h": "4H", "1h": "1H", "15m": "15M",
+  "4h": "4H", "1h": "1H", "15m": "15M", "d1": "D1",
 };
 
 const SR_TF_CONFIG: Record<string, { proximity: number; maxEach: number }> = {
   '15m': { proximity: 0.012, maxEach: 2 },
   '1h':  { proximity: 0.018, maxEach: 2 },
   '4h':  { proximity: 0.025, maxEach: 2 },
+  'd1':  { proximity: 0.060, maxEach: 2 },
 };
 
 // ── Exported: pip size helper ─────────────────────────────────────────────────
@@ -231,7 +233,7 @@ export function detectFVGs(candles: any[], currentPrice: number): FVGData[] {
   }));
 }
 
-export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine, fibLevels }: TradingChartProps) {
+export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine, fibLevels, timeframe }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -459,9 +461,10 @@ containerRef.current?.addEventListener('click', handleChartClick);
       '15m': toggles.sr15m,
       '1h':  toggles.sr1h,
       '4h':  toggles.sr4h,
+      'd1':  toggles.d1SR,
     };
 
-    (['15m', '1h', '4h'] as const).forEach(tf => {
+    (['15m', '1h', '4h', 'd1'] as const).forEach(tf => {
       if (!tfEnabled[tf]) return;
 
       const cfg = SR_TF_CONFIG[tf];
@@ -493,7 +496,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
         srPriceLinesRef.current.push(line);
       });
     });
-  }, [srLevels, data, toggles.sr15m, toggles.sr1h, toggles.sr4h]);
+  }, [srLevels, data, toggles.sr15m, toggles.sr1h, toggles.sr4h, toggles.d1SR]);
 
     // ── Effect 4: BOS / CHOCH lines (current timeframe) ──────────────────────
   useEffect(() => {
