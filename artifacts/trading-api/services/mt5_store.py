@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 # Interval aliases the bridge uses
-VALID_INTERVALS = {"5m", "15m", "1h", "4h"}
+VALID_INTERVALS = {"5m", "15m", "1h", "4h", "1d"}
 
 # How old (seconds) a push can be before we consider MT5 offline
 MT5_STALE_THRESHOLD = 120  # 2 minutes

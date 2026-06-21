@@ -212,7 +212,7 @@ function SymbolSelector({ symbol, setSymbol }: { symbol: string; setSymbol: (s: 
 export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, activeSetups = [] }: TopBarProps) {
   const [soundMuted, setSoundMuted] = useState(() => localStorage.getItem("struct_sound_muted") === "true");
   const { data: brokerTimeData } = useBrokerTime();
-  const timeframes = ["5M", "15M", "1H", "4H"];
+  const timeframes = ["5M", "15M", "1H", "4H","D1"];
 
   const toggleLayer = (key: keyof ToggleState) => {
     setToggles(prev => ({ ...prev, [key]: !prev[key] }));
