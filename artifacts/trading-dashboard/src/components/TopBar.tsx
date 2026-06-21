@@ -20,6 +20,8 @@ export interface ToggleState {
   ob: boolean;   // NEW — Order Blocks
   fvg: boolean;  // NEW — Fair Value Gaps
   fib: boolean;  // Fibonacci retracement levels from last 4H swing
+  d1Zones: boolean; // D1 supply/demand zones (D1 chart only)
+  d1SR: boolean;  // D1 S/R levels (cross-timeframe)
 }
 
 type TrendDir = "bullish" | "bearish" | "neutral";
@@ -311,6 +313,16 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
             </button>
           ))}
         </div>
+          <div className="flex items-center gap-1 bg-[#161e2c] rounded-lg p-1 border border-white/5">
+           <button onClick={() => toggleLayer('d1Zones')} aria-pressed={toggles.d1Zones}
+             className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+              toggles.d1Zones ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
+             title="Toggle D1 supply/demand zones (D1 chart only)">D1Z</button>
+           <button onClick={() => toggleLayer('d1SR')} aria-pressed={toggles.d1SR}
+             className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+              toggles.d1SR ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
+             title="Toggle D1 S/R levels (shows on all timeframes)">D1R</button>
+          </div>
       </div>
 
       {/* RIGHT: Framework alerts + Bias + API + Bridge + Analysis */}

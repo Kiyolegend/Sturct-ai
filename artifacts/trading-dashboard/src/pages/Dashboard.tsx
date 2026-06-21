@@ -29,6 +29,8 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     ob:       false,
     fvg:      false,
     fib:      false,
+    d1Zones:  false,
+    d1SR:     true,
   });
 
   

@@ -242,6 +242,7 @@ def compute_framework_status(
     broker_ts:    int,
     sr_levels:    list[dict],
     news_blocked: bool,
+    r_d1:         dict | None = None,
 ) -> dict:
     """
     Compute limit_ready for one symbol.
@@ -289,6 +290,15 @@ def compute_framework_status(
         ob1h = next((o for o in obs if o["type"] == direction), None)
         fvgs = detect_fvgs(candles_1h, current_price)
         fvg1h = next((f for f in fvgs if f["type"] == direction), None)
+
+    ob_d1 = fvg_d1 = None
+    if r_d1:
+        candles_d1 = _df_to_candles(r_d1.get("df"))
+        if candles_d1:
+            obs_d1  = detect_order_blocks(candles_d1, current_price, interval="d1")
+            ob_d1   = next((o for o in obs_d1  if o["type"] == direction), None)
+            fvgs_d1 = detect_fvgs(candles_d1, current_price, interval="d1")
+            fvg_d1  = next((f for f in fvgs_d1 if f["type"] == direction), None)
 
     zones_1h = r1h.get("zones") or []
     max_dist = 80 * pip
@@ -493,4 +503,6 @@ def compute_framework_status(
         "limit_entry":         limit_setup["entry"],
         "limit_sl":            limit_setup["sl"],
         "limit_tp":            limit_setup["tp"],
+        "ob_d1":   ob_d1,
+        "fvg_d1":  fvg_d1,
     }
