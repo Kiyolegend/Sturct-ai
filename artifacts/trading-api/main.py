@@ -60,8 +60,11 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             # Keep the connection alive; actual pushes happen via broadcast()
             await asyncio.sleep(1)
-    except WebSocketDisconnect:
-        active_connections.remove(websocket)
+    except Exception:
+        pass
+    finally:
+        if websocket in active_connections:
+            active_connections.remove(websocket)
 
 
 

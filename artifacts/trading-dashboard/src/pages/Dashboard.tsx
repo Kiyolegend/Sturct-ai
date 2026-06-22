@@ -231,20 +231,31 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   }, [activeSetups, symbol]);
 
   useEffect(() => {
-    const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${window.location.host}/trading-api/ws`);
-    ws.onopen    = () => setWsConnected(true);
-    ws.onclose   = () => setWsConnected(false);
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === "candle" && msg.symbol === symbolRef.current) {
-          refetch();
-        }
-      } catch {}
+    let ws: WebSocket;
+    let dead = false;
+
+    const connect = () => {
+      if (dead) return;
+      const proto = window.location.protocol === "https:" ? "wss" : "ws";
+      ws = new WebSocket(`${proto}://${window.location.host}/trading-api/ws`);
+      ws.onopen    = () => setWsConnected(true);
+      ws.onclose   = () => {
+        setWsConnected(false);
+        setTimeout(connect, 3000);
+      };
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "candle" && msg.symbol === symbolRef.current) {
+            refetch();
+          }
+        } catch {}
+      };
+      ws.onerror = () => ws.close();
     };
-    ws.onerror = () => ws.close();
-    return () => ws.close();
+
+    connect();
+    return () => { dead = true; ws?.close(); };
   }, [refetch]);
 
   const isMarketClosed = useMemo(() => {
