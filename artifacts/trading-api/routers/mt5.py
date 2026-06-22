@@ -16,6 +16,7 @@ from ws_manager import broadcast
 
 
 from services.mt5_store import store_candles, status as mt5_status, get_latest_timestamp, VALID_INTERVALS
+_bg_tasks: set = set()
 
 router = APIRouter()
 
@@ -70,7 +71,9 @@ async def mt5_push(
     df = df.sort_values("time").reset_index(drop=True)
 
     store_candles(payload.symbol, payload.interval, df)
-    asyncio.create_task(broadcast({"type": "candle", "symbol": payload.symbol, "interval": payload.interval}))
+    _task = asyncio.create_task(broadcast({"type": "candle", "symbol": payload.symbol, "interval": payload.interval}))
+    _bg_tasks.add(_task)
+    _task.add_done_callback(_bg_tasks.discard)
 
     return {
         "ok": True,
