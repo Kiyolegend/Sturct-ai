@@ -13,7 +13,7 @@ import pandas as pd
 from .zigzag_engine import SwingPoint
 
 
-def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict], trend: str, lookback_hours: int = 24) -> list[dict]:
+def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict], trend: str, lookback_hours: int = 24, fractal_n: int = 5) -> list[dict]:
 
 
     """
@@ -25,7 +25,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
 
     Returns list: {time, price, direction, label, broken_label}
     """
-    if len(swings) < 3 or len(structure_labels) < 2 or len(df) == 0:
+    if not swings or not structure_labels or len(df) == 0:
         return []
 
     closes = df["close"].values
@@ -42,7 +42,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
     if last_hl and trend in ("bullish", "neutral"):
         level = last_hl["price"]
         swing_idx = last_hl["index"]
-        for i in range(swing_idx + 1, len(df)):
+        for i in range(swing_idx + fractal_n + 1, len(df)):
             if closes[i] < level:
                 choch_events.append({
                     "time": times_arr[i],
@@ -58,7 +58,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
     if last_lh and trend in ("bearish", "neutral"):
         level = last_lh["price"]
         swing_idx = last_lh["index"]
-        for i in range(swing_idx + 1, len(df)):
+        for i in range(swing_idx + fractal_n + 1, len(df)):
             if closes[i] > level:
                 choch_events.append({
                     "time": times_arr[i],

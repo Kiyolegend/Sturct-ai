@@ -22,7 +22,8 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     if cached:
         return cached
     df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-    swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h", "d1") else 5)
+    tf_fractal_n = 3 if interval in ("1h", "4h", "d1") else 5
+    swings = detect_swings(df, fractal_n=tf_fractal_n)
     structure_labels = classify_structure(swings)
     trend_data = detect_trend(structure_labels)
     last_high_price = None
@@ -39,9 +40,9 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     trend_data["last_low_price"]  = last_low_price
     trend = trend_data["trend"]
     _bos_hours = {"5m": 8, "15m": 48, "1h": 72, "4h": 336, "d1": 8760}.get(interval, 48)
-    bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours)
+    bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours, fractal_n=tf_fractal_n)
     _choch_hours = {"5m": 8, "15m": 24, "1h": 72, "4h": 336, "d1": 4320}.get(interval, 24)
-    choch_events = detect_choch(df, swings, structure_labels, trend, lookback_hours=_choch_hours)
+    choch_events = detect_choch(df, swings, structure_labels, trend, lookback_hours=_choch_hours, fractal_n=tf_fractal_n)
     trendlines = compute_trendlines(structure_labels)
     zigzag_lines = swings_to_zigzag_lines(swings)
     current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
@@ -110,11 +111,12 @@ async def get_bos(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h", "d1") else 5)
+        tf_fractal_n = 3 if interval in ("1h", "4h", "d1") else 5
+        swings = detect_swings(df, fractal_n=tf_fractal_n)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
         _bos_hours = {"5m": 8, "15m": 48, "1h": 72, "4h": 336, "d1": 8760}.get(interval, 48)
-        bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours)
+        bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours, fractal_n=tf_fractal_n)
         return {"symbol": symbol, "interval": interval, "bos": bos_events}
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -129,11 +131,12 @@ async def get_choch(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h", "d1") else 5)
+        tf_fractal_n = 3 if interval in ("1h", "4h", "d1") else 5
+        swings = detect_swings(df, fractal_n=tf_fractal_n)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
         _choch_hours = {"5m": 8, "15m": 24, "1h": 72, "4h": 336, "d1": 4320}.get(interval, 24)
-        choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"], lookback_hours=_choch_hours)
+        choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"], lookback_hours=_choch_hours, fractal_n=tf_fractal_n)
         return {"symbol": symbol, "interval": interval, "choch": choch_events}
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -275,10 +278,10 @@ async def get_bos_choch(
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
         _bos_hours = 72
-        bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours)
+        bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours, fractal_n=3)
 
 
-        choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"], lookback_hours=72)
+        choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"], lookback_hours=72, fractal_n=3)
 
         now = int(df.iloc[-1]["time"].timestamp())
         max_age = 72 * 3600  # 48 hours in seconds

@@ -2,6 +2,8 @@ import asyncio
 import json
 from fastapi import WebSocket
 
+active_connections: list[WebSocket] = []
+
 async def broadcast(message: dict):
     """Push a message to all connected WebSocket clients."""
     try:

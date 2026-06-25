@@ -12,7 +12,7 @@ import pandas as pd
 from .zigzag_engine import SwingPoint
 
 
-def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict], trend: str = "neutral", lookback_hours: int = 48) -> list[dict]:
+def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict], trend: str = "neutral", lookback_hours: int = 48, fractal_n: int = 5) -> list[dict]:
     """
     Detect Break of Structure events.
     Returns list of BOS events: {time, price, direction, level_broken}
@@ -22,7 +22,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
       - bearish → only emit bearish BOS (bullish breaks are CHoCH, not BOS)
       - neutral → emit both directions (default, backward-compatible)
     """
-    if len(swings) < 2 or len(df) == 0:
+    if not swings or not structure_labels or len(df) == 0:
         return []
 
     bos_events = []
@@ -43,7 +43,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
             continue
 
         # Only check candles AFTER the swing point
-        for i in range(swing_idx + 1, len(df)):
+        for i in range(swing_idx + fractal_n + 1, len(df)):
             candle_time = times_arr[i]
             close = closes[i]
 
