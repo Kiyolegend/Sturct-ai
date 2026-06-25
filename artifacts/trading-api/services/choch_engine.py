@@ -29,7 +29,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
         return []
 
     closes = df["close"].values
-    times_arr = [int(pd.Timestamp(t).timestamp()) for t in df["time"].values]
+    times_arr = (pd.to_datetime(df["time"]).astype("int64") // 10**9).tolist()
 
     choch_events = []
     
@@ -70,10 +70,9 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
                 })
                 break
 
+    choch_events.sort(key=lambda e: e.get("time", 0))
     if times_arr:
         cutoff = times_arr[-1] - (lookback_hours * 3600)
         choch_events = [e for e in choch_events if e["time"] >= cutoff]
     return choch_events
-
-
     

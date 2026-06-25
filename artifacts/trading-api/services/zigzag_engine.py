@@ -32,6 +32,7 @@ def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoi
     highs = df["high"].values
     lows = df["low"].values
     times = df["time"].values
+    ts_unix = (pd.to_datetime(df["time"]).astype("int64") // 10**9).values
 
     raw_pivots: list[SwingPoint] = []
 
@@ -43,7 +44,7 @@ def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoi
         if highs[i] == window_highs.max():
             raw_pivots.append({
                 "index": i,
-                "time": int(pd.Timestamp(times[i]).timestamp()),
+                "time": int(ts_unix[i]),
                 "price": float(round(highs[i], 5)),
                 "kind": "high",
             })
@@ -52,7 +53,7 @@ def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoi
         if lows[i] == window_lows.min():
             raw_pivots.append({
                 "index": i,
-                "time": int(pd.Timestamp(times[i]).timestamp()),
+                "time": int(ts_unix[i]),
                 "price": float(round(lows[i], 5)),
                 "kind": "low",
             })

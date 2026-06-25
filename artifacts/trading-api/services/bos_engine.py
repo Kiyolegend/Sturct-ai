@@ -27,7 +27,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
 
     bos_events = []
     closes = df["close"].values
-    times_arr = [int(pd.Timestamp(t).timestamp()) for t in df["time"].values]
+    times_arr = (pd.to_datetime(df["time"]).astype("int64") // 10**9).tolist()
 
     # Track which swing highs/lows have been broken already to avoid duplicates
     broken_levels: set[float] = set()
@@ -75,8 +75,9 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
                 broken_levels.add(level)
                 break
     
-    if times_arr: 
-        cutoff = times_arr[-1] - (lookback_hours * 3600) 
+    bos_events.sort(key=lambda e: e.get("time", 0)) 
+    if times_arr:
+        cutoff = times_arr[-1] - (lookback_hours * 3600)
         bos_events = [e for e in bos_events if e["time"] >= cutoff]
     return bos_events
            
