@@ -29,7 +29,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
         return []
 
     closes = df["close"].values
-    times_arr = (pd.to_datetime(df["time"]).astype("int64") // 10**9).tolist()
+    times_arr = df["time"].astype("datetime64[s]").astype("int64").tolist()
 
     choch_events = []
     

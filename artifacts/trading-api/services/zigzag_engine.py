@@ -32,7 +32,7 @@ def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoi
     highs = df["high"].values
     lows = df["low"].values
     times = df["time"].values
-    ts_unix = (pd.to_datetime(df["time"]).astype("int64") // 10**9).values
+    ts_unix = df["time"].astype("datetime64[s]").astype("int64").values
 
     raw_pivots: list[SwingPoint] = []
 
