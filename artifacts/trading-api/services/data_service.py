@@ -22,7 +22,7 @@ def candles_to_dict(df: pd.DataFrame) -> list[dict]:
     result = []
     for _, row in df.iterrows():
         result.append({
-            "time": int(row["time"].timestamp()),
+            "time": int(row["time"].value // 10**9),
             "open": round(float(row["open"]), 5),
             "high": round(float(row["high"]), 5),
             "low": round(float(row["low"]), 5),

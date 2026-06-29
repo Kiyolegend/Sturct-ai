@@ -377,7 +377,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
 
     
 
-    if (toggles.zigzag && data.swings.length > 0) {
+    if (toggles.zigzag && (data.swings?.length ?? 0) > 0) {
       const uniqueSwings = Array.from(new Map(data.swings.map(s => [s.time, s])).values()
       ).sort((a, b) => a.time - b.time);
       zigzagSeriesRef.current.setData(
