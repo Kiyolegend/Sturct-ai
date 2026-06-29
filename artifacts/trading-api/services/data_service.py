@@ -10,7 +10,12 @@ async def fetch_ohlc(symbol: str = "USD/JPY", interval: str = "5m", outputsize: 
     """
     mt5_df = mt5_get_candles(symbol, interval)
     if mt5_df is not None and len(mt5_df) >= 10:
-        return mt5_df.tail(outputsize).reset_index(drop=True)
+        df = mt5_df.tail(outputsize).reset_index(drop=True)
+        # If the bridge stored time as unix-second integers instead of datetime64,
+        # convert them properly so every downstream engine works correctly.
+        if not pd.api.types.is_datetime64_any_dtype(df["time"]):
+            df["time"] = pd.to_datetime(df["time"], unit="s")
+        return df
 
     raise ValueError(
         f"MT5 data not available for {symbol} {interval}. "
