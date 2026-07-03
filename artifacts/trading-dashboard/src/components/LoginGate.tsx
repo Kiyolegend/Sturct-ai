@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { login, installSecureFetch, lock } from "@/lib/secureApi";
+import { login, installSecureFetch, lock, getStoredDeviceKey } from "@/lib/secureApi";
 import { PanicButton } from "@/components/PanicButton";
 
 installSecureFetch();
@@ -20,15 +20,18 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   const [password, setPassword] = useState("");
   const [totp, setTotp] = useState("");
   const [passphrase, setPassphrase] = useState("");
+  const [deviceKey, setDeviceKey] = useState(() => getStoredDeviceKey());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const needsDeviceKey = getStoredDeviceKey() === "";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await login(password, totp, passphrase);
+      await login(password, totp, passphrase, deviceKey);
       setUnlocked(true);
     } catch (err: any) {
       setError(err.message ?? "Login failed");
@@ -75,13 +78,28 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: "#4ade80", marginBottom: 16, letterSpacing: "0.1em" }}>
           STRUCT.ai — SECURE ACCESS
         </div>
+        {needsDeviceKey && (
+          <>
+            <input
+              type="password"
+              placeholder="Device key (first time on this device only)"
+              value={deviceKey}
+              onChange={(e) => setDeviceKey(e.target.value)}
+              style={inputStyle}
+              autoFocus
+            />
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: -6, marginBottom: 10 }}>
+              This device isn't recognized yet — enter the device key once and this browser will remember it.
+            </div>
+          </>
+        )}
         <input
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           style={inputStyle}
-          autoFocus
+          autoFocus={!needsDeviceKey}
         />
         <input
           type="text"

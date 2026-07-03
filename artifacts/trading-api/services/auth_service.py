@@ -1,10 +1,13 @@
 """
 Authentication + end-to-end payload encryption for STRUCT.ai remote access.
 
-Two independent layers:
-  1. Login — password + TOTP (6-digit rotating code, like Google Authenticator)
+Three independent layers:
+  1. Device key — a shared secret only your own devices know, stored in the
+     browser's localStorage after being typed in once. Checked BEFORE
+     password/2FA, so a device without it can't even attempt a login.
+  2. Login — password + TOTP (6-digit rotating code, like Google Authenticator)
      → short-lived signed session token.
-  2. Payload encryption — every request/response body (except /auth/login and
+  3. Payload encryption — every request/response body (except /auth/login and
      /health) is AES-256-GCM encrypted using a key derived from a shared
      passphrase that is NEVER transmitted over the network. Any relay/tunnel
      provider (e.g. Cloudflare) only ever sees ciphertext at their edge, even
@@ -16,10 +19,14 @@ Configure via environment variables (see generate_secrets.py to create these):
   STRUCT_JWT_SECRET      — random string used to sign session tokens
   STRUCT_ENC_PASSPHRASE  — shared passphrase used to derive the AES key
                             (entered identically on the phone/browser side)
+  STRUCT_DEVICE_KEY      — optional. If set (see generate_device_key.py),
+                            login requests must include this exact value or
+                            they are rejected before password/2FA are checked.
 """
 
 import os
 import time
+import secrets as secrets_module
 
 import bcrypt
 import httpx
@@ -34,6 +41,7 @@ PASSWORD_HASH = os.environ.get("STRUCT_PASSWORD_HASH", "")
 TOTP_SECRET = os.environ.get("STRUCT_TOTP_SECRET", "")
 JWT_SECRET = os.environ.get("STRUCT_JWT_SECRET", "")
 ENC_PASSPHRASE = os.environ.get("STRUCT_ENC_PASSPHRASE", "")
+DEVICE_KEY = os.environ.get("STRUCT_DEVICE_KEY", "")
 
 SESSION_TTL_SECONDS = 24 * 60 * 60  # 24h
 
@@ -41,6 +49,55 @@ KDF_SALT = b"struct.ai-e2e-v1-salt"
 KDF_ITERATIONS = 100_000
 
 _EPOCH_FILE = os.path.join(os.path.dirname(__file__), "..", ".session_epoch")
+
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_SECONDS = 15 * 60  # 15 minutes
+
+_failed_attempts = 0
+_locked_until = 0.0
+
+
+def is_locked_out() -> tuple[bool, int]:
+    """Returns (locked, seconds_remaining). If locked is True, seconds_remaining
+    tells the caller how long until they can try again."""
+    global _failed_attempts, _locked_until
+    now = time.time()
+    if _locked_until > now:
+        return True, int(_locked_until - now)
+    if _locked_until != 0 and _locked_until <= now:
+        _locked_until = 0.0
+        _failed_attempts = 0
+    return False, 0
+
+
+def record_failed_attempt() -> None:
+    global _failed_attempts, _locked_until
+    _failed_attempts += 1
+    if _failed_attempts >= MAX_FAILED_ATTEMPTS:
+        _locked_until = time.time() + LOCKOUT_SECONDS
+        print(f"WARNING: {MAX_FAILED_ATTEMPTS} failed login attempts in a row — "
+              f"login locked for {LOCKOUT_SECONDS // 60} minutes")
+
+
+def record_successful_login() -> None:
+    global _failed_attempts, _locked_until
+    _failed_attempts = 0
+    _locked_until = 0.0
+
+
+def is_device_key_required() -> bool:
+    """The device key gate is opt-in: if you haven't run generate_device_key.py
+    yet, STRUCT_DEVICE_KEY is empty and every device is allowed to attempt
+    login (same as before this feature existed)."""
+    return bool(DEVICE_KEY)
+
+
+def verify_device_key(candidate: str) -> bool:
+    if not DEVICE_KEY:
+        return True
+    if not candidate:
+        return False
+    return secrets_module.compare_digest(candidate, DEVICE_KEY)
 
 
 def _read_epoch() -> int:
@@ -93,8 +150,9 @@ def _true_time() -> float:
             _time_offset_seconds = server_time - local_now
             _time_offset_checked_at = local_now
             return local_now + _time_offset_seconds
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"WARNING: time-sync check failed ({e}) — falling back to local clock; "
+              f"if login codes keep being rejected, verify this machine's clock is correct")
     return local_now
 
 

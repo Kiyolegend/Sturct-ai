@@ -10,17 +10,7 @@ import { FrameworkMonitor } from "@/components/FrameworkMonitor";
 import { type ActiveSetup } from "@/hooks/use-trading-api";
 import NotFound from "@/pages/not-found";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 30,
-    },
-  },
-});
-
-function Router({ activeSetups, symbol, setSymbol }: {
-  function useIsMobile() {
+function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
@@ -32,14 +22,21 @@ function Router({ activeSetups, symbol, setSymbol }: {
   return isMobile;
 }
 
-function Router({ activeSetups, symbol, setSymbol }: {
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 1000 * 30,
+    },
+  },
+});
 
 function Router({ activeSetups, symbol, setSymbol }: {
   activeSetups: ActiveSetup[];
   symbol: string;
   setSymbol: (s: string) => void;
 }) {
-    const isMobile = useIsMobile();
+  const isMobile = useIsMobile();
   return (
     <Switch>
       <Route path="/">
