@@ -33,7 +33,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        # Add your tunnel/deployment URL here so the dashboard can be reached
+        # from another device (e.g. your phone) without CORS being rejected
+        # by the browser. Wildcard "*" cannot be combined with credentials.
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,8 +47,22 @@ app.add_middleware(
 PREFIX = "/trading-api"
 
 # Paths that are never gated behind login or encryption (login itself, health
-# checks, and the websocket handshake which uses its own upgrade protocol).
-_EXEMPT_PATHS = {f"{PREFIX}/auth/login", f"{PREFIX}/auth/revoke-all", f"{PREFIX}/health", f"{PREFIX}/ws"}
+# checks, the websocket handshake which uses its own upgrade protocol, and the
+# MT5 bridge endpoints which authenticate separately via X-MT5-Secret and send
+# plain, unencrypted JSON).
+_EXEMPT_PATHS = {
+    f"{PREFIX}/auth/login",
+    f"{PREFIX}/auth/revoke-all",
+    f"{PREFIX}/health",
+    f"{PREFIX}/ws",
+    f"{PREFIX}/mt5/push",
+    f"{PREFIX}/mt5/status",
+    f"{PREFIX}/mt5/server-time",
+    f"{PREFIX}/trade/pending",
+    f"{PREFIX}/trade/result",
+    f"{PREFIX}/trade/positions/sync",
+    f"{PREFIX}/trade/breakeven-moved",
+}
 
 
 class AuthMiddleware(BaseHTTPMiddleware):

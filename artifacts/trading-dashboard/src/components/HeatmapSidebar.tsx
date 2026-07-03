@@ -130,15 +130,17 @@ export function HeatmapSidebar({
   activeSymbol,
   onSelectSymbol,
   children,
+  forceVisible = false,
 }: {
   activeSymbol: string;
   onSelectSymbol: (s: string) => void;
   children?: React.ReactNode;
+  forceVisible?: boolean;
 }) {
   
 
   return (
-    <aside className="hidden lg:flex flex-col w-44 shrink-0 border-r border-white/5 bg-[#0a0e17] overflow-hidden">
+    <aside className={cn(forceVisible ? "flex w-full" : "hidden lg:flex w-44", "flex-col shrink-0 border-r border-white/5 bg-[#0a0e17] overflow-hidden")}>
       {/* Pairs list — scrollable */}
       <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5">
         <div className="px-2 pt-1 pb-2 flex items-center justify-between">
