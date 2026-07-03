@@ -44,7 +44,7 @@ set "PATH=%APPDATA%\npm;%PATH%"
 
 :: Step 1 — Install Python requirements
 echo [1/4] Installing Python requirements...
-pip install --user fastapi "uvicorn[standard]" pandas numpy httpx websockets python-dotenv requests MetaTrader5 >nul 2>&1
+pip install --user fastapi "uvicorn[standard]" pandas numpy httpx websockets python-dotenv requests MetaTrader5 bcrypt pyotp pyjwt cryptography "qrcode[pil]" >nul 2>&1
 echo       Done.
 echo.
 
