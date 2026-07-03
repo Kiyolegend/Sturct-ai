@@ -116,8 +116,6 @@ export function MobileDashboard({ activeSetups = [], symbol, setSymbol }: { acti
         orderType: setup.mode === "limit" ? "LIMIT" : "MARKET",
         comment:   "STRUCT.ai-Framework",
       });
-      // Auto-jump to the Trade tab so the user notices the new setup on mobile.
-      setActiveTab("trade");
     }
   }, [activeSetups, symbol]);
 
@@ -166,7 +164,7 @@ export function MobileDashboard({ activeSetups = [], symbol, setSymbol }: { acti
   ];
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#0a0e17] text-white overflow-hidden font-sans">
+    <div className="flex flex-col h-[100dvh] w-full bg-[#0a0e17] text-white overflow-hidden font-sans">
       <TopBar
         timeframe={timeframe}
         setTimeframe={setTimeframe}
@@ -282,7 +280,7 @@ export function MobileDashboard({ activeSetups = [], symbol, setSymbol }: { acti
         )}
       </div>
 
-      <nav className="shrink-0 h-16 border-t border-white/5 bg-[#0a0e17]/95 backdrop-blur-md flex items-stretch">
+      <nav className="shrink-0 border-t border-white/5 bg-[#0a0e17]/95 backdrop-blur-md flex items-stretch" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         {TABS.map((tab) => (
           <button
             key={tab.id}

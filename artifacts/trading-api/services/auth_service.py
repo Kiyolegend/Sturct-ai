@@ -99,6 +99,11 @@ def verify_device_key(candidate: str) -> bool:
         return False
     return secrets_module.compare_digest(candidate, DEVICE_KEY)
 
+def verify_passphrase(candidate: str) -> bool:
+    if not ENC_PASSPHRASE:
+        return False
+    return secrets_module.compare_digest(candidate, ENC_PASSPHRASE)
+
 
 def _read_epoch() -> int:
     try:
