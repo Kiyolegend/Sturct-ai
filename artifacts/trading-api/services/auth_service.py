@@ -22,8 +22,10 @@ import os
 import time
 
 import bcrypt
+import httpx
 import pyotp
 import jwt as pyjwt
+from email.utils import parsedate_to_datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -66,10 +68,40 @@ def verify_password(password: str) -> bool:
     return bcrypt.checkpw(password.encode(), PASSWORD_HASH.encode())
 
 
+_time_offset_seconds = 0.0
+_time_offset_checked_at = 0.0
+_TIME_OFFSET_TTL_SECONDS = 300  # re-check every 5 minutes
+
+
+def _true_time() -> float:
+    """Returns the real current time, corrected for a wrong/corrupted local
+    (Windows) clock. 2FA codes are generated on the phone using the phone's
+    own clock, so if this machine's clock is wrong, every code would be
+    rejected even when typed correctly. This fetches the real time from a
+    public HTTPS server's response header instead of trusting the local
+    clock, and caches the correction for a few minutes so login stays fast.
+    Falls back to the local clock if there's no internet access."""
+    global _time_offset_seconds, _time_offset_checked_at
+    local_now = time.time()
+    if local_now - _time_offset_checked_at < _TIME_OFFSET_TTL_SECONDS:
+        return local_now + _time_offset_seconds
+    try:
+        resp = httpx.head("https://www.google.com", timeout=3)
+        date_header = resp.headers.get("date")
+        if date_header:
+            server_time = parsedate_to_datetime(date_header).timestamp()
+            _time_offset_seconds = server_time - local_now
+            _time_offset_checked_at = local_now
+            return local_now + _time_offset_seconds
+    except Exception:
+        pass
+    return local_now
+
+
 def verify_totp(code: str) -> bool:
     if not TOTP_SECRET:
         return False
-    return pyotp.TOTP(TOTP_SECRET).verify(code, valid_window=1)
+    return pyotp.TOTP(TOTP_SECRET).verify(code, valid_window=1, for_time=int(_true_time()))
 
 
 def issue_session_token() -> str:
