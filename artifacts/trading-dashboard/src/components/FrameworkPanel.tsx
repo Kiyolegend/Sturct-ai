@@ -353,7 +353,7 @@ export function FrameworkPanel({ symbol }: Props) {
           {/* ── LIMIT ─────────────────────────────── */}
             <>
               {/* ── D1 Trend Context ── */}
-              {hasDir && (
+              {(
                 <div style={{
                   marginBottom: 10,
                   padding: "7px 9px",
