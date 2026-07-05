@@ -24,6 +24,7 @@ export function useFrameworkCheck(symbol: string) {
     const bias4h  = mtf?.bias_4h.trend  ?? "neutral";
     const bias1h  = mtf?.bias_1h.trend  ?? "neutral";
     const bias15m = mtf?.bias_15m.trend ?? "neutral";
+    const biasd1  = mtf?.bias_d1.trend  ?? "neutral";
     const pip     = pipSize(price);
     const isBull  = bias4h === "bullish";
     const dir     = bias4h;
@@ -157,6 +158,8 @@ export function useFrameworkCheck(symbol: string) {
         const raw = isBull ? ((hi - price) / leg) * 100 : ((price - lo) / leg) * 100;
         return Math.round(raw);
       })(),
+      d1_trend:          biasd1,
+      d1_counter_trend:  biasd1 !== "neutral" && biasd1 !== bias4h,
 };
 }, [mtf, data1h, data15m, data5m, news, srLevels, symbol, stickyReady]);
 useEffect(() => {

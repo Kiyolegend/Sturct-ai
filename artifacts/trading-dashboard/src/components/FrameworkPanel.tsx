@@ -84,6 +84,7 @@ export function FrameworkPanel({ symbol }: Props) {
   const bias4h  = (mtf?.bias_4h.trend  ?? "neutral") as Bias;
   const bias1h  = (mtf?.bias_1h.trend  ?? "neutral") as Bias;
   const bias15m = (mtf?.bias_15m.trend ?? "neutral") as Bias;
+  const biasd1  = (mtf?.bias_d1.trend  ?? "neutral") as Bias;
   const conf4h  = mtf?.bias_4h.confidence ?? 0;
 
   // price: used for all SL/TP/entry calculations (MTF bias, 5min refresh)
@@ -351,6 +352,40 @@ export function FrameworkPanel({ symbol }: Props) {
 
           {/* ── LIMIT ─────────────────────────────── */}
             <>
+              {/* ── D1 Trend Context ── */}
+              {hasDir && (
+                <div style={{
+                  marginBottom: 10,
+                  padding: "7px 9px",
+                  borderRadius: 5,
+                  border: biasd1 !== "neutral" && biasd1 !== bias4h
+                    ? "1px solid rgba(239,83,80,0.45)"
+                    : "1px solid rgba(255,255,255,0.07)",
+                  background: biasd1 !== "neutral" && biasd1 !== bias4h
+                    ? "rgba(239,83,80,0.08)"
+                    : "rgba(255,255,255,0.03)",
+                }}>
+                  <div style={{ fontSize: 7, fontWeight: 700, color: "#475569", letterSpacing: "0.1em", marginBottom: 4 }}>
+                    D1 TREND CONTEXT
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 9, fontWeight: 700,
+                      color: biasd1 === "bullish" ? "#26a69a" : biasd1 === "bearish" ? "#ef5350" : "#f59e0b"
+                    }}>
+                      D1: {biasd1.toUpperCase()}
+                    </span>
+                    {biasd1 === "neutral" && (
+                      <span style={{ fontSize: 8, color: "#94a3b8" }}>— consolidating, 4H setup valid</span>
+                    )}
+                    {biasd1 !== "neutral" && biasd1 === bias4h && (
+                      <span style={{ fontSize: 8, color: "#4ade80" }}>✓ With D1 flow — full confidence</span>
+                    )}
+                    {biasd1 !== "neutral" && biasd1 !== bias4h && (
+                      <span style={{ fontSize: 8, color: "#ef5350" }}>⚠ Counter-trend — cut TP, half size</span>
+                    )}
+                  </div>
+                </div>
+              )}
               <Step num={1} tf="4H" title="STORY" met={true}>
                 <div style={{ fontSize: 8.5, fontWeight: 700, color: dirColor }}>
                   {isBull ? "BULLISH" : "BEARISH"}

@@ -151,6 +151,7 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
         if ((status as any).has_15m_confluence) bonuses.push("15M ✓");
         if (status.phase_good)                  bonuses.push("Phase ✓");
         if ((status as any).retrace_pct != null) bonuses.push(`Retr ${(status as any).retrace_pct}%`);
+        if ((status as any).d1_counter_trend)   bonuses.push("⚠ D1 counter-trend");
         const bonusStr = bonuses.length > 0 ? ` · ${bonuses.join(" · ")}` : "";
 
         playAlert();
