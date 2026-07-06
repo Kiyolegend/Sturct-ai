@@ -219,13 +219,13 @@ function NarrativePanel({ symbol }: { symbol: string }) {
 
           {/* Structure */}
           <Section label="Structure Summary">
-            {n.structure.map((line, i) => (
+            {(n.structure ?? []).map((line, i) => (
               <div key={i} style={{ fontSize: 13, color: "#475569", lineHeight: 1.7 }}>{line}</div>
             ))}
           </Section>
 
           {/* Key levels */}
-          {(n.key_levels.resistance.length > 0 || n.key_levels.support.length > 0) && (
+          {n.key_levels && (n.key_levels.resistance.length > 0 || n.key_levels.support.length > 0) && (
             <Section label="Key Levels">
               {n.key_levels.resistance.map((lvl, i) => <LevelRow key={`r${i}`} level={lvl} kind="res" ref_={n.price} />)}
               <div style={{
@@ -244,13 +244,13 @@ function NarrativePanel({ symbol }: { symbol: string }) {
           {/* Session */}
           <Section label="Session Context">
             <div style={{ fontSize: 13, color:sessionLine.startsWith("No prime") ? "#f59e0b" : "#4ade80", lineHeight: 1.7, marginBottom: 4 }}>{sessionLine}</div>
-            {n.session.map((line, i) => (
+            {(n.session ?? []).map((line, i) => (
               <div key={i} style={{ fontSize: 13, color: "#475569", lineHeight: 1.7 }}>{line}</div>
             ))}
           </Section>
 
           {/* Trade readiness */}
-          <Section label="Trade Readiness">
+          {n.trade_readiness && <Section label="Trade Readiness">
             {n.trade_readiness.direction && (
               <div style={{
                 fontSize: 14, fontWeight: 700, letterSpacing: "0.05em",
@@ -303,6 +303,7 @@ function NarrativePanel({ symbol }: { symbol: string }) {
               {n.trade_readiness.action}
             </div>
           </Section>
+          )}
 
           {/* Confidence tiles */}
           <div style={{ display: "flex", gap: 8, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 14 }}>
