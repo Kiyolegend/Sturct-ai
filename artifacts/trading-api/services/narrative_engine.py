@@ -1,9 +1,22 @@
 """
 Narrative Engine — translates raw market structure analysis into plain-English commentary.
 
-Takes computed analysis (bias, BOS, CHoCH, zones, S/R, sessions) and produces a
-structured narrative that answers: what condition is the market in, what are the
-key levels, what should I be doing right now?
+IMPORTANT DESIGN CHANGE (per product decision):
+This engine no longer classifies a market "condition" (Bullish Pullback, Range,
+Expansion, etc.) and it no longer tells the trader WHERE to enter, WHAT level to
+watch, or WHAT to wait for. Finding the entry is the trader's job.
+
+Instead this engine answers one question: "what trading style does the current
+structure support right now?" — Scalping, Intraday Trade, Swing Trade, and/or
+Trend Exhaustion (a caution state, not a style to trade). More than one can be
+true at once, and if so, all of them are reported.
+
+Accuracy note on "Trend Exhaustion": this engine only has visibility into the
+recent swing structure pulled from the analysis window (roughly the last
+handful of 4H/1H/15M swings). It cannot know true multi-year/all-time highs or
+lows. Exhaustion here means "relative to the recent swing structure this
+engine can see" — described that way everywhere it's surfaced, not as an
+absolute all-time extreme claim.
 
 No market data is fetched here — this is a pure transformation function.
 """
@@ -12,142 +25,22 @@ from __future__ import annotations
 import time
 
 
-# ── Condition Classification ──────────────────────────────────────────────────
-
-def _classify_condition(
-    bias4h: str, bias1h: str, bias15m: str,
-    bos_5m: list, choch_15m: list,
-    near_resistance: bool, near_support: bool,
-    broker_ts: float = 0,
-) -> tuple[str, str]:
-    """
-    Returns (condition_label, one-sentence explanation).
-    Labels match the set requested: Bullish Trend, Bullish Pullback, Bearish Trend,
-    Bearish Pullback, Consolidation, Expansion, Distribution, Accumulation, Range.
-    """
-    now = broker_ts or time.time()
-
-    def recent_choch(direction: str, hours: float = 6) -> bool:
-        cutoff = now - hours * 3600
-        return any(
-            c.get("direction") == direction and c.get("time", 0) >= cutoff
-            for c in choch_15m
-        )
-
-    def recent_bos(direction: str, hours: float = 1) -> bool:
-        cutoff = now - hours * 3600
-        return any(
-            b.get("direction") == direction and b.get("time", 0) >= cutoff
-            for b in bos_5m
-        )
-
-    bull4h = bias4h == "bullish"
-    bear4h = bias4h == "bearish"
-    bull1h = bias1h == "bullish"
-    bear1h = bias1h == "bearish"
-    bull15 = bias15m == "bullish"
-    bear15 = bias15m == "bearish"
-    neut4h = not bull4h and not bear4h
-    neut1h = not bull1h and not bear1h
-    neut15 = not bull15 and not bear15
-
-    # ── Expansion (all TFs aligned + active BOS) ──
-    if bull4h and bull1h and bull15 and recent_bos("bullish"):
-        return ("Expansion",
-                "Strong bullish momentum across all timeframes with active 5M BOS — trend is accelerating.")
-    if bear4h and bear1h and bear15 and recent_bos("bearish"):
-        return ("Expansion",
-                "Strong bearish momentum across all timeframes with active 5M BOS — trend is accelerating.")
-
-    # ── Full trend alignment ──
-    if bull4h and bull1h and bull15:
-        return ("Bullish Trend", "All timeframes aligned bullish. Buyers are in full control.")
-    if bear4h and bear1h and bear15:
-        return ("Bearish Trend", "All timeframes aligned bearish. Sellers are in full control.")
-
-    # ── Pullback (best entry zones) ──
-    if bull4h and bull1h:
-        if bear15 or recent_choch("bearish"):
-            return ("Bullish Pullback",
-                    "Higher timeframe structure is bullish but 15M is correcting — "
-                    "this is typically the prime long entry zone.")
-        if neut15:
-            return ("Bullish Pullback",
-                    "Higher timeframe bullish with 15M pausing. "
-                    "Consolidation within an uptrend — watch for the next leg higher.")
-
-    if bear4h and bear1h:
-        if bull15 or recent_choch("bullish"):
-            return ("Bearish Pullback",
-                    "Higher timeframe structure is bearish but 15M is bouncing — "
-                    "this is typically the prime short entry zone.")
-        if neut15:
-            return ("Bearish Pullback",
-                    "Higher timeframe bearish with 15M pausing. "
-                    "Bounce within a downtrend — watch for the next leg lower.")
-
-    # ── Distribution / Accumulation (HTF conflict near extremes) ──
-    if bull4h and bear1h:
-        if near_resistance:
-            return ("Distribution",
-                    "4H bullish but 1H has turned bearish near resistance — "
-                    "potential distribution area. Longs are at risk.")
-        return ("Distribution",
-                "4H bullish but 1H sellers are gaining control. "
-                "Short-term structure is weakening.")
-
-    if bear4h and bull1h:
-        if near_support:
-            return ("Accumulation",
-                    "4H bearish but 1H buyers are recovering near support — "
-                    "potential accumulation area. Shorts are at risk.")
-        return ("Accumulation",
-                "4H bearish but 1H buyers are gaining control. "
-                "Watch for a structural shift.")
-
-    # ── Single clear TF ──
-    if bull4h and neut1h:
-        return ("Bullish Bias",
-                "4H structure is bullish but 1H has not yet confirmed. "
-                "Macro context favors longs — wait for lower TF alignment.")
-    if bear4h and neut1h:
-        return ("Bearish Bias",
-                "4H structure is bearish but 1H has not yet confirmed. "
-                "Macro context favors shorts — wait for lower TF alignment.")
-
-    if neut4h and bull1h:
-        if near_resistance:
-            return ("Range",
-                    "1H bullish but approaching key resistance with no 4H trend. "
-                    "Breakout or reversal imminent.")
-        return ("Range", "1H showing bullish structure but 4H is flat. Range conditions likely.")
-
-    if neut4h and bear1h:
-        if near_support:
-            return ("Range",
-                    "1H bearish but approaching key support with no 4H trend. "
-                    "Breakdown or bounce imminent.")
-        return ("Range", "1H showing bearish structure but 4H is flat. Range conditions likely.")
-
-    return ("Consolidation",
-            "No clear directional bias on any timeframe. "
-            "Market is compressing — wait for a session-driven breakout.")
-
-
 # ── Structure Summary ─────────────────────────────────────────────────────────
 
 def _structure_summary(
     bias4h: str, bias1h: str, bias15m: str,
     choch_15m: list, bos_5m: list,
     broker_ts: float = 0,
+    bias_d1: str = "neutral",
 ) -> list[str]:
-    """Returns 3-5 factual sentences describing the current market structure."""
+    """Returns 4-6 factual sentences describing the current market structure/bias."""
     now = broker_ts or time.time()
     lines: list[str] = []
 
     def fmt(b: str) -> str:
         return {"bullish": "bullish", "bearish": "bearish"}.get(b, "neutral")
 
+    lines.append(f"D1 structure is {fmt(bias_d1)}.")
     lines.append(f"4H structure is {fmt(bias4h)}.")
     lines.append(f"1H structure is {fmt(bias1h)}.")
 
@@ -179,7 +72,7 @@ def _structure_summary(
     else:
         lines.append("Higher timeframe bias is developing — patience required.")
 
-    # Recent 5M BOS note
+    # Recent 5M BOS note (factual, not an instruction to act)
     bos_recent = sorted(
         [b for b in bos_5m if now - b.get("time", 0) <= 90 * 60],
         key=lambda x: x.get("time", 0), reverse=True,
@@ -192,7 +85,7 @@ def _structure_summary(
     return lines
 
 
-# ── Swing Context ─────────────────────────────────────────────────────────────
+# ── Swing Context (used internally for style/exhaustion classification) ───────
 
 def _swing_context(
     hi_price: float | None,
@@ -202,8 +95,9 @@ def _swing_context(
     pip_size: float,
 ) -> dict:
     """
-    Returns plain-English description of where price is in the 4H swing.
-    Tells the trader: how far has the pullback gone? Am I in the entry window?
+    Returns where price sits within the current 4H swing leg. Purely descriptive —
+    no entry instruction. Used both for display (structure context) and internally
+    to help classify trading style / trend exhaustion.
     """
     if not hi_price or not lo_price or not current_price:
         return {}
@@ -225,32 +119,27 @@ def _swing_context(
     if retrace_pct < 20:
         desc = (
             f"The 4H leg covered {leg_pips} pips. Price has barely pulled back "
-            f"({retrace_pct}% retrace) — momentum is still running. "
-            f"Not a great entry zone yet."
+            f"({retrace_pct}% retrace) — the move is still extended."
         )
     elif retrace_pct < 38:
         desc = (
             f"The 4H leg covered {leg_pips} pips. Price is at a {retrace_pct}% retrace — "
-            f"approaching the Fibonacci entry window (38%) but not there yet. "
-            f"Watch but wait."
+            f"approaching the typical structural pullback zone (38%) but not there yet."
         )
     elif retrace_pct <= 70:
         desc = (
             f"The 4H leg covered {leg_pips} pips. Price is at a {retrace_pct}% retrace — "
-            f"inside the Fibonacci entry window (38–70%). "
-            f"This is the zone to look for entries."
+            f"inside the typical structural pullback zone (38–70%)."
         )
     elif retrace_pct <= 85:
         desc = (
             f"The 4H leg covered {leg_pips} pips. Price has retraced {retrace_pct}% — "
-            f"deeper than ideal (above 70%). Setup is lower conviction. "
-            f"Tighten your criteria before entering."
+            f"deeper than a typical pullback."
         )
     else:
         desc = (
             f"The 4H leg covered {leg_pips} pips. Price has retraced {retrace_pct}% — "
-            f"this deep a pullback suggests the move may be reversing entirely. "
-            f"Do not trade in the original direction."
+            f"this deep a pullback often signals the prior trend leg is exhausted."
         )
 
     return {
@@ -258,237 +147,6 @@ def _swing_context(
         "retrace_pct": retrace_pct,
         "in_window":   in_window,
         "description": desc,
-    }
-
-
-# ── Strongest Level ───────────────────────────────────────────────────────────
-
-def _strongest_level(
-    sr_levels: list,
-    zones: list,
-    current_price: float,
-    bias_4h: str,
-    pip_size: float,
-) -> dict:
-    """
-    Identifies the single most important level for the trader to watch.
-    For bulls → strongest support below. For bears → strongest resistance above.
-    Returns plain-English description.
-    """
-    if bias_4h == "neutral":
-        return {}
-
-    is_bull = bias_4h == "bullish"
-    candidates: list[dict] = []
-
-    for lvl in (sr_levels or []):
-        p = lvl.get("price")
-        if not isinstance(p, (int, float)):
-            continue
-        if is_bull and p >= current_price:
-            continue
-        if not is_bull and p <= current_price:
-            continue
-        score   = lvl.get("score", 1)
-        touches = lvl.get("touches", 1)
-        tf      = lvl.get("timeframe", "")
-        tf_weight = {"4h": 3, "1h": 2, "15m": 1}.get(tf, 1)
-        importance = (score * 2) + (touches * 1.5) + (tf_weight * 2)
-        pips = abs(p - current_price) / pip_size
-        candidates.append({
-            "price":      round(p, 5),
-            "kind":       lvl.get("kind", "level"),
-            "timeframe":  tf.upper(),
-            "touches":    touches,
-            "pips_away":  round(pips),
-            "importance": importance,
-            "source":     "S/R",
-        })
-
-    for zone in (zones or []):
-        top    = zone.get("top", 0)
-        bottom = zone.get("bottom", 0)
-        if not top or not bottom:
-            continue
-        center = (top + bottom) / 2
-        if is_bull and center >= current_price:
-            continue
-        if not is_bull and center <= current_price:
-            continue
-        tf        = zone.get("timeframe", "")
-        tf_weight = {"4h": 3, "1h": 2, "15m": 1}.get(tf, 1)
-        strength  = zone.get("strength", 1)
-        importance = (strength * 2) + (tf_weight * 3)
-        pips = abs(center - current_price) / pip_size
-        candidates.append({
-            "price":      round(center, 5),
-            "kind":       "zone",
-            "timeframe":  tf.upper(),
-            "pips_away":  round(pips),
-            "importance": importance,
-            "source":     "Zone",
-            "range":      [round(bottom, 5), round(top, 5)],
-        })
-
-    if not candidates:
-        return {}
-
-    best = max(candidates, key=lambda x: x["importance"])
-    tf_label    = best["timeframe"] or "Key"
-    kind_label  = "Order Block / Zone" if best["source"] == "Zone" else best["kind"].capitalize()
-    pips        = best["pips_away"]
-    side_word   = "below" if is_bull else "above"
-    action_word = "support" if is_bull else "resistance"
-
-    best["description"] = (
-        f"The strongest level is the {tf_label} {kind_label} at {best['price']} — "
-        f"{pips} pips {side_word} current price. "
-        f"This is the key {action_word} zone where institutional interest is most likely. "
-        f"{'Watch for a bounce here for longs.' if is_bull else 'Watch for a rejection here for shorts.'}"
-    )
-    return best
-
-
-# ── Watch For ─────────────────────────────────────────────────────────────────
-
-def _watch_for(
-    condition: str,
-    bias_4h: str,
-    bias_1h: str,
-    bias_15m: str,
-    choch_15m: list,
-    bos_5m: list,
-    broker_ts: float,
-) -> str:
-    """
-    Returns one plain-English sentence telling the trader exactly what to wait for
-    before committing to a trade.
-    """
-    now = broker_ts or time.time()
-    is_bull = bias_4h == "bullish"
-    is_bear = bias_4h == "bearish"
-
-    if condition in ("Consolidation", "Range"):
-        return (
-            "Wait for price to break and close a full candle outside the current range "
-            "on the 1H timeframe before considering any directional trade."
-        )
-
-    if condition == "Expansion":
-        if is_bull:
-            return (
-                "Momentum is running — do not chase. Wait for a 15M pullback and a fresh "
-                "5M bullish BOS above the most recent swing high before re-entering."
-            )
-        return (
-            "Momentum is running — do not chase. Wait for a 15M bounce and a fresh "
-            "5M bearish BOS below the most recent swing low before re-entering."
-        )
-
-    if condition == "Distribution":
-        return (
-            "Conflicting timeframes — wait for the 4H to close a new high (confirming continuation) "
-            "or the 1H to break its recent low (confirming reversal) before committing."
-        )
-
-    if condition == "Accumulation":
-        return (
-            "Conflicting timeframes — wait for the 1H to print a clear higher high above the "
-            "last 1H swing high before trusting the long side."
-        )
-
-    recent_bos = any(now - b.get("time", 0) <= 90 * 60 for b in bos_5m)
-
-    if is_bull:
-        if bias_15m in ("bearish", "neutral"):
-            return (
-                "15M is pulling back into the trend. Wait for a 15M bullish CHoCH or a fresh "
-                "5M bullish BOS near the key support level — that is your entry signal."
-            )
-        if recent_bos:
-            return (
-                "5M bullish BOS is active. Watch for price to hold above the BOS level on the "
-                "next 5M dip — that confirms momentum is real. Enter on the pullback."
-            )
-        return (
-            "Structure is bullish but no fresh 5M trigger yet. Wait for a 5M bullish BOS "
-            "above the last swing high to confirm momentum before entering."
-        )
-
-    if is_bear:
-        if bias_15m in ("bullish", "neutral"):
-            return (
-                "15M is bouncing into the trend. Wait for a 15M bearish CHoCH or a fresh "
-                "5M bearish BOS near the key resistance level — that is your entry signal."
-            )
-        if recent_bos:
-            return (
-                "5M bearish BOS is active. Watch for price to hold below the BOS level on the "
-                "next 5M bounce — that confirms momentum is real. Enter on the bounce."
-            )
-        return (
-            "Structure is bearish but no fresh 5M trigger yet. Wait for a 5M bearish BOS "
-            "below the last swing low to confirm momentum before entering."
-        )
-
-    return (
-        "No clear directional structure. Wait for the 4H to establish a trend before "
-        "looking for any entries."
-    )
-
-
-# ── Key Levels ────────────────────────────────────────────────────────────────
-
-def _key_levels(
-    sr_levels: list, zones: list,
-    current_price: float, pip_size: float,
-) -> dict:
-    """
-    Returns nearest resistance levels above price and support levels below price.
-    Combines S/R swing levels and supply/demand zones.
-    """
-    resistance: list[dict] = []
-    support: list[dict] = []
-
-    for lvl in (sr_levels or []):
-        p = lvl.get("price")
-        if not isinstance(p, (int, float)):
-            continue
-        score     = lvl.get("score", 1)
-        touches   = lvl.get("touches", 1)
-        timeframe = lvl.get("timeframe", "")
-        major     = score >= 0.7 or touches >= 4 or timeframe == "4h"
-        pips      = round(abs(p - current_price) / pip_size)
-        entry     = {
-            "price":     round(p, 5),
-            "label":     "Major" if major else "",
-            "timeframe": timeframe.upper() if timeframe else "",
-            "pips_away": pips,
-            "source":    "S/R",
-        }
-        (resistance if p > current_price else support).append(entry)
-
-    for zone in (zones or []):
-        top    = zone.get("top", 0)
-        bottom = zone.get("bottom", 0)
-        if not top or not bottom:
-            continue
-        center    = zone.get("center", (top + bottom) / 2)
-        timeframe = zone.get("timeframe", "")
-        pips      = round(abs(center - current_price) / pip_size)
-        entry     = {
-            "price":     round(center, 5),
-            "range":     [round(bottom, 5), round(top, 5)],
-            "label":     "Zone",
-            "timeframe": timeframe.upper() if timeframe else "",
-            "pips_away": pips,
-            "source":    "Zone",
-        }
-        (resistance if center > current_price else support).append(entry)
-
-    return {
-        "resistance": sorted(resistance, key=lambda x: x["pips_away"])[:3],
-        "support":    sorted(support,    key=lambda x: x["pips_away"])[:3],
     }
 
 
@@ -501,162 +159,30 @@ def _session_context(sessions: list[str]) -> list[str]:
 
     if "london" in s and ("ny" in s or "new york" in s):
         lines.append("London/New York overlap is active — highest liquidity window of the day.")
-        lines.append("This is the most reliable period for breakout and momentum trades.")
+        lines.append("This is generally the most active period for breakout and momentum conditions.")
     elif "london" in s:
         lines.append("London session is active.")
-        lines.append("Expect directional moves and elevated volatility. London trends typically set the day's direction.")
+        lines.append("Expect directional moves and elevated volatility. London typically sets the day's tone.")
     elif "ny" in s or "new york" in s:
         lines.append("New York session is active.")
-        lines.append("Watch for US data-driven moves. NY often reverses or continues London trends decisively.")
+        lines.append("US data-driven moves are common. NY often reverses or continues London's move.")
     elif "asian" in s or "asia" in s:
         lines.append("Asian session — range conditions expected with tighter price action.")
-        lines.append("London open setup is forming. S5/S6 breakout strategies are most applicable here.")
-        lines.append("Avoid chasing moves in thin conditions.")
+        lines.append("Liquidity is thin compared to London/NY.")
     else:
         lines.append("Inter-session period — liquidity is lower than normal.")
-        lines.append("Avoid low-conviction entries. Wait for London or New York to open.")
+        lines.append("Session is quiet until London or New York opens.")
 
     return lines
-
-
-# ── Trade Readiness ───────────────────────────────────────────────────────────
-
-def _trade_readiness(
-    condition: str,
-    bias4h: str, bias1h: str, bias15m: str,
-    choch_15m: list, bos_5m: list,
-    sessions: list[str],
-    sr_levels: list, zones: list,
-    current_price: float, pip_size: float,
-    news_blocked: bool,
-    broker_ts: float = 0
-) -> dict:
-    """
-    Evaluates 5 conditions and returns a readiness object with plain-English summary.
-    """
-    now = broker_ts or time.time()
-    s_lower = [x.lower() for x in (sessions or [])]
-    in_session = any(x in s_lower for x in ["london", "ny", "new york"])
-
-    if news_blocked:
-        return {
-            "ready": False, "direction": None,
-            "summary": "This pair is blocked due to a high-impact news event.",
-            "action": "Do not trade. Wait for the news window to pass before entering.",
-            "conditions": [{"label": "News window clear", "met": False}],
-            "met": 0, "total": 1,
-        }
-
-    if condition in ("Consolidation", "Range"):
-        return {
-            "ready": False, "direction": None,
-            "summary": "Market is ranging with no clear directional bias.",
-            "action": "Wait. No trade until price breaks and holds outside the current range.",
-            "conditions": [
-                {"label": "4H + 1H aligned",   "met": False},
-                {"label": "Active session",     "met": in_session},
-            ],
-            "met": 1 if in_session else 0, "total": 2,
-        }
-
-    bull = bias4h == "bullish" and bias1h == "bullish"
-    bear = bias4h == "bearish" and bias1h == "bearish"
-    direction = "long" if bull else ("short" if bear else None)
-
-    if not direction:
-        return {
-            "ready": False, "direction": None,
-            "summary": "Higher timeframe bias is not yet aligned.",
-            "action": "Wait for 4H and 1H to agree on direction before looking for entries.",
-            "conditions": [
-                {"label": "4H + 1H aligned",   "met": False},
-                {"label": "Active session",     "met": in_session},
-            ],
-            "met": 1 if in_session else 0, "total": 2,
-        }
-
-    # ── Build 5-condition checklist ──────────────────────────────────────────
-    htf_met = True
-
-    recent_choch = [c for c in choch_15m if now - c.get("time", 0) <= 4 * 3600]
-    pullback_met = (
-        (direction == "long"  and (bias15m in ("neutral", "bearish") or any(c.get("direction") == "bearish" for c in recent_choch))) or
-        (direction == "short" and (bias15m in ("neutral", "bullish") or any(c.get("direction") == "bullish" for c in recent_choch)))
-    )
-
-    bos_dir = "bullish" if direction == "long" else "bearish"
-    bos_met = any(
-        b.get("direction") == bos_dir and now - b.get("time", 0) <= 90 * 60
-        for b in bos_5m
-    )
-
-    threshold = 15 * pip_size
-    level_met = False
-    for lvl in (sr_levels or []):
-        p = lvl.get("price")
-        if isinstance(p, (int, float)) and abs(p - current_price) <= threshold:
-            level_met = True
-            break
-    if not level_met:
-        for zone in (zones or []):
-            top, bottom = zone.get("top", 0), zone.get("bottom", 0)
-            if top and bottom:
-                center = (top + bottom) / 2
-                if abs(center - current_price) <= threshold:
-                    level_met = True
-                    break
-
-    session_met = in_session
-
-    conditions = [
-        {"label": f"4H + 1H aligned {'bullish' if direction == 'long' else 'bearish'}", "met": htf_met},
-        {"label": "15M pullback / structure pause present",                              "met": pullback_met},
-        {"label": "5M BOS confirmed in trade direction",                                 "met": bos_met},
-        {"label": "Price near key S/R level or zone (15 pips)",                         "met": level_met},
-        {"label": "Active trading session (London or New York)",                         "met": session_met},
-    ]
-
-    met   = sum(1 for c in conditions if c["met"])
-    total = len(conditions)
-
-    dir_label = "Long" if direction == "long" else "Short"
-
-    if met == total:
-        summary = f"All {total} conditions satisfied — {dir_label} setup is ready."
-        action  = f"Look to enter {dir_label.lower()} at current price or on the next touch of the nearest key level."
-        ready   = True
-    elif met == total - 1:
-        missing = next(c["label"] for c in conditions if not c["met"])
-        summary = f"{met}/{total} conditions met — {dir_label} setup is nearly complete."
-        action  = f"One condition missing: {missing}. Monitor closely."
-        ready   = False
-    elif met >= 2:
-        missing = [c["label"] for c in conditions if not c["met"]]
-        summary = f"{met}/{total} conditions met — {dir_label} setup is developing."
-        action  = f"Still waiting on: {'; '.join(missing[:2])}."
-        ready   = False
-    else:
-        summary = f"Only {met}/{total} conditions met. No {dir_label.lower()} setup at this time."
-        action  = "Wait. Market conditions are not aligned for a trade."
-        ready   = False
-
-    return {
-        "ready":      ready,
-        "direction":  direction,
-        "summary":    summary,
-        "action":     action,
-        "conditions": conditions,
-        "met":        met,
-        "total":      total,
-    }
 
 
 # ── Confidence ────────────────────────────────────────────────────────────────
 
 def _confidence(
-    readiness: dict,
     bias4h: str, bias1h: str, bias15m: str,
+    sessions: list[str], news_blocked: bool,
 ) -> dict:
+    """Market clarity / structure quality / overall signal confidence. No entry info."""
     bull_align = bias4h == "bullish" and bias1h == "bullish"
     bear_align = bias4h == "bearish" and bias1h == "bearish"
 
@@ -675,22 +201,222 @@ def _confidence(
     )
     structure_quality = "High" if aligned_15m else ("Medium" if bias15m != "neutral" else "Low")
 
-    met   = readiness.get("met", 0)
-    total = readiness.get("total", 5)
-    base  = int((met / max(total, 1)) * 100)
+    in_session = any(x in [s.lower() for s in (sessions or [])] for x in ("london", "ny", "new york"))
 
-    if clarity == "High":
-        signal_confidence = min(100, base + 10)
-    elif clarity == "Low":
-        signal_confidence = max(0, base - 20)
-    else:
-        signal_confidence = base
+    signal_confidence = clarity_score
+    if news_blocked:
+        signal_confidence -= 15
+    if not in_session:
+        signal_confidence -= 10
+    signal_confidence = max(0, min(100, signal_confidence))
 
     return {
         "market_clarity":    clarity,
         "structure_quality": structure_quality,
         "signal_confidence": signal_confidence,
     }
+
+
+# ── Trading Style Classification ──────────────────────────────────────────────
+
+def _classify_trading_styles(
+    bias4h: str, bias1h: str, bias15m: str,
+    bos_5m: list, bos_15m: list, choch_15m: list,
+    sessions: list[str], news_blocked: bool,
+    swing_ctx: dict,
+    broker_ts: float = 0,
+    bias_d1: str = "neutral",
+) -> list[dict]:
+    """
+    Returns a list of {"style": str, "direction": str|None, "reason": str} entries
+    for every style currently supported by structure. Zero, one, or several can
+    qualify. Does NOT mention price levels, entries, or waiting instructions.
+    """
+    now = broker_ts or time.time()
+    s_lower = [x.lower() for x in (sessions or [])]
+    in_session = any(x in s_lower for x in ("london", "ny", "new york"))
+
+    def recent(events: list, hours: float, direction: str | None = None) -> bool:
+        cutoff = now - hours * 3600
+        return any(
+            e.get("time", 0) >= cutoff and (direction is None or e.get("direction") == direction)
+            for e in events
+        )
+
+    styles: list[dict] = []
+
+    htf_dir: str | None = None
+    if bias4h == bias1h and bias4h in ("bullish", "bearish"):
+        htf_dir = bias4h
+
+    full_align = htf_dir is not None and bias15m == htf_dir
+
+    def to_direction(d: str | None) -> str | None:
+        """Maps a bias string to an explicit long/short direction. None means no directional read."""
+        if d == "bullish":
+            return "long"
+        if d == "bearish":
+            return "short"
+        return None
+
+    # ── Scalping: needs live liquidity + short-term structure moving, no news block ──
+    if not news_blocked and in_session:
+        short_term_active = (
+            bias15m != "neutral"
+            or recent(bos_5m, 1.5)
+            or recent(choch_15m, 4)
+        )
+        if short_term_active:
+            styles.append({
+                "style": "Scalping",
+                "direction": to_direction(bias15m),
+                "reason": (
+                    "Active session with short-term (5M/15M) structure moving — "
+                    "conditions support scalping."
+                ),
+            })
+
+    # ── Intraday Trade: 4H + 1H agree on direction ──
+    if htf_dir is not None:
+        styles.append({
+            "style": "Intraday Trade",
+            "direction": to_direction(htf_dir),
+            "reason": (
+                f"4H and 1H structure both {htf_dir} — conditions support an "
+                f"intraday trade in that direction."
+            ),
+        })
+
+    # ── Swing Trade: all three timeframes aligned, or HTF aligned with a healthy 4H pullback ──
+    d1_confirms = bias_d1 in ("bullish", "bearish") and htf_dir is not None and bias_d1 == htf_dir
+    d1_suffix = " D1 also confirms this direction — stronger macro conviction." if d1_confirms else ""
+
+    if full_align:
+        styles.append({
+            "style": "Swing Trade",
+            "direction": to_direction(htf_dir),
+            "reason": (
+                f"4H, 1H, and 15M are all aligned {htf_dir} — conditions support "
+                f"a swing trade in that direction.{d1_suffix}"
+            ),
+        })
+    elif htf_dir is not None and swing_ctx.get("in_window"):
+        styles.append({
+            "style": "Swing Trade",
+            "direction": to_direction(htf_dir),
+            "reason": (
+                f"4H and 1H aligned {htf_dir}, with the 4H leg pulled back into a "
+                f"typical structural zone ({swing_ctx.get('retrace_pct')}% retrace) — "
+                f"conditions support a swing trade.{d1_suffix}"
+            ),
+        })
+
+    return styles
+
+
+def _trend_exhaustion(
+    bias4h: str,
+    swing_ctx: dict,
+    bos_5m: list,
+    choch_15m: list,
+    current_price: float,
+    hi_4h: float | None,
+    lo_4h: float | None,
+    pip_size: float,
+    broker_ts: float = 0,
+    bias_d1: str = "neutral",
+    hi_d1: float | None = None,
+    lo_d1: float | None = None,
+) -> dict:
+    """
+    Flags trend exhaustion relative to the recent swing structure this engine can
+    see (NOT a claim about true multi-year/all-time highs or lows — this engine
+    doesn't have that data). Returns {"active": bool, "notes": [str, ...]}.
+    """
+    now = broker_ts or time.time()
+    notes: list[str] = []
+
+    retrace_pct = swing_ctx.get("retrace_pct")
+
+    # Deep retracement — the prior leg likely exhausted
+    if retrace_pct is not None and retrace_pct >= 85:
+        notes.append(
+            f"The 4H pullback has gone very deep ({retrace_pct}%) — this often marks "
+            f"exhaustion of the prior trend leg rather than a healthy retracement."
+        )
+
+    # Hard extension with almost no pullback — climax-style move
+    full_align_bull = bias4h == "bullish"
+    full_align_bear = bias4h == "bearish"
+    hard_bos = (
+        (full_align_bull and any(b.get("direction") == "bullish" and now - b.get("time", 0) <= 30 * 60 for b in bos_5m)) or
+        (full_align_bear and any(b.get("direction") == "bearish" and now - b.get("time", 0) <= 30 * 60 for b in bos_5m))
+    )
+    if hard_bos and retrace_pct is not None and retrace_pct <= 8:
+        notes.append(
+            "Price is extending hard with almost no pullback — this kind of move "
+            "can reverse sharply once it runs out of steam."
+        )
+
+    # Pushed beyond the recent 4H swing extreme without fresh confirmation
+    if bias4h == "bullish" and hi_4h and current_price > hi_4h:
+        confirmed = any(b.get("direction") == "bullish" and now - b.get("time", 0) <= 3600 for b in bos_5m)
+        if not confirmed:
+            notes.append(
+                "Price has pushed beyond the most recent 4H swing high visible to this "
+                "engine without fresh confirmation — often a sign of exhaustion or a "
+                "false breakout (not a claim about the all-time high)."
+            )
+    elif bias4h == "bearish" and lo_4h and current_price < lo_4h:
+        confirmed = any(b.get("direction") == "bearish" and now - b.get("time", 0) <= 3600 for b in bos_5m)
+        if not confirmed:
+            notes.append(
+                "Price has pushed beyond the most recent 4H swing low visible to this "
+                "engine without fresh confirmation — often a sign of exhaustion or a "
+                "false breakdown (not a claim about the all-time low)."
+            )
+
+    # Pushed beyond the recent D1 (daily) swing extreme — the strongest
+    # multi-timeframe exhaustion signal this engine can produce. This is the
+    # daily swing range visible in the data pulled, NOT a true all-time high/low.
+    if bias_d1 == "bullish" and hi_d1 and current_price > hi_d1:
+        confirmed_d1 = any(
+            b.get("direction") == "bullish" and now - b.get("time", 0) <= 4 * 3600
+            for b in bos_5m
+        )
+        if not confirmed_d1:
+            notes.append(
+                "Price has pushed beyond the most recent D1 (daily) swing high visible "
+                "to this engine without fresh confirmation — the strongest exhaustion / "
+                "false-breakout signal available here (this engine cannot see true "
+                "all-time highs, only the recent daily swing range)."
+            )
+    elif bias_d1 == "bearish" and lo_d1 and current_price < lo_d1:
+        confirmed_d1 = any(
+            b.get("direction") == "bearish" and now - b.get("time", 0) <= 4 * 3600
+            for b in bos_5m
+        )
+        if not confirmed_d1:
+            notes.append(
+                "Price has pushed beyond the most recent D1 (daily) swing low visible "
+                "to this engine without fresh confirmation — the strongest exhaustion / "
+                "false-breakdown signal available here (this engine cannot see true "
+                "all-time lows, only the recent daily swing range)."
+            )
+
+    return {"active": len(notes) > 0, "notes": notes}
+
+
+def _build_style_summary(best: list[dict]) -> str:
+    if not best:
+        return (
+            "No trading style is favorable right now — structure is unclear or "
+            "conditions are quiet. Standing aside is the best action."
+        )
+    names = [b["style"] for b in best]
+    if len(names) == 1:
+        return f"Best trading style right now: {names[0]}."
+    return f"Multiple styles are currently confirmed: {', '.join(names)}."
 
 
 # ── Main Entry Point ──────────────────────────────────────────────────────────
@@ -714,54 +440,74 @@ def generate_narrative(
     broker_ts:     float = 0,
     hi_4h:         float | None = None,
     lo_4h:         float | None = None,
+    bias_d1:       str = "neutral",
+    hi_d1:         float | None = None,
+    lo_d1:         float | None = None,
 ) -> dict:
+    """
+    NOTE: D1 (bias_d1, hi_d1, lo_d1) was added as a new set of parameters with
+    defaults, so this remains backward-compatible with any other caller — but
+    routers/narrative.py has been updated to fetch D1 and pass these in, since
+    that's what powers the D1 bias line and the strongest exhaustion check.
+    `zones` and `sr_levels` are accepted for call-compatibility but are no
+    longer used to build the response (we no longer surface price levels here).
+    """
     pip_size = pip_size or 0.0001
     now = broker_ts or time.time()
 
-    # Near-level flags for condition classifier
-    threshold = 20 * pip_size
-    near_res = any(
-        isinstance((p := lvl.get("price")), (int, float)) and
-        p > current_price and abs(p - current_price) <= threshold
-        for lvl in (sr_levels or [])
-    )
-    near_sup = any(
-        isinstance((p := lvl.get("price")), (int, float)) and
-        p < current_price and abs(p - current_price) <= threshold
-        for lvl in (sr_levels or [])
-    )
-
-    condition, condition_detail = _classify_condition(
-        bias_4h, bias_1h, bias_15m, bos_5m, choch_15m, near_res, near_sup, broker_ts=now,
-    )
-
-    structure  = _structure_summary(bias_4h, bias_1h, bias_15m, choch_15m, bos_5m, broker_ts=now)
-    key_levels = _key_levels(sr_levels, zones, current_price, pip_size)
+    structure  = _structure_summary(bias_4h, bias_1h, bias_15m, choch_15m, bos_5m, broker_ts=now, bias_d1=bias_d1)
     session    = _session_context(sessions)
-    readiness  = _trade_readiness(
-        condition, bias_4h, bias_1h, bias_15m,
-        choch_15m, bos_5m, sessions,
-        sr_levels, zones, current_price, pip_size, news_blocked, broker_ts=now,
-    )
-    confidence = _confidence(readiness, bias_4h, bias_1h, bias_15m)
+    swing_ctx  = _swing_context(hi_4h, lo_4h, current_price, bias_4h, pip_size)
+    confidence = _confidence(bias_4h, bias_1h, bias_15m, sessions, news_blocked)
 
-    swing_ctx      = _swing_context(hi_4h, lo_4h, current_price, bias_4h, pip_size)
-    strongest_lvl  = _strongest_level(sr_levels, zones, current_price, bias_4h, pip_size)
-    watch_for_text = _watch_for(condition, bias_4h, bias_1h, bias_15m, choch_15m, bos_5m, now)
+    best_styles = _classify_trading_styles(
+        bias_4h, bias_1h, bias_15m,
+        bos_5m, bos_15m, choch_15m,
+        sessions, news_blocked, swing_ctx,
+        broker_ts=now,
+        bias_d1=bias_d1,
+    )
+
+    exhaustion = _trend_exhaustion(
+        bias_4h, swing_ctx, bos_5m, choch_15m,
+        current_price, hi_4h, lo_4h, pip_size,
+        broker_ts=now,
+        bias_d1=bias_d1, hi_d1=hi_d1, lo_d1=lo_d1,
+    )
+    if exhaustion["active"]:
+        exhaustion_bias = bias_4h if bias_4h in ("bullish", "bearish") else bias_d1
+        exhaustion_direction = (
+            "long" if exhaustion_bias == "bullish"
+            else "short" if exhaustion_bias == "bearish"
+            else None
+        )
+        best_styles = best_styles + [{
+            "style":     "Trend Exhaustion",
+            "direction": exhaustion_direction,
+            "reason":    " ".join(exhaustion["notes"]),
+        }]
+
+    trading_styles = {
+        "best":                best_styles,
+        "multiple_confirmed":  len(best_styles) > 1,
+        "summary":             _build_style_summary(best_styles),
+    }
 
     return {
-        "symbol":           symbol,
-        "price":            current_price,
-        "condition":        condition,
-        "condition_detail": condition_detail,
-        "structure":        structure,
-        "key_levels":       key_levels,
-        "session":          session,
-        "trade_readiness":  readiness,
-        "confidence":       confidence,
-        "swing_context":    swing_ctx,
-        "strongest_level":  strongest_lvl,
-        "watch_for":        watch_for_text,
+        "symbol": symbol,
+        "price":  current_price,
+        "bias": {
+            "d1":  bias_d1,
+            "h4":  bias_4h,
+            "h1":  bias_1h,
+            "m15": bias_15m,
+        },
+        "structure":       structure,
+        "session":         session,
+        "swing_context":   swing_ctx,
+        "trading_styles":  trading_styles,
+        "trend_exhaustion": exhaustion,
+        "confidence":      confidence,
         "news": {
             "blocked": news_blocked,
             "reason":  news_reason,
@@ -771,7 +517,7 @@ def generate_narrative(
     }
 
 
-# ── Environment Evaluator ─────────────────────────────────────────────────────
+# ── Environment Evaluator (UNCHANGED — powers the pair-sweep sidebar, not this panel) ──
 
 def build_environment(
     current_price: float,
@@ -791,6 +537,8 @@ def build_environment(
     Returns Scalp and Limit environment ratings for one symbol.
     Ratings: "Favorable" | "Mixed" | "Unfavorable"
     No trade signals — only describes market conditions.
+    This function is untouched — it feeds /pair-sweep, a separate feature from
+    the narrative panel this change targets.
     """
     now = broker_ts or time.time()
 

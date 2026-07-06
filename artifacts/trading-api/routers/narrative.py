@@ -131,18 +131,19 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
     Returns a full plain-English market narrative for the selected symbol.
     Updates automatically when symbol changes on the dashboard.
     """
-    # ── Fetch all 4 timeframes in parallel ───────────────────────────────────
+    # ── Fetch all timeframes in parallel (D1 added for macro bias + exhaustion) ──
     results = await asyncio.gather(
         _analyse_timeframe(symbol, "4h",  100),
         _analyse_timeframe(symbol, "1h",  200),
         _analyse_timeframe(symbol, "15m", 200),
         _analyse_timeframe(symbol, "5m",  300),
+        _analyse_timeframe(symbol, "d1",  200),
     )
-    r4h, r1h, r15m, r5m = results
+    r4h, r1h, r15m, r5m, rd1 = results
 
     current_price = (
         r5m.get("price") or r15m.get("price") or
-        r1h.get("price") or r4h.get("price")
+        r1h.get("price") or r4h.get("price") or rd1.get("price")
     )
     if not current_price:
         raise HTTPException(status_code=503, detail=f"No data available for {symbol}")
@@ -153,6 +154,7 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
     bias_4h  = trend_4h.get("trend",  "neutral")
     bias_1h  = (r1h.get("trend")  or {}).get("trend",  "neutral")
     bias_15m = (r15m.get("trend") or {}).get("trend",  "neutral")
+    bias_d1  = (rd1.get("trend")  or {}).get("trend",  "neutral")
 
     # 4H swing hi/lo for retrace context
     hi_4h: float | None = None
@@ -163,6 +165,18 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
         if s.get("label") in ("HL", "LL", "EQL") and lo_4h is None:
             lo_4h = float(s["price"])
         if hi_4h is not None and lo_4h is not None:
+            break
+
+    # D1 swing hi/lo — best "multi-timeframe extreme" proxy this engine has
+    # (it is the recent daily swing range, NOT a true all-time high/low).
+    hi_d1: float | None = None
+    lo_d1: float | None = None
+    for s in reversed(rd1.get("structure_labels") or []):
+        if s.get("label") in ("HH", "LH", "EQH") and hi_d1 is None:
+            hi_d1 = float(s["price"])
+        if s.get("label") in ("HL", "LL", "EQL") and lo_d1 is None:
+            lo_d1 = float(s["price"])
+        if hi_d1 is not None and lo_d1 is not None:
             break
 
     bos_5m    = r5m.get("bos",   []) or []
@@ -231,6 +245,9 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
         broker_ts=float(broker_ts),
         hi_4h=hi_4h,
         lo_4h=lo_4h,
+        bias_d1=bias_d1,
+        hi_d1=hi_d1,
+        lo_d1=lo_d1,
     )
 
     # ── Attach framework status (scalp_ready / limit_ready) ──────────────────

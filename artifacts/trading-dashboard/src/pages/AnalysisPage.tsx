@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 import { FrameworkPanel } from "@/components/FrameworkPanel";
+import { LoginGate } from "@/components/LoginGate";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -132,7 +133,7 @@ function NarrativePanel({ symbol }: { symbol: string }) {
 
   const n = narrative;
   const condColor = n ? cc(n.condition) : "#64748b";
-  const pct = n ? (n.trade_readiness.met / n.trade_readiness.total) * 100 : 0;
+  const pct = n?.trade_readiness ? (n.trade_readiness.met / n.trade_readiness.total) * 100: 0;
   const barColor = pct >= 100 ? "#4ade80" : pct >= 60 ? "#fbbf24" : "#ef5350";
   const sessionLine = n ? sessionStatus(n.broker_time) : "";
 
@@ -193,7 +194,7 @@ function NarrativePanel({ symbol }: { symbol: string }) {
       {n && (
         <>
           {/* News block */}
-          {n.news.blocked && (
+          {n.news?.blocked && (
             <div style={{
               display: "flex", alignItems: "flex-start", gap: 8,
               background: "#ef535018", border: "1px solid #ef535050",
@@ -202,7 +203,7 @@ function NarrativePanel({ symbol }: { symbol: string }) {
               <AlertTriangle size={14} style={{ color: "#ef5350", flexShrink: 0, marginTop: 2 }} />
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#ef5350", letterSpacing: "0.05em" }}>NEWS BLOCK ACTIVE</div>
-                <div style={{ fontSize: 12, color: "#7f1d1d", marginTop: 3, lineHeight: 1.6 }}>{n.news.reason}</div>
+                <div style={{ fontSize: 12, color: "#7f1d1d", marginTop: 3, lineHeight: 1.6 }}>{n.news?.reason}</div>
               </div>
             </div>
           )}
@@ -381,6 +382,7 @@ export function AnalysisPage() {
   const [symbol, setSymbol] = useState("USD/JPY");
 
   return (
+    <LoginGate>
     <div style={{
       minHeight: "100vh", background: "#0a0e17", color: "white",
       fontFamily: "'Roboto Mono', monospace",
@@ -399,6 +401,7 @@ export function AnalysisPage() {
             Analysis View
           </span>
         </div>
+        
 
         {/* Symbol switcher */}
         <div style={{ display: "flex", gap: 6 }}>
@@ -436,6 +439,7 @@ export function AnalysisPage() {
         <FrameworkPanel symbol={symbol} />
       </div>
     </div>
+    </LoginGate>
   );
 }
 
