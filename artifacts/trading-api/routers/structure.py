@@ -14,6 +14,7 @@ from services.trendline_engine import compute_trendlines
 from services.zones_engine import detect_zones
 from services.mtf_sr_engine import compute_mtf_sr_levels
 from services.session_engine import compute_sessions
+from services.candle_pattern_engine import detect_candle_patterns
 
 router = APIRouter()
 
@@ -155,6 +156,57 @@ async def get_zones(
         current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
         zones = detect_zones(swings, interval, current_price)
         return {"symbol": symbol, "interval": interval, "zones": zones}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/patterns")
+async def get_patterns(
+    symbol: str = Query(default="USD/JPY"),
+    interval: str = Query(default="5m"),
+    outputsize: int = Query(default=200, ge=10, le=5000),
+):
+    try:
+        df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
+        swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h", "d1") else 5)
+        current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
+        zones = detect_zones(swings, interval, current_price)
+        patterns = detect_candle_patterns(df, swings, zones)
+        return {"symbol": symbol, "interval": interval, "patterns": patterns}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/pattern-summary")
+async def get_pattern_summary(
+    symbol: str = Query(default="USD/JPY"),
+):
+    try:
+        df_15m, df_1h, df_4h, df_d1 = await asyncio.gather(
+            fetch_ohlc(symbol=symbol, interval="15m", outputsize=150),
+            fetch_ohlc(symbol=symbol, interval="1h", outputsize=150),
+            fetch_ohlc(symbol=symbol, interval="4h", outputsize=150),
+            fetch_ohlc(symbol=symbol, interval="d1", outputsize=365),
+        )
+
+        def _last_pattern(df, fractal_n: int, interval: str):
+            swings = detect_swings(df, fractal_n=fractal_n)
+            current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
+            zones = detect_zones(swings, interval, current_price)
+            patterns = detect_candle_patterns(df, swings, zones)
+            return patterns[0] if patterns else None
+
+        return {
+            "symbol": symbol,
+            "pattern_15m": _last_pattern(df_15m, 5, "15m"),
+            "pattern_1h": _last_pattern(df_1h, 3, "1h"),
+            "pattern_4h": _last_pattern(df_4h, 3, "4h"),
+            "pattern_d1": _last_pattern(df_d1, 3, "d1"),
+        }
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:

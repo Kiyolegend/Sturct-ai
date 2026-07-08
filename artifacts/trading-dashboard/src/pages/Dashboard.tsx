@@ -5,7 +5,7 @@ import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
 
-import { useTradingAnalysis, useSRLevels, useMTFBias, useSessions, useBrokerTime, type ActiveSetup } from "@/hooks/use-trading-api";
+import { useTradingAnalysis, useSRLevels, useMTFBias, usePatternSummary, useSessions, useBrokerTime, type ActiveSetup } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
 
 const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
@@ -45,6 +45,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const { data, isLoading, error, refetch, isRefetching } = useTradingAnalysis(symbol, timeframe, 500);
   const { data: srData }       = useSRLevels(symbol);
   const { data: biasData }     = useMTFBias(symbol);
+  const { data: patternData }  = usePatternSummary(symbol);
   const { data: sessionsData } = useSessions(symbol, timeframe === "d1" ? "5m" : timeframe);
   
 
@@ -281,6 +282,10 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
         bias1h={biasData?.bias_1h?.trend}
         bias4h={biasData?.bias_4h?.trend}
         biasd1={biasData?.bias_d1?.trend}
+        pattern15m={patternData?.pattern_15m}
+        pattern1h={patternData?.pattern_1h}
+        pattern4h={patternData?.pattern_4h}
+        patternd1={patternData?.pattern_d1}
         activeSetups={activeSetups}
       />
 

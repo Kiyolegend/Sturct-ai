@@ -11,39 +11,22 @@ import { LoginGate } from "@/components/LoginGate";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface Condition { label: string; met: boolean }
-interface TradeReadiness {
-  ready: boolean;
+interface TradingStyle {
+  style: string;
   direction: "long" | "short" | null;
-  summary: string;
-  action: string;
-  conditions: Condition[];
-  met: number;
-  total: number;
-}
-interface KeyLevel {
-  price: number;
-  label?: string;
-  timeframe?: string;
-  pips_away: number;
-  source: string;
-  range?: [number, number];
+  reason: string;
 }
 interface Narrative {
-  symbol: string;
-  price: number;
-  condition: string;
-  condition_detail: string;
+  symbol:    string;
+  price:     number;
+  bias:      { d1: string; h4: string; h1: string; m15: string };
   structure: string[];
-  key_levels: { resistance: KeyLevel[]; support: KeyLevel[] };
-  session: string[];
-  trade_readiness: TradeReadiness;
-  confidence: {
-    market_clarity: "High" | "Medium" | "Low";
-    structure_quality: "High" | "Medium" | "Low";
-    signal_confidence: number;
-  };
-  news: { blocked: boolean; reason: string };
+  session:   string[];
+  swing_context:    { leg_pips?: number; retrace_pct?: number; in_window?: boolean; description?: string };
+  trading_styles:   { best: TradingStyle[]; multiple_confirmed: boolean; summary: string };
+  trend_exhaustion: { active: boolean; notes: string[] };
+  confidence: { market_clarity: "High"|"Medium"|"Low"; structure_quality: "High"|"Medium"|"Low"; signal_confidence: number };
+  news:        { blocked: boolean; reason: string };
   generated_at: number;
   broker_time?: number;
 }
@@ -52,25 +35,12 @@ interface Narrative {
 
 const PAIRS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"];
 
-const CONDITION_COLORS: Record<string, string> = {
-  "Bullish Trend":    "#26a69a",
-  "Bullish Pullback": "#4ade80",
-  "Bullish Bias":     "#4ade80",
-  "Bearish Trend":    "#ef5350",
-  "Bearish Pullback": "#f87171",
-  "Bearish Bias":     "#f87171",
-  "Expansion":        "#f59e0b",
-  "Distribution":     "#fb923c",
-  "Accumulation":     "#a78bfa",
-  "Range":            "#94a3b8",
-  "Consolidation":    "#475569",
-};
 
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function cc(label: string) { return CONDITION_COLORS[label] ?? "#64748b"; }
+
 function qc(q: "High" | "Medium" | "Low") {
   return q === "High" ? "#4ade80" : q === "Medium" ? "#fbbf24" : "#475569";
 }
@@ -132,9 +102,8 @@ function NarrativePanel({ symbol }: { symbol: string }) {
   useEffect(() => { const id = setInterval(() => fetch_(symbol), 30_000); return () => clearInterval(id); }, [symbol, fetch_]);
 
   const n = narrative;
-  const condColor = n ? cc(n.condition) : "#64748b";
-  const pct = n?.trade_readiness ? (n.trade_readiness.met / n.trade_readiness.total) * 100: 0;
-  const barColor = pct >= 100 ? "#4ade80" : pct >= 60 ? "#fbbf24" : "#ef5350";
+  const primaryStyle = n?.trading_styles?.best?.[0] ?? null;
+  const psColor = primaryStyle?.direction === "long" ? "#26a69a" : primaryStyle?.direction === "short" ? "#ef5350" : "#94a3b8";
   const sessionLine = n ? sessionStatus(n.broker_time) : "";
 
   return (
@@ -153,14 +122,15 @@ function NarrativePanel({ symbol }: { symbol: string }) {
           <span style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0", fontFamily: "monospace" }}>
             {symbol.replace("/", "")}
           </span>
-          {n && (
+           {primaryStyle && (
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 6,
-              background: `${condColor}18`, border: `1px solid ${condColor}55`,
+              background: `${psColor}18`, border: `1px solid ${psColor}55`,
               borderRadius: 5, padding: "3px 10px",
             }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: condColor, boxShadow: `0 0 7px 2px ${condColor}88`, flexShrink: 0 }} />
-              <span style={{ fontSize: 12, fontWeight: 700, color: condColor, letterSpacing: "0.05em" }}>{n.condition}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: psColor, letterSpacing: "0.05em" }}>
+                {primaryStyle.direction === "long" ? "▲ " : primaryStyle.direction === "short" ? "▼ " : ""}{primaryStyle.style}
+              </span>
             </div>
           )}
         </div>
@@ -208,15 +178,24 @@ function NarrativePanel({ symbol }: { symbol: string }) {
             </div>
           )}
 
-          {/* Condition sentence */}
-          <div style={{
-            fontSize: 13, color: "#64748b", lineHeight: 1.75,
-            borderBottom: "1px solid rgba(255,255,255,0.05)",
-            paddingBottom: 12, marginBottom: 14,
-          }}>
-            {n.condition_detail}
-          </div>
-
+          {/* Bias row */}
+          {n.bias && (
+            <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+              {(["d1","h4","h1","m15"] as const).map(tf => {
+                const val = (n.bias as any)[tf] as string;
+                const color = val === "bullish" ? "#26a69a" : val === "bearish" ? "#ef5350" : "#374151";
+                return (
+                  <div key={tf} style={{
+                    flex: 1, textAlign: "center", padding: "6px 0",
+                    background: `${color}12`, border: `1px solid ${color}40`, borderRadius: 5,
+                  }}>
+                    <div style={{ fontSize: 8, color: "#374151", letterSpacing: "0.1em", marginBottom: 2 }}>{tf.toUpperCase()}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color }}>{val.toUpperCase()}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {/* Structure */}
           <Section label="Structure Summary">
             {(n.structure ?? []).map((line, i) => (
@@ -224,22 +203,7 @@ function NarrativePanel({ symbol }: { symbol: string }) {
             ))}
           </Section>
 
-          {/* Key levels */}
-          {n.key_levels && (n.key_levels.resistance.length > 0 || n.key_levels.support.length > 0) && (
-            <Section label="Key Levels">
-              {n.key_levels.resistance.map((lvl, i) => <LevelRow key={`r${i}`} level={lvl} kind="res" ref_={n.price} />)}
-              <div style={{
-                display: "flex", alignItems: "center", gap: 10,
-                margin: "6px 0", padding: "4px 0",
-                borderTop: "1px dashed rgba(255,255,255,0.07)",
-                borderBottom: "1px dashed rgba(255,255,255,0.07)",
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#475569" }}>{fmt(n.price, n.price)}</span>
-                <span style={{ fontSize: 11, color: "#374151" }}>current price</span>
-              </div>
-              {n.key_levels.support.map((lvl, i) => <LevelRow key={`s${i}`} level={lvl} kind="sup" ref_={n.price} />)}
-            </Section>
-          )}
+          
 
           {/* Session */}
           <Section label="Session Context">
@@ -249,61 +213,58 @@ function NarrativePanel({ symbol }: { symbol: string }) {
             ))}
           </Section>
 
-          {/* Trade readiness */}
-          {n.trade_readiness && <Section label="Trade Readiness">
-            {n.trade_readiness.direction && (
-              <div style={{
-                fontSize: 14, fontWeight: 700, letterSpacing: "0.05em",
-                color: n.trade_readiness.direction === "long" ? "#26a69a" : "#ef5350",
-                marginBottom: 8,
-              }}>
-                {n.trade_readiness.direction === "long" ? "▲ LONG BIAS" : "▼ SHORT BIAS"}
+          {/* Swing Context */}
+          {n.swing_context?.description && (
+            <Section label="Swing Context">
+              <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.7, marginBottom: 8 }}>
+                {n.swing_context.description}
               </div>
-            )}
-            <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.7, marginBottom: 10 }}>
-              {n.trade_readiness.summary}
-            </div>
-            <div style={{
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid rgba(255,255,255,0.05)",
-              borderRadius: 6, padding: "10px 14px", marginBottom: 10,
-            }}>
-              {n.trade_readiness.conditions.map((c, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
-                  <span style={{ fontSize: 14, color: c.met ? "#4ade80" : "#374151", flexShrink: 0, lineHeight: 1 }}>
-                    {c.met ? "✓" : "○"}
-                  </span>
-                  <span style={{ fontSize: 13, color: c.met ? "#94a3b8" : "#374151", lineHeight: 1.6 }}>
-                    {c.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {/* Progress bar */}
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                <span style={{ fontSize: 11, color: "#374151" }}>{n.trade_readiness.met} of {n.trade_readiness.total} conditions</span>
-                <span style={{ fontSize: 11, color: barColor }}>
-                  {pct >= 100 ? "Ready" : pct >= 60 ? "Developing" : "Waiting"}
-                </span>
-              </div>
-              <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2 }}>
-                <div style={{
-                  height: "100%", width: `${pct}%`, background: barColor,
-                  borderRadius: 2, transition: "width 0.7s ease",
-                  boxShadow: `0 0 8px ${barColor}88`,
-                }} />
-              </div>
-            </div>
-            <div style={{
-              fontSize: 13, lineHeight: 1.7,
-              color: n.trade_readiness.ready ? "#4ade80" : "#374151",
-              borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8,
-            }}>
-              {n.trade_readiness.action}
-            </div>
-          </Section>
+              {n.swing_context.retrace_pct !== undefined && (
+                <>
+                  <div style={{ fontSize: 11, color: "#374151", marginBottom: 4 }}>
+                    {n.swing_context.retrace_pct}% retrace{n.swing_context.in_window ? " — in structural pullback zone ✓" : ""}
+                  </div>
+                  <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2 }}>
+                    <div style={{
+                      height: "100%",
+                      width: `${Math.min(100, n.swing_context.retrace_pct)}%`,
+                      background: n.swing_context.in_window ? "#26a69a" : "#f59e0b",
+                      borderRadius: 2, transition: "width 0.7s ease",
+                    }} />
+                  </div>
+                </>
+              )}
+            </Section>
           )}
+
+          {/* Trading Styles */}
+          <Section label="Trading Style">
+            {(!n.trading_styles?.best || n.trading_styles.best.length === 0) ? (
+              <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.7 }}>
+                No style confirmed — structure unclear or conditions quiet. Stand aside.
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, color: "#475569", marginBottom: 10 }}>{n.trading_styles.summary}</div>
+                {n.trading_styles.best.map((s, i) => {
+                  const isEx = s.style === "Trend Exhaustion";
+                  const dc = s.direction === "long" ? "#26a69a" : s.direction === "short" ? "#ef5350" : "#94a3b8";
+                  return (
+                    <div key={i} style={{
+                      background: isEx ? "rgba(239,83,80,0.07)" : "rgba(255,255,255,0.02)",
+                      border: isEx ? "1px solid rgba(239,83,80,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: 6, padding: "10px 12px", marginBottom: 8,
+                    }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: isEx ? "#ef5350" : dc, marginBottom: 5 }}>
+                        {isEx ? "⚠ TREND EXHAUSTION" : `${s.direction === "long" ? "▲" : s.direction === "short" ? "▼" : "◆"} ${s.style.toUpperCase()}`}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.6 }}>{s.reason}</div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </Section>
 
           {/* Confidence tiles */}
           <div style={{ display: "flex", gap: 8, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 14 }}>
@@ -352,30 +313,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function LevelRow({ level, kind, ref_ }: { level: KeyLevel; kind: "res" | "sup"; ref_: number }) {
-  const color = kind === "res" ? "#fbbf24" : "#a78bfa";
-  const isMajor = level.label === "Major";
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ width: 3, height: 16, background: color, borderRadius: 1, opacity: isMajor ? 1 : 0.45 }} />
-        <span style={{ fontSize: 14, fontWeight: 700, color, letterSpacing: "0.04em" }}>
-          {fmt(level.price, ref_)}
-        </span>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {isMajor && (
-          <span style={{
-            fontSize: 9, fontWeight: 700, color,
-            background: `${color}22`, borderRadius: 3, padding: "2px 5px", letterSpacing: "0.1em",
-          }}>MAJOR</span>
-        )}
-        {level.timeframe && <span style={{ fontSize: 10, color: "#374151" }}>{level.timeframe}</span>}
-        <span style={{ fontSize: 11, color: "#374151" }}>{level.pips_away}p</span>
-      </div>
-    </div>
-  );
-}
+
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 

@@ -172,6 +172,40 @@ export function useMTFBias(symbol: string = "USD/JPY") {
   });
 }
 
+
+export interface CandlePattern {
+  time: number;
+  index: number;
+  pattern: "pin_bar_rejection" | "engulfing" | "liquidity_sweep" | "displacement" | "inside_bar";
+  direction: "bullish" | "bearish" | "neutral";
+  price: number;
+  context: string;
+}
+
+export interface PatternSummaryResponse {
+  symbol: string;
+  pattern_15m: CandlePattern | null;
+  pattern_1h: CandlePattern | null;
+  pattern_4h: CandlePattern | null;
+  pattern_d1: CandlePattern | null;
+}
+
+export function usePatternSummary(symbol: string = "USD/JPY") {
+  return useQuery<PatternSummaryResponse, Error>({
+    queryKey: ["pattern-summary", symbol],
+    queryFn: async () => {
+      const params = new URLSearchParams({ symbol });
+      const res = await fetch(`/trading-api/pattern-summary?${params.toString()}`);
+      if (!res.ok) throw new Error(`Pattern summary API error: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: 60 * 1000,
+    retry: PATIENT_RETRY,
+    retryDelay: patientRetryDelay,
+    staleTime: 4 * 60 * 1000,
+  });
+}
+
 export function useBosChoch(symbol: string = "USD/JPY") {
   return useQuery<BosChochResponse, Error>({
     queryKey: ["bos-choch", symbol],

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Activity, BarChart2, ChevronDown, Bell, Volume2, VolumeX } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useMT5Status, useBrokerTime, type ActiveSetup } from "../hooks/use-trading-api";
+import { useMT5Status, useBrokerTime, type ActiveSetup, type CandlePattern } from "../hooks/use-trading-api";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -39,6 +39,10 @@ interface TopBarProps {
   bias1h?: TrendDir;
   bias4h?: TrendDir;
   biasd1?: TrendDir;
+  pattern15m?: CandlePattern | null;
+  pattern1h?:  CandlePattern | null;
+  pattern4h?:  CandlePattern | null;
+  patternd1?:  CandlePattern | null;
   activeSetups?: ActiveSetup[];
 }
 
@@ -71,6 +75,40 @@ function BiasBadge({ label, trend }: { label: string; trend?: TrendDir }) {
         neutral ? "text-orange-400" : bull ? "text-teal-400" : "text-red-400"
       )}>
         {neutral ? "CONS" : bull ? "BULL" : "BEAR"}
+      </span>
+    </div>
+  );
+}
+
+
+const PATTERN_LABELS: Record<CandlePattern["pattern"], string> = {
+  pin_bar_rejection: "Rejection",
+  engulfing: "Engulfing",
+  liquidity_sweep: "Sweep",
+  displacement: "Displacement",
+  inside_bar: "Inside Bar",
+};
+
+function PatternBadge({ label, pattern }: { label: string; pattern?: CandlePattern | null }) {
+  if (!pattern) return null;
+  const bull = pattern.direction === "bullish";
+  const neutral = pattern.direction === "neutral";
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center px-2 py-1 rounded border text-center",
+        neutral ? "bg-sky-500/10 border-sky-500/30"
+          : bull ? "bg-teal-500/10 border-teal-500/30"
+          : "bg-red-500/10 border-red-500/30"
+      )}
+      title={pattern.context}
+    >
+      <span className="text-[8px] font-semibold tracking-widest uppercase text-white/40">{label}</span>
+      <span className={cn(
+        "text-[10px] font-bold uppercase leading-none mt-0.5",
+        neutral ? "text-sky-400" : bull ? "text-teal-400" : "text-red-400"
+      )}>
+        {neutral ? "" : bull ? "Bull " : "Bear "}{PATTERN_LABELS[pattern.pattern]}
       </span>
     </div>
   );
@@ -213,7 +251,7 @@ function SymbolSelector({ symbol, setSymbol }: { symbol: string; setSymbol: (s: 
   );
 }
 
-export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, biasd1, activeSetups = [] }: TopBarProps) {
+export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, biasd1, pattern15m, pattern1h, pattern4h, patternd1, activeSetups = [] }: TopBarProps) {
   const [soundMuted, setSoundMuted] = useState(() => localStorage.getItem("struct_sound_muted") === "true");
   const { data: brokerTimeData } = useBrokerTime();
   const timeframes = ["5M", "15M", "1H", "4H","D1"];
@@ -426,6 +464,12 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
           <BiasBadge label="1H"  trend={bias1h}  />
           <BiasBadge label="4H"  trend={bias4h}  />
           <BiasBadge label="D1"  trend={biasd1}  />
+        </div>
+          <div className="hidden lg:flex items-center gap-1">
+          <PatternBadge label="15M" pattern={pattern15m} />
+          <PatternBadge label="1H"  pattern={pattern1h}  />
+          <PatternBadge label="4H"  pattern={pattern4h}  />
+          <PatternBadge label="D1"  pattern={patternd1}  />
         </div>
         <ApiBadge />
         <BridgeBadge />
