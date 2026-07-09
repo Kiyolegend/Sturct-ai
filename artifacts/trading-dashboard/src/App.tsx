@@ -1,13 +1,12 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Dashboard } from "@/pages/Dashboard";
 import { MobileDashboard } from "@/pages/MobileDashboard";
 import { AnalysisPage } from "@/pages/AnalysisPage";
-import { FrameworkMonitor } from "@/components/FrameworkMonitor";
-import { type ActiveSetup } from "@/hooks/use-trading-api";
+import { ChochMonitor } from "@/components/ChochMonitor";
 import NotFound from "@/pages/not-found";
 
 function useIsMobile() {
@@ -31,8 +30,7 @@ const queryClient = new QueryClient({
   },
 });
 
-function Router({ activeSetups, symbol, setSymbol }: {
-  activeSetups: ActiveSetup[];
+function Router({ symbol, setSymbol }: {
   symbol: string;
   setSymbol: (s: string) => void;
 }) {
@@ -42,8 +40,8 @@ function Router({ activeSetups, symbol, setSymbol }: {
       <Route path="/">
         {() =>
           isMobile
-            ? <MobileDashboard activeSetups={activeSetups} symbol={symbol} setSymbol={setSymbol} />
-            : <Dashboard activeSetups={activeSetups} symbol={symbol} setSymbol={setSymbol} />
+            ? <MobileDashboard symbol={symbol} setSymbol={setSymbol} />
+            : <Dashboard symbol={symbol} setSymbol={setSymbol} />
         }
       </Route>
       <Route path="/analysis" component={AnalysisPage} />
@@ -53,18 +51,14 @@ function Router({ activeSetups, symbol, setSymbol }: {
 }
 
 function App() {
-  const [activeSetups, setActiveSetups] = useState<ActiveSetup[]>([]);
   const [symbol, setSymbol] = useState("USD/JPY");
-
-  const handleActiveSetups = useCallback((s: ActiveSetup[]) => setActiveSetups(s), []);
-  const handleSwitchSymbol = useCallback((pair: string) => setSymbol(pair), []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <FrameworkMonitor onActiveSetups={handleActiveSetups} onSwitchSymbol={handleSwitchSymbol} />
-          <Router activeSetups={activeSetups} symbol={symbol} setSymbol={setSymbol} />
+          <ChochMonitor />
+          <Router symbol={symbol} setSymbol={setSymbol} />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

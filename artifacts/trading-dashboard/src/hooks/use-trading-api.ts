@@ -222,6 +222,28 @@ export function useBosChoch(symbol: string = "USD/JPY") {
   });
 }
 
+export interface ChochResponse {
+  symbol: string;
+  interval: string;
+  choch: ChochEvent[];
+}
+
+export function useChoch(symbol: string, interval: "1h" | "4h") {
+  return useQuery<ChochResponse, Error>({
+    queryKey: ["choch", symbol, interval],
+    queryFn: async () => {
+      const params = new URLSearchParams({ symbol, interval, outputsize: "300" });
+      const res = await fetch(`/trading-api/choch?${params.toString()}`);
+      if (!res.ok) throw new Error(`CHoCH API error: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: 60 * 1000,
+    retry: PATIENT_RETRY,
+    retryDelay: patientRetryDelay,
+    staleTime: 55 * 1000,
+  });
+}
+
 export interface SessionBox {
   session: "asian" | "london" | "ny";
   start_time: number;

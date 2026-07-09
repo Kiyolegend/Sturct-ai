@@ -33,8 +33,10 @@ _order_event = asyncio.Event()
 
 # FIX 3 — valid symbols (must match what the MT5 bridge knows how to map)
 _VALID_SYMBOLS = {
-    "USD/JPY", "EUR/USD", "GBP/USD", 
-    "AUD/USD", "USD/CHF",
+    "USD/JPY", "EUR/USD", "GBP/USD",
+    "AUD/USD", "USD/CHF", "EUR/JPY",
+    "GBP/JPY", "USD/CAD", "NZD/USD",
+    "AUD/JPY", "CAD/JPY",
 }
 
 
