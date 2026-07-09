@@ -412,7 +412,7 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
         <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
           {fetchedAt > 0 && !loading && (
             <span style={{ fontSize: 6, color: "#1f2937" }}>
-              {secAgo(Math.floor(fetchedAt / 1000))}
+              {secAgo(Math.floor(fetchedAt / 1000), Math.floor(Date.now() / 1000))}
             </span>
           )}
           {loading && (
@@ -712,7 +712,7 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
               <div style={{ marginTop: 4, textAlign: "right" }}>
                 {fetchedAt > 0 && (
                   <span style={{ fontSize: 5.5, color: "#1e293b" }}>
-                    updated {secAgo(Math.floor(fetchedAt / 1000))}
+                    {secAgo(Math.floor(fetchedAt / 1000), Math.floor(Date.now() / 1000))}
                   </span>
                 )}
               </div>
