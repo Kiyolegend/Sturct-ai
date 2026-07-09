@@ -6,7 +6,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { RefreshCw, AlertTriangle } from "lucide-react";
-import { FrameworkPanel } from "@/components/FrameworkPanel";
 import { LoginGate } from "@/components/LoginGate";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -371,14 +370,11 @@ export function AnalysisPage() {
 
       {/* Body — 2 columns */}
       <div style={{
-        display: "grid", gridTemplateColumns: "1fr 420px", gap: 16,
+        display: "grid", gridTemplateColumns: "1fr", gap: 16,
         padding: 20, maxWidth: 1400, margin: "0 auto",
       }}>
         {/* Left: Narrative */}
         <NarrativePanel symbol={symbol} />
-
-        {/* Right: Environment */}
-        <FrameworkPanel symbol={symbol} />
       </div>
     </div>
     </LoginGate>

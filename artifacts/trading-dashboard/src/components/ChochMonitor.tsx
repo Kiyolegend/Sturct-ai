@@ -119,11 +119,21 @@ export function ChochMonitor() {
         seenRef.current[key] = latestTime;
 
         const [symbol, tf] = key.split("_");
-        const isBull       = latest.direction === "bullish";
-        const emoji        = isBull ? "🟢" : "🔴";
-        const dirLabel     = isBull ? "BULLISH" : "BEARISH";
-        const title        = `${emoji} CHoCH — ${symbol} ${tf.toUpperCase()}`;
-        const body         = `${dirLabel} shift at ${fmt(latest.price)} — ${latest.broken_label} broken`;
+        const isBull         = latest.direction === "bullish";
+        const emoji          = isBull ? "🟢" : "🔴";
+        const dirLabel       = isBull ? "BULLISH" : "BEARISH";
+        const nowSec         = Math.floor(Date.now() / 1000);
+        const ageSec         = nowSec - latestTime;
+        const validitySec    = tf === "1h" ? 8 * 3600 : 48 * 3600;
+        const remainingSec   = validitySec - ageSec;
+        const ageStr         = ageSec < 3600
+          ? `${Math.floor(ageSec / 60)}m ago`
+          : `${(ageSec / 3600).toFixed(1)}h ago`;
+        const validStr       = remainingSec > 0
+          ? `${Math.floor(remainingSec / 3600)}h ${Math.floor((remainingSec % 3600) / 60)}m left`
+          : "⚠ EXPIRED";
+        const title          = `${emoji} CHoCH — ${symbol} ${tf.toUpperCase()} · ${ageStr}`;
+        const body           = `${dirLabel} shift at ${fmt(latest.price)} — ${latest.broken_label} broken · ${validStr}`;
 
         playAlert();
         fireSystemNotification(title, body);
