@@ -33,8 +33,10 @@ interface Narrative {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PAIRS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"];
-
+const PAIRS = [
+  "USD/JPY", "EUR/USD", "GBP/USD", "EUR/JPY", "GBP/JPY",
+  "AUD/USD", "USD/CAD", "USD/CHF", "NZD/USD", "AUD/JPY", "CAD/JPY"
+];
 
 
 
@@ -49,7 +51,8 @@ function fmt(p: number, ref: number) { return p.toFixed(ref > 50 ? 3 : 5); }
 // ── Session countdown (same DST logic as MarketNarrative) ─────────────────────
 
 function sessionStatus(brokerTime?: number) {
-  const now  = brokerTime ? new Date(brokerTime * 1000) : new Date();
+  if (!brokerTime) return "Session info unavailable — bridge offline";
+  const now = new Date(brokerTime * 1000);
   const mid  = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15));
   const lonOff = (() => { try { const m = mid.toLocaleString("en", { timeZone: "Europe/London",    timeZoneName: "shortOffset" }).match(/([+-])(\d+)/); return m ? (m[1] === "+" ? 1 : -1) * parseInt(m[2]) : 0;  } catch { return 0;  } })();
   const nyOff  = (() => { try { const m = mid.toLocaleString("en", { timeZone: "America/New_York", timeZoneName: "shortOffset" }).match(/([+-])(\d+)/); return m ? (m[1] === "+" ? 1 : -1) * parseInt(m[2]) : -5; } catch { return -5; } })();

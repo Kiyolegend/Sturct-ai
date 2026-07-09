@@ -121,7 +121,8 @@ function fmtPrice(p: number, ref: number) {
   return p.toFixed(ref > 50 ? 3 : 5);
 }
 function secAgo(ts: number, brokerNowSecs?: number) {
-  const s = (brokerNowSecs ?? Math.floor(Date.now() / 1000)) - ts;
+  if (!brokerNowSecs) return "—";
+  const s = brokerNowSecs - ts;
   if (s < 0) return "just now";
   if (s < 60)   return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
@@ -730,10 +731,10 @@ export function MarketNarrative({ symbol, refreshTrigger }: MarketNarrativeProps
 
 
 function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
-  const [now, setNow] = React.useState(() => brokerTime ? new Date(brokerTime * 1000) : new Date());
+  const [now, setNow] = React.useState<Date | null>(() => brokerTime ? new Date(brokerTime * 1000) : null);
   React.useEffect(() => {
     const t = setInterval(() => setNow(prev => {
-      if (!brokerTime) return new Date();
+      if (!brokerTime) return prev;
       return new Date(prev.getTime() + 30_000);
     }), 30_000);
     return () => clearInterval(t);
@@ -742,6 +743,7 @@ function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
   React.useEffect(() => {
     if (brokerTime) setNow(new Date(brokerTime * 1000));
   }, [brokerTime]);
+  if (!now) return null;
 
   const midMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15));
   const lonOff = (() => { try { const m = midMonth.toLocaleString("en", { timeZone: "Europe/London",    timeZoneName: "shortOffset" }).match(/([+-])(\d+)/); return m ? (m[1] === "+" ? 1 : -1) * parseInt(m[2]) : 0;  } catch { return 0;  } })();

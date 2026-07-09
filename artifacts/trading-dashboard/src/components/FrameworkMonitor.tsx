@@ -20,12 +20,12 @@
  */
 
 import { useEffect, useMemo, useRef } from "react";
-import { type ActiveSetup } from "@/hooks/use-trading-api";
+import { useBrokerTime, type ActiveSetup } from "@/hooks/use-trading-api";
 import { useFrameworkCheck } from "@/hooks/use-framework-check";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 
-const PAIRS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"] as const;
+const PAIRS = ["USD/JPY", "EUR/USD", "GBP/USD", "EUR/JPY", "GBP/JPY", "AUD/USD", "USD/CAD", "USD/CHF", "NZD/USD", "AUD/JPY", "CAD/JPY"] as const;
 const LIMIT_REFIRE_COOLDOWN_SECS = 60 * 60; // 60 min — prevents R/R oscillation re-spam
 
 function fmt(p: number): string {
@@ -78,6 +78,8 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
   const r4 = useFrameworkCheck("AUD/USD");
   const r5 = useFrameworkCheck("USD/CHF");
 
+  const { data: btData } = useBrokerTime();
+
   const data = useMemo(() => ({
     pairs: {
       "USD/JPY": r1,
@@ -86,8 +88,8 @@ export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
       "AUD/USD": r4,
       "USD/CHF": r5,
     },
-    broker_time: Math.floor(Date.now() / 1000),
-  }), [r1, r2, r3, r4, r5]);
+    broker_time: btData?.broker_time ?? 0,
+  }), [r1, r2, r3, r4, r5, btData]);
 
   const { toast } = useToast();
 

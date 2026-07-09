@@ -40,7 +40,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   
 
   const { data: brokerTimeData } = useBrokerTime();
-  const brokerNow = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
+  const brokerNow = brokerTimeData?.broker_time ?? 0;
 
   const { data, isLoading, error, refetch, isRefetching } = useTradingAnalysis(symbol, timeframe, 500);
   const { data: srData }       = useSRLevels(symbol);
