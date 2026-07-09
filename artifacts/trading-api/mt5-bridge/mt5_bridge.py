@@ -39,6 +39,12 @@ SYMBOLS = [
     {"mt5_name": "GBPUSDm", "api_symbol": "GBP/USD"},
     {"mt5_name": "AUDUSDm", "api_symbol": "AUD/USD"},
     {"mt5_name": "USDCHFm", "api_symbol": "USD/CHF"},
+    {"mt5_name": "EURJPYm", "api_symbol": "EUR/JPY"},
+    {"mt5_name": "GBPJPYm", "api_symbol": "GBP/JPY"},
+    {"mt5_name": "USDCADm", "api_symbol": "USD/CAD"},
+    {"mt5_name": "NZDUSDm", "api_symbol": "NZD/USD"},
+    {"mt5_name": "AUDJPYm", "api_symbol": "AUD/JPY"},
+    {"mt5_name": "CADJPYm", "api_symbol": "CAD/JPY"},
 ]
 
 # Settings
