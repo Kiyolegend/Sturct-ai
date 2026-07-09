@@ -735,7 +735,7 @@ function SessionCountdown({ brokerTime }: { brokerTime?: number }) {
   React.useEffect(() => {
     const t = setInterval(() => setNow(prev => {
       if (!brokerTime) return prev;
-      return new Date(prev.getTime() + 30_000);
+      return prev ? new Date(prev.getTime() + 30_000) : prev;
     }), 30_000);
     return () => clearInterval(t);
   }, [brokerTime]);

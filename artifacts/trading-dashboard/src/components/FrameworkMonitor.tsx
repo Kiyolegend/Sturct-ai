@@ -72,24 +72,36 @@ interface Props {
 }
 
 export function FrameworkMonitor({ onActiveSetups, onSwitchSymbol }: Props) {
-  const r1 = useFrameworkCheck("USD/JPY");
-  const r2 = useFrameworkCheck("EUR/USD");
-  const r3 = useFrameworkCheck("GBP/USD");
-  const r4 = useFrameworkCheck("AUD/USD");
-  const r5 = useFrameworkCheck("USD/CHF");
+const r1  = useFrameworkCheck("USD/JPY");
+const r2  = useFrameworkCheck("EUR/USD");
+const r3  = useFrameworkCheck("GBP/USD");
+const r4  = useFrameworkCheck("AUD/USD");
+const r5  = useFrameworkCheck("USD/CHF");
+const r6  = useFrameworkCheck("EUR/JPY");
+const r7  = useFrameworkCheck("GBP/JPY");
+const r8  = useFrameworkCheck("USD/CAD");
+const r9  = useFrameworkCheck("NZD/USD");
+const r10 = useFrameworkCheck("AUD/JPY");
+const r11 = useFrameworkCheck("CAD/JPY");
 
-  const { data: btData } = useBrokerTime();
+const { data: btData } = useBrokerTime();
 
-  const data = useMemo(() => ({
-    pairs: {
-      "USD/JPY": r1,
-      "EUR/USD": r2,
-      "GBP/USD": r3,
-      "AUD/USD": r4,
-      "USD/CHF": r5,
-    },
-    broker_time: btData?.broker_time ?? 0,
-  }), [r1, r2, r3, r4, r5, btData]);
+const data = useMemo(() => ({
+  pairs: {
+    "USD/JPY": r1,
+    "EUR/USD": r2,
+    "GBP/USD": r3,
+    "AUD/USD": r4,
+    "USD/CHF": r5,
+    "EUR/JPY": r6,
+    "GBP/JPY": r7,
+    "USD/CAD": r8,
+    "NZD/USD": r9,
+    "AUD/JPY": r10,
+    "CAD/JPY": r11,
+  },
+  broker_time: btData?.broker_time ?? 0,
+}), [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, btData]);
 
   const { toast } = useToast();
 
