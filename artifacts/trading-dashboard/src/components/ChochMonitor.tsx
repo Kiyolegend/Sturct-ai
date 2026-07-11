@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useChoch, type ChochEvent } from "@/hooks/use-trading-api";
 import { useToast } from "@/hooks/use-toast";
+import { addChochAlert } from "@/hooks/use-choch-alerts";
 
 function fmt(p: number): string {
   return p > 50 ? p.toFixed(3) : p.toFixed(5);
@@ -137,7 +138,15 @@ export function ChochMonitor() {
 
         playAlert();
         fireSystemNotification(title, body);
-        toast({ title, description: body, duration: 60_000 });
+        addChochAlert({
+          id: `${symbol}_${tf}_${latestTime}`,
+          symbol, tf: tf as "1h" | "4h",
+          direction: latest.direction,
+          price: latest.price,
+          brokenLabel: latest.broken_label,
+          firedAt: latestTime,
+          expiresAt: latestTime + validitySec,
+        });
       }
     }
   }, [allData, toast]);

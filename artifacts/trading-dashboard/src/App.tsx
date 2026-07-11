@@ -8,6 +8,10 @@ import { MobileDashboard } from "@/pages/MobileDashboard";
 import { AnalysisPage } from "@/pages/AnalysisPage";
 import { ChochMonitor } from "@/components/ChochMonitor";
 import NotFound from "@/pages/not-found";
+import { ChochAlertPanel } from "@/components/ChochAlertPanel";
+
+<ChochMonitor />
+<ChochAlertPanel />
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() =>
