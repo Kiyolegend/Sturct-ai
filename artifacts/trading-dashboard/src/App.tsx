@@ -10,8 +10,7 @@ import { ChochMonitor } from "@/components/ChochMonitor";
 import NotFound from "@/pages/not-found";
 import { ChochAlertPanel } from "@/components/ChochAlertPanel";
 
-<ChochMonitor />
-<ChochAlertPanel />
+
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() =>
@@ -62,6 +61,7 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <ChochMonitor />
+          <ChochAlertPanel />
           <Router symbol={symbol} setSymbol={setSymbol} />
         </WouterRouter>
         <Toaster />
