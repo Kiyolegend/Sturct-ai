@@ -461,7 +461,14 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
         >
           ⊞ Analysis
         </a>
-        
+        <a
+          href="/choch"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 transition-colors"
+        >
+          ⊞ CHoCH
+        </a>
         <div className="hidden lg:flex items-center gap-1">
           <BiasBadge label="15M" trend={bias15m} />
           <BiasBadge label="1H"  trend={bias1h}  />

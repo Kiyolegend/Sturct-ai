@@ -8,7 +8,7 @@ import { MobileDashboard } from "@/pages/MobileDashboard";
 import { AnalysisPage } from "@/pages/AnalysisPage";
 import { ChochMonitor } from "@/components/ChochMonitor";
 import NotFound from "@/pages/not-found";
-import { ChochAlertPanel } from "@/components/ChochAlertPanel";
+import { ChochMonitorPage } from "@/pages/ChochMonitorPage";
 
 
 
@@ -48,6 +48,7 @@ function Router({ symbol, setSymbol }: {
         }
       </Route>
       <Route path="/analysis" component={AnalysisPage} />
+      <Route path="/choch" component={ChochMonitorPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -61,7 +62,6 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <ChochMonitor />
-          <ChochAlertPanel />
           <Router symbol={symbol} setSymbol={setSymbol} />
         </WouterRouter>
         <Toaster />
