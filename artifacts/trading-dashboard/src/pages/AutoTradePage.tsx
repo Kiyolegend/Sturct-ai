@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { useAutoTradeStatus, useAutoTradeLog } from "@/hooks/use-trading-api";
 import { LoginGate } from "@/components/LoginGate";
+import { useQueryClient } from "@tanstack/react-query";
 
 const PAIRS = [
   "USD/JPY", "EUR/USD", "GBP/USD", "EUR/JPY", "GBP/JPY",
@@ -38,6 +39,7 @@ export function AutoTradePage() {
   const { data: logData }          = useAutoTradeLog();
   const [busy, setBusy]            = useState(false);
   const [showLog, setShowLog]      = useState(true);
+  const queryClient                = useQueryClient();
 
   const enabled    = state?.enabled    ?? false;
   const paperMode  = state?.paper_mode ?? true;
@@ -52,6 +54,7 @@ export function AutoTradePage() {
     setBusy(true);
     try {
       await fetch(`/trading-api/auto-trade/${enabled ? "off" : "on"}`, { method: "POST" });
+      queryClient.invalidateQueries({ queryKey: ["/auto-trade/status"] });
     } finally { setBusy(false); }
   }
 
@@ -64,6 +67,7 @@ export function AutoTradePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paper }),
       });
+      queryClient.invalidateQueries({ queryKey: ["/auto-trade/status"] });
     } finally { setBusy(false); }
   }
 
