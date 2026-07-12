@@ -315,23 +315,49 @@ async def _evaluate_pair(symbol: str) -> dict:
             }
 
         # ── STEP 4: Structural SL ────────────────────────────────────────────
+        # Minimum SL distance — a D1-based trade needs room to breathe.
+        # Skip any structural swing that is too close to give a meaningful SL.
+        MIN_SL_PIPS = 15
         sl_p: Optional[float] = None
+
         if is_bull:
+            # Walk back through HLs — use the first one that gives >= MIN_SL_PIPS
             hl_cands = [l for l in labels_1h if l.get("label") in ("HL", "EQL")]
-            if hl_cands:
-                sl_p = round(float(hl_cands[-1]["price"]) - 3 * pip, 5)
+            for cand in reversed(hl_cands):
+                cand_sl = round(float(cand["price"]) - 3 * pip, 5)
+                if (entry_p - cand_sl) >= MIN_SL_PIPS * pip:
+                    sl_p = cand_sl
+                    break
         else:
+            # Walk back through LHs — use the first one that gives >= MIN_SL_PIPS
             lh_cands = [l for l in labels_1h if l.get("label") in ("LH", "EQH")]
-            if lh_cands:
-                sl_p = round(float(lh_cands[-1]["price"]) + 3 * pip, 5)
+            for cand in reversed(lh_cands):
+                cand_sl = round(float(cand["price"]) + 3 * pip, 5)
+                if (cand_sl - entry_p) >= MIN_SL_PIPS * pip:
+                    sl_p = cand_sl
+                    break
 
+        # Fallback 1 — OB boundary if no valid swing found
         if sl_p is None and ob_1h:
-            sl_p = round(ob_1h["bottom"] - 5 * pip if is_bull else ob_1h["top"] + 5 * pip, 5)
-        if sl_p is None:
-            sl_p = round(entry_p - 30 * pip if is_bull else entry_p + 30 * pip, 5)
+            sl_p = round(
+                ob_1h["bottom"] - MIN_SL_PIPS * pip if is_bull
+                else ob_1h["top"] + MIN_SL_PIPS * pip,
+                5,
+            )
 
-        if is_bull     and sl_p >= entry_p: sl_p = round(entry_p - 20 * pip, 5)
-        if not is_bull and sl_p <= entry_p: sl_p = round(entry_p + 20 * pip, 5)
+        # Fallback 2 — hard minimum distance
+        if sl_p is None:
+            sl_p = round(
+                entry_p - MIN_SL_PIPS * pip if is_bull
+                else entry_p + MIN_SL_PIPS * pip,
+                5,
+            )
+
+        # Final hard safety — can never be less than MIN_SL_PIPS no matter what
+        if is_bull and (entry_p - sl_p) < MIN_SL_PIPS * pip:
+            sl_p = round(entry_p - MIN_SL_PIPS * pip, 5)
+        if not is_bull and (sl_p - entry_p) < MIN_SL_PIPS * pip:
+            sl_p = round(entry_p + MIN_SL_PIPS * pip, 5)
 
         # ── STEP 5: TP from D1 swing origin ─────────────────────────────────
         tp_p: Optional[float] = None
