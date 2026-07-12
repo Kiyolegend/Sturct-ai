@@ -54,7 +54,7 @@ export function AutoTradePage() {
     setBusy(true);
     try {
       await fetch(`/trading-api/auto-trade/${enabled ? "off" : "on"}`, { method: "POST" });
-      queryClient.invalidateQueries({ queryKey: ["/auto-trade/status"] });
+      queryClient.invalidateQueries({ queryKey: ["auto-trade-status"] });
     } finally { setBusy(false); }
   }
 
@@ -67,7 +67,7 @@ export function AutoTradePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ paper }),
       });
-      queryClient.invalidateQueries({ queryKey: ["/auto-trade/status"] });
+      queryClient.invalidateQueries({ queryKey: ["auto-trade-status"] });
     } finally { setBusy(false); }
   }
 
