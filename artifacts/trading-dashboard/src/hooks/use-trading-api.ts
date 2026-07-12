@@ -479,3 +479,64 @@ export function useFrameworkStatus(intervalMs = 30_000) {
     staleTime: 25_000,
   });
 }
+// ── Auto Trade Engine ─────────────────────────────────────────────────────────
+
+export interface AutoTradePairStatus {
+  status:            "READY" | "WATCHING" | "WAITING" | "NEUTRAL" | "ERROR";
+  reason:            string;
+  symbol:            string;
+  d1?:               string;
+  direction?:        "BUY" | "SELL";
+  entry?:            number;
+  sl?:               number;
+  tp?:               number;
+  rr?:               number;
+  entry_source?:     string;
+  price?:            number;
+  evaluated_at?:     number;
+  fired_at?:         number;
+  paper_mode?:       boolean;
+  order_id?:         string;
+  exhaustion_score?:  number;
+  exhaustion_signal?: boolean;
+  exhaustion_detail?: string;
+}
+
+export interface AutoTradeStateResponse {
+  enabled:    boolean;
+  paper_mode: boolean;
+  pairs:      Record<string, AutoTradePairStatus>;
+  log_count:  number;
+}
+
+export interface AutoTradeLogResponse {
+  log: AutoTradePairStatus[];
+}
+
+export function useAutoTradeStatus() {
+  return useQuery<AutoTradeStateResponse, Error>({
+    queryKey: ["auto-trade-status"],
+    queryFn: async () => {
+      const res = await fetch("/trading-api/auto-trade/status");
+      if (!res.ok) throw new Error(`Auto trade status: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: 5_000,
+    retry: 1,
+    staleTime: 4_000,
+  });
+}
+
+export function useAutoTradeLog() {
+  return useQuery<AutoTradeLogResponse, Error>({
+    queryKey: ["auto-trade-log"],
+    queryFn: async () => {
+      const res = await fetch("/trading-api/auto-trade/log");
+      if (!res.ok) throw new Error(`Auto trade log: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: 10_000,
+    retry: 1,
+    staleTime: 9_000,
+  });
+}

@@ -4,8 +4,9 @@ import { TradingChart, type FibLevel } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
+import { AutoTradePanel } from "@/components/AutoTradePanel";
 
-import { useTradingAnalysis, useSRLevels, useMTFBias, usePatternSummary, useSessions, useBrokerTime, type ActiveSetup } from "@/hooks/use-trading-api";
+import { useTradingAnalysis, useSRLevels, useMTFBias, usePatternSummary, useSessions, useBrokerTime, type ActiveSetup, useAutoTradeStatus, useAutoTradeLog } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
 
 const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
@@ -47,6 +48,8 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const { data: biasData }     = useMTFBias(symbol);
   const { data: patternData }  = usePatternSummary(symbol);
   const { data: sessionsData } = useSessions(symbol, timeframe === "d1" ? "5m" : timeframe);
+  useAutoTradeStatus();
+  useAutoTradeLog();
   
 
   const fibLevels = useMemo((): FibLevel[] => {
@@ -306,6 +309,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
           />
 
           <NewsPanel />
+          <AutoTradePanel />
 
         </HeatmapSidebar>
 

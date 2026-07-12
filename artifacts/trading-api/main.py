@@ -23,6 +23,7 @@ from routers.news import router as news_router
 from routers.narrative import router as narrative_router
 from routers.daily_pnl import router as daily_pnl_router
 from routers.auth import router as auth_router
+from routers.auto_trade import router as auto_trade_router
 from services import auth_service
 
 app = FastAPI(
@@ -122,6 +123,7 @@ app.include_router(mt5_router, prefix=PREFIX)
 app.include_router(news_router, prefix=PREFIX)
 app.include_router(narrative_router, prefix=PREFIX)
 app.include_router(daily_pnl_router, prefix=PREFIX)
+app.include_router(auto_trade_router, prefix=PREFIX)
 
 
 @app.get(f"{PREFIX}/health")

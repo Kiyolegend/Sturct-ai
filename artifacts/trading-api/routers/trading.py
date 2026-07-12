@@ -31,6 +31,18 @@ _last_positions: list[dict] = []
 _breakeven_moved: set[int] = set()
 _order_event = asyncio.Event()
 
+def queue_order(order: dict) -> str:
+    """Called by auto_trade_engine to queue an order without HTTP overhead."""
+    order_id = str(uuid.uuid4())
+    _pending_orders.append({
+        **order,
+        "order_id":  order_id,
+        "queued_at": _broker_time() or int(time.time()),
+    })
+    _order_event.set()
+    print(f"[TRADE] AutoQueued: {order.get('direction')} {order.get('lots')} {order.get('symbol')} id={order_id}")
+    return order_id
+
 # FIX 3 — valid symbols (must match what the MT5 bridge knows how to map)
 _VALID_SYMBOLS = {
     "USD/JPY", "EUR/USD", "GBP/USD",
