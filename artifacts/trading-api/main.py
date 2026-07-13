@@ -25,6 +25,9 @@ from routers.daily_pnl import router as daily_pnl_router
 from routers.auth import router as auth_router
 from routers.auto_trade import router as auto_trade_router
 from services import auth_service
+from services.db import init_db  
+
+init_db()
 
 app = FastAPI(
     title="Trading Market Structure API",
