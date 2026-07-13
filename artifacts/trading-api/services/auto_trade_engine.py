@@ -188,7 +188,7 @@ async def _evaluate_pair(symbol: str) -> dict:
     try:
         # ── STEP 1: D1 direction (the law) ───────────────────────────────────
         try:
-            df_d1 = await fetch_ohlc(symbol, "d1", 300)
+            df_d1 = await fetch_ohlc(symbol, "d1", 500)
         except ValueError:
             return {"status": "WAITING", "reason": "No D1 data from MT5 yet", "symbol": symbol}
 
