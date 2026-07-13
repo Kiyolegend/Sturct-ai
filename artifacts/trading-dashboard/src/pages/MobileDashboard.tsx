@@ -16,6 +16,14 @@ const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
   "d1":  5 * 24 * 60 * 60,
 };
 
+const CANDLE_LIMITS: Record<string, number> = {
+  "5m":  2000,
+  "15m": 2000,
+  "1h":  2000,
+  "4h":  1500,
+  "d1":  1200,
+};
+
 type MobileTab = "chart" | "trade" | "pairs" | "news";
 
 export function MobileDashboard({ activeSetups = [], symbol, setSymbol }: { activeSetups?: ActiveSetup[]; symbol: string; setSymbol: (s: string) => void }) {
@@ -41,7 +49,7 @@ export function MobileDashboard({ activeSetups = [], symbol, setSymbol }: { acti
   const { data: brokerTimeData } = useBrokerTime();
   const brokerNow = brokerTimeData?.broker_time ?? 0;
 
-  const { data, isLoading, error, refetch, isRefetching } = useTradingAnalysis(symbol, timeframe, 500);
+  const { data, isLoading, error, refetch, isRefetching } = useTradingAnalysis(symbol, timeframe, CANDLE_LIMITS[timeframe] ?? 500);
   const { data: srData }       = useSRLevels(symbol);
   const { data: biasData }     = useMTFBias(symbol);
   const { data: sessionsData } = useSessions(symbol, timeframe === "d1" ? "5m" : timeframe);
