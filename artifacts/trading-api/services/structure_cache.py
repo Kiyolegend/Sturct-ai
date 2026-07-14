@@ -28,3 +28,7 @@ def get_result(symbol: str, interval: str) -> Optional[dict]:
 def invalidate(symbol: str, interval: str) -> None:
     """Drop cache for this symbol+interval so next request recomputes fresh."""
     _cache.pop(f"{symbol}_{interval}", None)
+
+def invalidate_all() -> None:
+    """Bust the entire cache — call after a full history re-collect."""
+    _cache.clear()

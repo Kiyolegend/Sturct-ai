@@ -24,6 +24,7 @@ from routers.narrative import router as narrative_router
 from routers.daily_pnl import router as daily_pnl_router
 from routers.auth import router as auth_router
 from routers.auto_trade import router as auto_trade_router
+from routers.collect import router as collect_router
 from services import auth_service
 from services.db import init_db  
 
@@ -127,6 +128,7 @@ app.include_router(news_router, prefix=PREFIX)
 app.include_router(narrative_router, prefix=PREFIX)
 app.include_router(daily_pnl_router, prefix=PREFIX)
 app.include_router(auto_trade_router, prefix=PREFIX)
+app.include_router(collect_router, prefix=PREFIX)
 
 
 @app.get(f"{PREFIX}/health")
