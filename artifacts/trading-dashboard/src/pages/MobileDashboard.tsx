@@ -155,6 +155,13 @@ export function MobileDashboard({ activeSetups = [], symbol, setSymbol }: { acti
     return () => { dead = true; ws?.close(); };
   }, [refetch]);
 
+    // Polling fallback — chart always stays live even when WS is unstable
+  useEffect(() => {
+    const interval = wsConnected ? 30_000 : 5_000;
+    const id = setInterval(() => refetch(), interval);
+    return () => clearInterval(id);
+  }, [wsConnected, refetch]);
+
   const isMarketClosed = useMemo(() => {
     if (!data?.candles || data.candles.length === 0) return false;
     const lastCandle = data.candles[data.candles.length - 1];
