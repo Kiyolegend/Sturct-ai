@@ -477,6 +477,14 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
         >
           ⊞ Auto Trade
         </a>
+        <a
+          href="/collect"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+        >
+          ⊞ Data
+        </a>
         <div className="hidden lg:flex items-center gap-1">
           <BiasBadge label="15M" trend={bias15m} />
           <BiasBadge label="1H"  trend={bias1h}  />
@@ -489,14 +497,6 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
           <PatternBadge label="4H"  pattern={pattern4h}  />
           <PatternBadge label="D1"  pattern={patternd1}  />
         </div>
-        <a
-          href="/collect"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-        >
-          ⊞ Data
-        </a>
         <ApiBadge />
         <BridgeBadge />
       </div>

@@ -265,6 +265,7 @@ def pull_tf(mt5, broker_sym: str, tf_label: str, years: int,
 # REPLACE THE WHOLE FUNCTION WITH THIS:
 def pull_4h(mt5, broker_sym: str, years: int,
             since: datetime.datetime | None = None) -> list:
+    return pull_tf(mt5, broker_sym, "4h", years, since=since)
     """
     Pull native MT5 TIMEFRAME_H4 bars directly.
     The old approach (resample 1H → 4H with pandas) created UTC-midnight-aligned
