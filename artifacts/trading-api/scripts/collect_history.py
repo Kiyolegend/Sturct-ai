@@ -74,6 +74,7 @@ REFRESH_OVERLAP = {
 # MT5 timeframe integer constants
 MT5_TF = {
     "d1":  16408,   # TIMEFRAME_D1
+    "4h":  16388,   # TIMEFRAME_H4
     "1h":  16385,   # TIMEFRAME_H1
     "15m": 15,      # TIMEFRAME_M15
     "5m":  5,       # TIMEFRAME_M5
@@ -261,38 +262,17 @@ def pull_tf(mt5, broker_sym: str, tf_label: str, years: int,
         return rates_to_rows(rates)
 
 
+# REPLACE THE WHOLE FUNCTION WITH THIS:
 def pull_4h(mt5, broker_sym: str, years: int,
             since: datetime.datetime | None = None) -> list:
     """
-    Pull 1H from MT5 then resample to 4H.
-    MT5's native H4 can have alignment issues; 1H→4H resample is more reliable.
+    Pull native MT5 TIMEFRAME_H4 bars directly.
+    The old approach (resample 1H → 4H with pandas) created UTC-midnight-aligned
+    timestamps that never matched the broker-time-aligned bars the live bridge
+    stores, causing a permanent duplicate in SQLite where neither set overwrote
+    the other. The historical bars won the timestamp race and froze the price.
     """
-    import pandas as pd
-    tf_const = MT5_TF["1h"]
-    end   = datetime.datetime.now(datetime.timezone.utc)
-    start = since if since else (end - datetime.timedelta(days=365 * years))
-    label = f"since {start.strftime('%Y-%m-%d')}" if since else f"{years}yr"
-
-    print(f"    pulling {label} of 1H from MT5 for 4H resample ...", end=" ", flush=True)
-    rates = mt5.copy_rates_range(broker_sym, tf_const, start, end)
-    if rates is None or len(rates) == 0:
-        print(f"0 bars  (MT5: {mt5.last_error()})")
-        return []
-    print(f"{len(rates):,} 1H bars — resampling to 4H ...")
-
-    df = pd.DataFrame(rates)
-    df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
-    df = df.set_index("time")
-    df4 = df.resample("4h").agg(
-        {"open": "first", "high": "max", "low": "min", "close": "last"}
-    ).dropna()
-    print(f"    resampled: {len(df4):,} 4H bars")
-
-    return [
-        (int(ts.timestamp()), float(r["open"]), float(r["high"]),
-         float(r["low"]), float(r["close"]))
-        for ts, r in df4.iterrows()
-    ]
+    return pull_tf(mt5, broker_sym, "4h", years, since=since)
 
 
 # ── Build since_map for refresh mode ──────────────────────────────────────────
