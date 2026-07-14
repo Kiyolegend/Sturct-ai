@@ -116,11 +116,12 @@ export function useSRLevels(symbol: string = "USD/JPY") {
     queryFn: async () => {
       const params = new URLSearchParams({ symbol, outputsize: "300" });
       const res = await fetch(`/trading-api/sr-levels?${params.toString()}`);
-      if (!res.ok) throw new Error(`SR levels API error: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: SR levels API error: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: 5 * 60 * 1000,
-    retry: PATIENT_RETRY,
+    retry: (failureCount, error) =>
+      !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
     retryDelay: patientRetryDelay,
     staleTime: 4 * 60 * 1000,
   });
@@ -162,11 +163,12 @@ export function useMTFBias(symbol: string = "USD/JPY") {
     queryFn: async () => {
       const params = new URLSearchParams({ symbol });
       const res = await fetch(`/trading-api/mtf-bias?${params.toString()}`);
-      if (!res.ok) throw new Error(`MTF bias API error: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: MTF bias API error: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: 60 * 1000,
-    retry: PATIENT_RETRY,
+    retry: (failureCount, error) =>
+      !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
     retryDelay: patientRetryDelay,
     staleTime: 4 * 60 * 1000,
   });
@@ -196,11 +198,12 @@ export function usePatternSummary(symbol: string = "USD/JPY") {
     queryFn: async () => {
       const params = new URLSearchParams({ symbol });
       const res = await fetch(`/trading-api/pattern-summary?${params.toString()}`);
-      if (!res.ok) throw new Error(`Pattern summary API error: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: Pattern summary API error: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: 60 * 1000,
-    retry: PATIENT_RETRY,
+    retry: (failureCount, error) =>
+      !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
     retryDelay: patientRetryDelay,
     staleTime: 4 * 60 * 1000,
   });
@@ -212,11 +215,12 @@ export function useBosChoch(symbol: string = "USD/JPY") {
     queryFn: async () => {
       const params = new URLSearchParams({ symbol, outputsize: "300" });
       const res = await fetch(`/trading-api/bos-choch?${params.toString()}`);
-      if (!res.ok) throw new Error(`BOS/CHOCH API error: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: BOS/CHOCH API error: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: 5 * 60 * 1000,
-    retry: PATIENT_RETRY,
+    retry: (failureCount, error) =>
+      !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
     retryDelay: patientRetryDelay,
     staleTime: 4 * 60 * 1000,
   });
@@ -234,11 +238,12 @@ export function useChoch(symbol: string, interval: "1h" | "4h") {
     queryFn: async () => {
       const params = new URLSearchParams({ symbol, interval, outputsize: "300" });
       const res = await fetch(`/trading-api/choch?${params.toString()}`);
-      if (!res.ok) throw new Error(`CHoCH API error: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: CHoCH API error: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: 60 * 1000,
-    retry: PATIENT_RETRY,
+    retry: (failureCount, error) =>
+      !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
     retryDelay: patientRetryDelay,
     staleTime: 55 * 1000,
   });
@@ -264,11 +269,12 @@ export function useSessions(symbol: string = "USD/JPY", interval: string = "5m")
     queryFn: async () => {
       const params = new URLSearchParams({ symbol, interval, outputsize: "500" });
       const res = await fetch(`/trading-api/sessions?${params.toString()}`);
-      if (!res.ok) throw new Error(`Sessions API error: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: Sessions API error: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: 60 * 1000,
-    retry: PATIENT_RETRY,
+    retry: (failureCount, error) =>
+      !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
     retryDelay: patientRetryDelay,
     staleTime: 55 * 1000,
   });
@@ -285,7 +291,7 @@ export function useMT5Status() {
     queryKey: ["mt5-status"],
     queryFn: async () => {
       const res = await fetch("/trading-api/mt5/status");
-      if (!res.ok) throw new Error("MT5 status error");
+      if (!res.ok) throw new Error(`${res.status}: MT5 status error`);
       return res.json();
     },
     refetchInterval: 15 * 1000,
@@ -307,16 +313,17 @@ export function useTradingAnalysis(symbol: string = "USD/JPY", interval: string 
       const res = await fetch(`/trading-api/analysis?${params.toString()}`);
 
       if (!res.ok) {
-        if (res.status === 404) throw new Error("Endpoint not found. Make sure the Trading API is running.");
+        if (res.status === 404) throw new Error("404: Endpoint not found. Make sure the Trading API is running.");
         const err = await res.text();
-        throw new Error(`API Error: ${err}`);
+        throw new Error(`${res.status}: API Error: ${err}`);
       }
 
       return res.json();
     },
     refetchInterval: 60000,
     staleTime: 55_000,
-    retry: PATIENT_RETRY,
+    retry: (failureCount, error) =>
+      !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
     retryDelay: patientRetryDelay,
     placeholderData: (prev) => prev,
   });
@@ -362,7 +369,7 @@ export function useNewsStatus() {
     queryKey: ["news-status"],
     queryFn: async () => {
       const res = await fetch("/trading-api/news-status");
-      if (!res.ok) throw new Error(`News status error: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: News status error: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: 60 * 1000,
@@ -400,7 +407,7 @@ export function usePairSweep(intervalMs = 20000) {
     queryKey: ["pair-sweep"],
     queryFn: async () => {
       const res = await fetch("/trading-api/pair-sweep");
-      if (!res.ok) throw new Error(`Pair sweep error: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: Pair sweep error: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: intervalMs,
@@ -418,7 +425,7 @@ export function useBrokerTime() {
     queryKey: ["broker-time"],
     queryFn: async () => {
       const res = await fetch("/trading-api/mt5/server-time");
-      if (!res.ok) throw new Error("Broker time error");
+      if (!res.ok) throw new Error(`${res.status}: Broker time error`);
       return res.json();
     },
     refetchInterval: 30 * 1000,
@@ -472,7 +479,7 @@ export function useFrameworkStatus(intervalMs = 30_000) {
     queryKey: ["framework-status"],
     queryFn: async () => {
       const res = await fetch("/trading-api/framework-status");
-      if (!res.ok) throw new Error(`Framework status error: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: Framework status error: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: intervalMs,
@@ -519,7 +526,7 @@ export function useAutoTradeStatus() {
     queryKey: ["auto-trade-status"],
     queryFn: async () => {
       const res = await fetch("/trading-api/auto-trade/status");
-      if (!res.ok) throw new Error(`Auto trade status: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: Auto trade status: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: 5_000,
@@ -533,7 +540,7 @@ export function useAutoTradeLog() {
     queryKey: ["auto-trade-log"],
     queryFn: async () => {
       const res = await fetch("/trading-api/auto-trade/log");
-      if (!res.ok) throw new Error(`Auto trade log: ${await res.text()}`);
+      if (!res.ok) throw new Error(`${res.status}: Auto trade log: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: 10_000,

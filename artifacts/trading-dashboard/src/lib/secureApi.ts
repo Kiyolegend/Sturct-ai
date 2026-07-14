@@ -152,6 +152,10 @@ export function installSecureFetch() {
     }
 
     const res = await window.__nativeFetch!(input, { ...init, headers, body });
+    if (res.status === 401) {
+      lock();
+      window.dispatchEvent(new Event("struct:session-expired"));
+    }
 
     try {
       const envelope = await res.clone().json();

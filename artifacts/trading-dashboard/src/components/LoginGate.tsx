@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { login, installSecureFetch, lock, getStoredDeviceKey } from "@/lib/secureApi";
 import { PanicButton } from "@/components/PanicButton";
 
@@ -23,6 +23,12 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   const [deviceKey, setDeviceKey] = useState(() => getStoredDeviceKey());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+useEffect(() => {
+  const onExpired = () => setUnlocked(false);
+  window.addEventListener("struct:session-expired", onExpired);
+  return () => window.removeEventListener("struct:session-expired", onExpired);
+}, []);
 
   const needsDeviceKey = getStoredDeviceKey() === "";
 
