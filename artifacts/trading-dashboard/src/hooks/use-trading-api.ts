@@ -318,6 +318,7 @@ export function useTradingAnalysis(symbol: string = "USD/JPY", interval: string 
     staleTime: 55_000,
     retry: PATIENT_RETRY,
     retryDelay: patientRetryDelay,
+    placeholderData: (prev) => prev,
   });
 }
 

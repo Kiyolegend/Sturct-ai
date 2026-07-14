@@ -24,3 +24,7 @@ def get_result(symbol: str, interval: str) -> Optional[dict]:
     if time.time() - entry["_cached_at"] > CACHE_TTL:
         return None
     return entry
+
+def invalidate(symbol: str, interval: str) -> None:
+    """Drop cache for this symbol+interval so next request recomputes fresh."""
+    _cache.pop(f"{symbol}_{interval}", None)

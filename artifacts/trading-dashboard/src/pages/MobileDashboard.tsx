@@ -102,6 +102,8 @@ export function MobileDashboard({ activeSetups = [], symbol, setSymbol }: { acti
 
   const symbolRef       = useRef(symbol);
   const lastPrefillRef  = useRef<string>("");
+  const refetchRef = useRef(refetch);
+  useEffect(() => { refetchRef.current = refetch; }, [refetch]);
   useEffect(() => {
     symbolRef.current      = symbol;
     lastPrefillRef.current = "";

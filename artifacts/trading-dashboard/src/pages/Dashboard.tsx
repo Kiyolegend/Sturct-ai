@@ -212,6 +212,8 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
 
   const symbolRef       = useRef(symbol);
   const lastPrefillRef  = useRef<string>("");
+  const refetchRef = useRef(refetch);
+  useEffect(() => { refetchRef.current = refetch; }, [refetch]);
   useEffect(() => {
     symbolRef.current      = symbol;
     lastPrefillRef.current = "";
@@ -258,7 +260,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === "candle" && msg.symbol === symbolRef.current) {
-            refetch();
+            refetchRef.current()
           }
         } catch {}
       };
@@ -267,14 +269,14 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
 
     connect();
     return () => { dead = true; ws?.close(); };
-  }, [refetch]);
+  }, []);
 
     // Polling fallback — chart always stays live even when WS is unstable
   useEffect(() => {
     const interval = wsConnected ? 30_000 : 5_000;
-    const id = setInterval(() => refetch(), interval);
+    const id = setInterval(() => refetchRef.current(), interval);
     return () => clearInterval(id);
-  }, [wsConnected, refetch]);
+  }, [wsConnected]);
 
   const isMarketClosed = useMemo(() => {
     if (!data?.candles || data.candles.length === 0) return false;
