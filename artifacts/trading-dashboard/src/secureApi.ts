@@ -52,7 +52,7 @@ function fromB64(s: string): Uint8Array {
 
 async function encryptJson(obj: unknown): Promise<string> {
   if (!aesKey) throw new Error("Locked");
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const iv = crypto.getRandomValues(new Uint8Array(12)) as Uint8Array<ArrayBuffer>;
   const data = new TextEncoder().encode(JSON.stringify(obj));
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, data);
   return JSON.stringify({ iv: toB64(iv), data: toB64(new Uint8Array(ct)) });
@@ -60,8 +60,8 @@ async function encryptJson(obj: unknown): Promise<string> {
 
 async function decryptJson(envelope: { iv: string; data: string }): Promise<any> {
   if (!aesKey) throw new Error("Locked");
-  const iv = fromB64(envelope.iv);
-  const ct = fromB64(envelope.data);
+  const iv = fromB64(envelope.iv) as Uint8Array<ArrayBuffer>;
+  const ct = fromB64(envelope.data) as Uint8Array<ArrayBuffer>;
   const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, ct);
   return JSON.parse(new TextDecoder().decode(pt));
 }
@@ -121,7 +121,7 @@ export function installSecureFetch() {
       headers.set("Content-Type", "application/json");
     }
 
-    const res = await window.__nativeFetch!(input, { ...init, headers, body });
+    const res = await window.__nativeFetch!(input, { ...init, headers, body, cache: "no-store" });
 
     try {
       const envelope = await res.clone().json();

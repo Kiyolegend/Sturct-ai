@@ -69,6 +69,17 @@ _EXEMPT_PATHS = {
     f"{PREFIX}/trade/breakeven-moved",
 }
 
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    """Forces Cache-Control: no-store on every /trading-api/* response so
+    the WebView2 cache never freezes the chart on a stale snapshot."""
+
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith(PREFIX):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
 
 class AuthMiddleware(BaseHTTPMiddleware):
     """Requires a valid Bearer session token on every /trading-api/* request,
@@ -118,6 +129,7 @@ class EncryptionMiddleware(BaseHTTPMiddleware):
 # is attempted, so add Encryption first, then Auth.
 app.add_middleware(EncryptionMiddleware)
 app.add_middleware(AuthMiddleware)
+app.add_middleware(NoCacheMiddleware)
 
 app.include_router(auth_router, prefix=PREFIX)
 app.include_router(data_router, prefix=PREFIX)
