@@ -320,12 +320,13 @@ export function useTradingAnalysis(symbol: string = "USD/JPY", interval: string 
 
       return res.json();
     },
-    refetchInterval: 60000,
-    staleTime: 55_000,
+    refetchInterval: 10_000,
+    staleTime: 8_000,
     retry: (failureCount, error) =>
       !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
     retryDelay: patientRetryDelay,
     placeholderData: (prev) => prev,
+    structuralSharing: false,
   });
 }
 
