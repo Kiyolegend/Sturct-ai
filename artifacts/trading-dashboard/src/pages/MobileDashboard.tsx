@@ -14,6 +14,7 @@ const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
   "1h":  90 * 60,
   "4h":  5 * 60 * 60,
   "d1":  5 * 24 * 60 * 60,
+  "w1":  14 * 24 * 60 * 60, 
 };
 
 const CANDLE_LIMITS: Record<string, number> = {
@@ -22,6 +23,7 @@ const CANDLE_LIMITS: Record<string, number> = {
   "1h":  2000,
   "4h":  1500,
   "d1":  1200,
+  "w1":  300,
 };
 
 type MobileTab = "chart" | "trade" | "pairs" | "news";
@@ -44,6 +46,8 @@ export function MobileDashboard({ activeSetups = [], symbol, setSymbol }: { acti
     fibD1:    false,
     d1Zones:  false,
     d1SR:     true,
+    w1Zones:  false, 
+    w1SR:     true,
   });
 
   const { data: brokerTimeData } = useBrokerTime();
@@ -52,7 +56,7 @@ export function MobileDashboard({ activeSetups = [], symbol, setSymbol }: { acti
   const { data, isLoading, error, refetch, isRefetching } = useTradingAnalysis(symbol, timeframe, CANDLE_LIMITS[timeframe] ?? 500);
   const { data: srData }       = useSRLevels(symbol);
   const { data: biasData }     = useMTFBias(symbol);
-  const { data: sessionsData } = useSessions(symbol, timeframe === "d1" ? "5m" : timeframe);
+  const { data: sessionsData } = useSessions(symbol, (timeframe === "d1"|| timeframe === "w1") ? "5m" : timeframe);
 
   const fibLevels = useMemo((): FibLevel[] => {
     const hi = biasData?.bias_4h?.last_high_price as number | undefined;

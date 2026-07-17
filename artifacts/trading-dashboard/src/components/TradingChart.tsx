@@ -61,7 +61,7 @@ const BOS_COLORS = {
 const CHOCH_COLOR = '#f59e0b';
 
 const TF_LABEL: Record<string, string> = {
-  "4h": "4H", "1h": "1H", "15m": "15M", "d1": "D1",
+  "4h": "4H", "1h": "1H", "15m": "15M", "d1": "D1", "w1": "W1",
 };
 
 const SR_TF_CONFIG: Record<string, { proximity: number; maxEach: number }> = {
@@ -69,6 +69,7 @@ const SR_TF_CONFIG: Record<string, { proximity: number; maxEach: number }> = {
   '1h':  { proximity: 0.018, maxEach: 2 },
   '4h':  { proximity: 0.025, maxEach: 2 },
   'd1':  { proximity: 0.060, maxEach: 2 },
+  'w1':  { proximity: 0.12,  maxEach: 2 },
 };
 
 // ── Exported: pip size helper ─────────────────────────────────────────────────
@@ -264,7 +265,7 @@ export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, 
     sortedCandles.length ? (sortedCandles[sortedCandles.length - 1] as any).close as number : null,
   [sortedCandles]);
 
-  const isD1 = timeframe === "d1";
+  const isD1 = timeframe === "d1" || timeframe === "w1";
   const computedOBs = useMemo((): OrderBlockData[] => {
     if (!toggles.ob || !sortedCandles.length || currentPrice === null) return [];
     return detectOrderBlocks(sortedCandles, currentPrice, isD1);
@@ -440,7 +441,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
 
   useEffect(() => {
     setTimeout(tick, 50);
-  }, [sessions, toggles.sessions, toggles.zones, toggles.ob, toggles.fvg, data, computedOBs, computedFVGs]);
+  }, [sessions, toggles.sessions, toggles.zones, toggles.ob, toggles.fvg, toggles.d1Zones, toggles.w1Zones, data, computedOBs, computedFVGs]);
 
   // ── Effect 3: S/R price lines ──────────────────────────────────────────────
   useEffect(() => {
@@ -465,9 +466,10 @@ containerRef.current?.addEventListener('click', handleChartClick);
       '1h':  toggles.sr1h,
       '4h':  toggles.sr4h,
       'd1':  toggles.d1SR,
+      'w1':  toggles.w1SR,
     };
 
-    (['15m', '1h', '4h', 'd1'] as const).forEach(tf => {
+    (['15m', '1h', '4h', 'd1', 'w1'] as const).forEach(tf => {
       if (!tfEnabled[tf]) return;
 
       const cfg = SR_TF_CONFIG[tf];
@@ -491,7 +493,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
         const line = candleSeriesRef.current!.createPriceLine({
           price: level.price,
           color: SR_COLORS[level.kind],
-          lineWidth: tf === 'd1' ? 3 : tf === '4h' ? 2 : 1,
+          lineWidth: tf === 'w1' || tf === 'd1' ? 3 : tf === '4h' ? 2 : 1,
           lineStyle: LineStyle.Solid,
           axisLabelVisible: true,
           title: `${TF_LABEL[tf]} ${level.kind === 'resistance' ? 'R' : 'S'}`,
@@ -499,7 +501,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
         srPriceLinesRef.current.push(line);
       });
     });
-  }, [srLevels, data, toggles.sr15m, toggles.sr1h, toggles.sr4h, toggles.d1SR]);
+  }, [srLevels, data, toggles.sr15m, toggles.sr1h, toggles.sr4h, toggles.d1SR, toggles.w1SR]);
 
     // ── Effect 4: BOS / CHOCH lines (current timeframe) ──────────────────────
   useEffect(() => {
@@ -622,6 +624,8 @@ containerRef.current?.addEventListener('click', handleChartClick);
       const filtered = currentPrice === null ? [] : data.zones.filter(z => {
         if (z.timeframe === "d1" && timeframe !== "d1") return false;
         if (z.timeframe === "d1" && !toggles.d1Zones) return false;
+        if (z.timeframe === "w1" && timeframe !== "w1") return false; 
+        if (z.timeframe === "w1" && !toggles.w1Zones) return false;
         const withinProximity = Math.abs(z.center - currentPrice) / currentPrice <= PROXIMITY_PCT;
         return z.strength >= STRENGTH_MIN && z.touches <= MAX_TOUCHES && withinProximity;
       });

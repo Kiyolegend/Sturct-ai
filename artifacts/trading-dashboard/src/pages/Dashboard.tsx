@@ -15,6 +15,7 @@ const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
   "1h":  90 * 60,
   "4h":  5 * 60 * 60,
   "d1":  5 * 24 * 60 * 60,
+  "w1":  14 * 24 * 60 * 60,
 };
 
 const CANDLE_LIMITS: Record<string, number> = {
@@ -23,6 +24,7 @@ const CANDLE_LIMITS: Record<string, number> = {
   "1h":  400,
   "4h":  400,
   "d1":  365,
+  "w1":  300,
 };
 
 export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetups?: ActiveSetup[]; symbol: string; setSymbol: (s: string) => void }) {
@@ -42,6 +44,8 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     fibD1:    false,
     d1Zones:  false,
     d1SR:     true,
+    w1Zones:  false,
+    w1SR:     true,
   });
 
   
@@ -55,7 +59,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const { data: srData }       = useSRLevels(symbol);
   const { data: biasData }     = useMTFBias(symbol);
   const { data: patternData }  = usePatternSummary(symbol);
-  const { data: sessionsData } = useSessions(symbol, timeframe === "d1" ? "5m" : timeframe);
+  const { data: sessionsData } = useSessions(symbol, (timeframe === "d1" || timeframe === "w1") ? "5m" : timeframe);
   
   
 

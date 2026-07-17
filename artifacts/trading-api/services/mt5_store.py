@@ -24,7 +24,7 @@ from typing import Optional
 
 # Interval labels the bridge sends (lowercase).
 # Safety-normalised by _tf() before any use.
-VALID_INTERVALS = {"5m", "15m", "1h", "4h", "d1"}
+VALID_INTERVALS = {"5m", "15m", "1h", "4h", "d1", "w1"}
 
 # Seconds without a bridge push before is_online() returns False.
 # Does NOT affect data availability — get_candles() still returns stored rows.
@@ -32,6 +32,7 @@ MT5_STALE_THRESHOLD = 120  # 2 minutes
 
 # Rolling window per timeframe — original pre-database values that worked.
 _CANDLE_LIMIT: dict[str, int] = {
+    "w1":  300,
     "d1":  365,   # ~1 year of daily bars
     "4h":  300,   # ~50 days of 4-hour bars
     "1h":  300,   # ~12 days of hourly bars

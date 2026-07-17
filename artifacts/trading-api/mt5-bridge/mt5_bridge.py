@@ -54,6 +54,7 @@ CANDLE_COUNT = {
     "1h":  300,
     "4h":  300,
     "d1":  365,
+    "w1":  300,
 }
 PUSH_INTERVAL = 5  # seconds
 
@@ -63,6 +64,7 @@ TIMEFRAME_MAP = {
     "1h": mt5.TIMEFRAME_H1,
     "4h": mt5.TIMEFRAME_H4,
     "d1":  mt5.TIMEFRAME_D1,
+    "w1":  mt5.TIMEFRAME_W1,
 }
 
 PUSH_URL   = f"{API_BASE_URL}/trading-api/mt5/push"

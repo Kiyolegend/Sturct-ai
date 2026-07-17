@@ -23,6 +23,8 @@ export interface ToggleState {
   fibD1: boolean;  // Fibonacci retracement levels from last D1 swing
   d1Zones: boolean; // D1 supply/demand zones (D1 chart only)
   d1SR: boolean;  // D1 S/R levels (cross-timeframe)
+  w1Zones:  boolean;
+  w1SR:     boolean;
 }
 
 type TrendDir = "bullish" | "bearish" | "neutral";
@@ -257,7 +259,7 @@ function SymbolSelector({ symbol, setSymbol }: { symbol: string; setSymbol: (s: 
 export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, biasd1, pattern15m, pattern1h, pattern4h, patternd1, activeSetups = [] }: TopBarProps) {
   const [soundMuted, setSoundMuted] = useState(() => localStorage.getItem("struct_sound_muted") === "true");
   const { data: brokerTimeData } = useBrokerTime();
-  const timeframes = ["5M", "15M", "1H", "4H","D1"];
+  const timeframes = ["5M", "15M", "1H", "4H","D1", "W1"];
 
   const toggleLayer = (key: keyof ToggleState) => {
     setToggles(prev => ({ ...prev, [key]: !prev[key] }));
@@ -373,6 +375,16 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
              className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
               toggles.d1SR ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
              title="Toggle D1 S/R levels (shows on all timeframes)">D1R</button>
+          </div>
+          <div className="flex items-center gap-1 bg-[#161e2c] rounded-lg p-1 border border-white/5">
+            <button onClick={() => toggleLayer('w1Zones')} aria-pressed={toggles.w1Zones}
+              className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+                toggles.w1Zones ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
+              title="Toggle W1 supply/demand zones (W1 chart only)">W1Z</button>
+            <button onClick={() => toggleLayer('w1SR')} aria-pressed={toggles.w1SR}
+              className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+                toggles.w1SR ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
+              title="Toggle W1 S/R levels (shows on all timeframes)">W1R</button>
           </div>
       </div>
 

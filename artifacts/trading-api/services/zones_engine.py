@@ -51,7 +51,7 @@ def detect_zones(swings: list[SwingPoint], timeframe: str = "1h", current_price:
     zone_width        = ZONE_WIDTH_PIPS * pip
 
     # Timeframe strength weights
-    tf_strength = {"d1": 4, "4h": 3, "1h": 2, "15m": 1, "5m": 0}
+    tf_strength = {"w1": 5, "d1": 4, "4h": 3, "1h": 2, "15m": 1, "5m": 0}
     base_strength = tf_strength.get(timeframe, 1)
 
     # Pair prices with times, then sort by price so the seed-based clustering

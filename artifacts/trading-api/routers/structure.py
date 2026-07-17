@@ -23,7 +23,7 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     
         
     df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-    tf_fractal_n = 3 if interval in ("1h", "4h", "d1") else 5
+    tf_fractal_n = 2 if interval == "w1" else 3 if interval in ("1h", "4h", "d1") else 5
     swings = detect_swings(df, fractal_n=tf_fractal_n)
     structure_labels = classify_structure(swings)
     trend_data = detect_trend(structure_labels)
@@ -40,9 +40,9 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     trend_data["last_high_price"] = last_high_price
     trend_data["last_low_price"]  = last_low_price
     trend = trend_data["trend"]
-    _bos_hours = {"5m": 8, "15m": 48, "1h": 72, "4h": 336, "d1": 8760}.get(interval, 48)
+    _bos_hours   = {"5m": 8, "15m": 48, "1h": 72, "4h": 336, "d1": 8760, "w1": 87600}.get(interval, 48)
     bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours, fractal_n=tf_fractal_n)
-    _choch_hours = {"5m": 8, "15m": 24, "1h": 72, "4h": 336, "d1": 4320}.get(interval, 24)
+    _choch_hours = {"5m": 8, "15m": 24, "1h": 72, "4h": 336, "d1": 4320, "w1": 43800}.get(interval, 24)
     choch_events = detect_choch(df, swings, structure_labels, trend, lookback_hours=_choch_hours, fractal_n=tf_fractal_n)
     trendlines = compute_trendlines(structure_labels)
     zigzag_lines = swings_to_zigzag_lines(swings)
@@ -72,7 +72,7 @@ async def get_structure(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h", "d1") else 5)
+        swings = detect_swings(df, fractal_n=2 if interval == "w1" else 3 if interval in ("1h", "4h", "d1") else 5)
         structure_labels = classify_structure(swings)
         zigzag_lines = swings_to_zigzag_lines(swings)
         return {
@@ -95,7 +95,7 @@ async def get_trend(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h", "d1") else 5)
+        swings = detect_swings(df, fractal_n=2 if interval == "w1" else 3 if interval in ("1h", "4h", "d1") else 5)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
         return {"symbol": symbol, "interval": interval, **trend_data}
@@ -112,11 +112,11 @@ async def get_bos(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        tf_fractal_n = 3 if interval in ("1h", "4h", "d1") else 5
+        tf_fractal_n = 2 if interval == "w1" else 3 if interval in ("1h", "4h", "d1") else 5
         swings = detect_swings(df, fractal_n=tf_fractal_n)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
-        _bos_hours = {"5m": 8, "15m": 48, "1h": 72, "4h": 336, "d1": 8760}.get(interval, 48)
+        _bos_hours = {"5m": 8, "15m": 48, "1h": 72, "4h": 336, "d1": 8760, "w1": 87600}.get(interval, 48)
         bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours, fractal_n=tf_fractal_n)
         return {"symbol": symbol, "interval": interval, "bos": bos_events}
     except ValueError as e:
@@ -132,11 +132,11 @@ async def get_choch(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        tf_fractal_n = 3 if interval in ("1h", "4h", "d1") else 5
+        tf_fractal_n = 2 if interval == "w1" else 3 if interval in ("1h", "4h", "d1") else 5
         swings = detect_swings(df, fractal_n=tf_fractal_n)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
-        _choch_hours = {"5m": 8, "15m": 24, "1h": 72, "4h": 336, "d1": 4320}.get(interval, 24)
+        _choch_hours = {"5m": 8, "15m": 24, "1h": 72, "4h": 336, "d1": 4320, "w1": 43800}.get(interval, 24)
         choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"], lookback_hours=_choch_hours, fractal_n=tf_fractal_n)
         return {"symbol": symbol, "interval": interval, "choch": choch_events}
     except ValueError as e:
@@ -152,7 +152,7 @@ async def get_zones(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h", "d1") else 5)
+        swings = detect_swings(df, fractal_n=2 if interval == "w1" else 3 if interval in ("1h", "4h", "d1") else 5)
         current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
         zones = detect_zones(swings, interval, current_price)
         return {"symbol": symbol, "interval": interval, "zones": zones}
@@ -170,7 +170,7 @@ async def get_patterns(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=3 if interval in ("1h", "4h", "d1") else 5)
+        swings = detect_swings(df, fractal_n=2 if interval == "w1" else 3 if interval in ("1h", "4h", "d1") else 5)
         current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
         zones = detect_zones(swings, interval, current_price)
         patterns = detect_candle_patterns(df, swings, zones)
@@ -361,16 +361,17 @@ async def get_sr_levels(
     outputsize: int = Query(default=300, ge=50, le=1000),
 ):
     """
-    Multi-timeframe Support/Resistance levels (15m, 1h, 4h, d1).
+    Multi-timeframe Support/Resistance levels (15m, 1h, 4h, d1, w1).
     """
     try:
-        df_15m, df_1h, df_4h, df_d1 = await asyncio.gather(
+        df_15m, df_1h, df_4h, df_d1, df_w1 = await asyncio.gather(
             fetch_ohlc(symbol=symbol, interval="15m", outputsize=outputsize),
-            fetch_ohlc(symbol=symbol, interval="1h", outputsize=outputsize),
-            fetch_ohlc(symbol=symbol, interval="4h", outputsize=outputsize),
-            fetch_ohlc(symbol=symbol, interval="d1", outputsize=365),
+            fetch_ohlc(symbol=symbol, interval="1h",  outputsize=outputsize),
+            fetch_ohlc(symbol=symbol, interval="4h",  outputsize=outputsize),
+            fetch_ohlc(symbol=symbol, interval="d1",  outputsize=365),
+            fetch_ohlc(symbol=symbol, interval="w1",  outputsize=300),
         )
-        df_map = {"15m": df_15m, "1h": df_1h, "4h": df_4h, "d1": df_d1}
+        df_map = {"15m": df_15m, "1h": df_1h, "4h": df_4h, "d1": df_d1, "w1": df_w1}
         levels = compute_mtf_sr_levels(df_map)
         return {
             "symbol": symbol,
