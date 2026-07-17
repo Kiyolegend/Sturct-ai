@@ -305,10 +305,12 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
         bias1h={biasData?.bias_1h?.trend}
         bias4h={biasData?.bias_4h?.trend}
         biasd1={biasData?.bias_d1?.trend}
+        biasw1={biasData?.bias_w1?.trend}
         pattern15m={patternData?.pattern_15m}
         pattern1h={patternData?.pattern_1h}
         pattern4h={patternData?.pattern_4h}
         patternd1={patternData?.pattern_d1}
+        patternw1={patternData?.pattern_w1}
         activeSetups={activeSetups}
       />
 

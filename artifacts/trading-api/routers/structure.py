@@ -186,11 +186,12 @@ async def get_pattern_summary(
     symbol: str = Query(default="USD/JPY"),
 ):
     try:
-        df_15m, df_1h, df_4h, df_d1 = await asyncio.gather(
+        df_15m, df_1h, df_4h, df_d1, df_w1 = await asyncio.gather(
             fetch_ohlc(symbol=symbol, interval="15m", outputsize=150),
             fetch_ohlc(symbol=symbol, interval="1h", outputsize=150),
             fetch_ohlc(symbol=symbol, interval="4h", outputsize=150),
             fetch_ohlc(symbol=symbol, interval="d1", outputsize=365),
+            fetch_ohlc(symbol=symbol, interval="w1", outputsize=300),
         )
 
         def _last_pattern(df, fractal_n: int, interval: str):
@@ -206,6 +207,7 @@ async def get_pattern_summary(
             "pattern_1h": _last_pattern(df_1h, 3, "1h"),
             "pattern_4h": _last_pattern(df_4h, 3, "4h"),
             "pattern_d1": _last_pattern(df_d1, 3, "d1"),
+            "pattern_w1":  _last_pattern(df_w1,  2, "w1"),
         }
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -254,7 +256,7 @@ async def get_mtf_bias(
     the most recent confirmed swing in the opposite direction of the bias.
     """
     try:
-        df_15m, df_1h, df_4h, df_d1 = await asyncio.gather(
+        df_15m, df_1h, df_4h, df_d1, df_w1 = await asyncio.gather(
             fetch_ohlc(symbol=symbol, interval="15m", outputsize=150),
             fetch_ohlc(symbol=symbol, interval="1h", outputsize=150),
             fetch_ohlc(symbol=symbol, interval="4h", outputsize=150),

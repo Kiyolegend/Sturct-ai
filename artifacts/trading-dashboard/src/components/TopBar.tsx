@@ -41,6 +41,7 @@ interface TopBarProps {
   bias1h?: TrendDir;
   bias4h?: TrendDir;
   biasd1?: TrendDir;
+  biasw1?: TrendDir;
   pattern15m?: CandlePattern | null;
   pattern1h?:  CandlePattern | null;
   pattern4h?:  CandlePattern | null;
@@ -256,7 +257,7 @@ function SymbolSelector({ symbol, setSymbol }: { symbol: string; setSymbol: (s: 
   );
 }
 
-export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, biasd1, pattern15m, pattern1h, pattern4h, patternd1, activeSetups = [] }: TopBarProps) {
+export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, biasd1, biasw1, pattern15m, pattern1h, pattern4h, patternd1, patternw1, activeSetups = [] }: TopBarProps) {
   const [soundMuted, setSoundMuted] = useState(() => localStorage.getItem("struct_sound_muted") === "true");
   const { data: brokerTimeData } = useBrokerTime();
   const timeframes = ["5M", "15M", "1H", "4H","D1", "W1"];
@@ -489,25 +490,19 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
         >
           ⊞ Auto Trade
         </a>
-        <a
-          href="/collect"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-        >
-          ⊞ Data
-        </a>
         <div className="hidden lg:flex items-center gap-1">
           <BiasBadge label="15M" trend={bias15m} />
           <BiasBadge label="1H"  trend={bias1h}  />
           <BiasBadge label="4H"  trend={bias4h}  />
           <BiasBadge label="D1"  trend={biasd1}  />
+          <BiasBadge label="W1"  trend={biasw1}  />
         </div>
           <div className="hidden lg:flex items-center gap-1">
           <PatternBadge label="15M" pattern={pattern15m} />
           <PatternBadge label="1H"  pattern={pattern1h}  />
           <PatternBadge label="4H"  pattern={pattern4h}  />
           <PatternBadge label="D1"  pattern={patternd1}  />
+          <PatternBadge label="W1"  pattern={patternw1}  />
         </div>
         <ApiBadge />
         <BridgeBadge />

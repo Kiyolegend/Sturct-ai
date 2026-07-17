@@ -191,6 +191,7 @@ export interface PatternSummaryResponse {
   pattern_1h: CandlePattern | null;
   pattern_4h: CandlePattern | null;
   pattern_d1: CandlePattern | null;
+  pattern_w1?: CandlePattern | null;
 }
 
 export function usePatternSummary(symbol: string = "USD/JPY") {
