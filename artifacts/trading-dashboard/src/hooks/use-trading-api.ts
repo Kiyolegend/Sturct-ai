@@ -310,7 +310,7 @@ export function useTradingAnalysis(symbol: string = "USD/JPY", interval: string 
         outputsize: outputsize.toString(),
       });
 
-      const res = await fetch(`/trading-api/analysis?${params.toString()}`);
+      const res = await fetch(`/trading-api/analysis?${params.toString()}`, { cache: "no-store" });
 
       if (!res.ok) {
         if (res.status === 404) throw new Error("404: Endpoint not found. Make sure the Trading API is running.");

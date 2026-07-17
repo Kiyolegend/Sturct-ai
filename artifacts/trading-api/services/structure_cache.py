@@ -6,7 +6,7 @@ TTL: 25 seconds.
 import time
 from typing import Optional
 
-CACHE_TTL = 25  # seconds
+CACHE_TTL = 4  # seconds
 
 _cache: dict[str, dict] = {}
 
