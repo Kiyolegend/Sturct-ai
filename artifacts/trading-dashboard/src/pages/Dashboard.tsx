@@ -138,7 +138,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   }, [goldenZoneAlertD1, fibD1Levels, data?.candles]);
 
   const swingAgeD1 = useMemo((): string | null => {
-    const t = (biasData?.bias_d1 as any)?.last_swing_time as number | undefined;
+    const t = biasData?.bias_d1?.last_swing_time ?? undefined;
     if (!t || !brokerNow) return null;
     const mins = Math.round((brokerNow - t) / 60);
     if (mins < 60) return `${mins}m ago`;
@@ -148,7 +148,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   }, [biasData?.bias_d1, brokerNow]);
 
   const swingAgeColorD1 = useMemo((): string => {
-    const t = (biasData?.bias_d1 as any)?.last_swing_time as number | undefined;
+    const t = biasData?.bias_d1?.last_swing_time ?? undefined;
     if (!t || !brokerNow) return "text-slate-600";
     const mins = Math.round((brokerNow - t) / 60);
     if (mins <= 2880) return "text-slate-500";
@@ -190,7 +190,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   }, [goldenZoneAlert, fibLevels, data?.candles]);
 
     const swingAge = useMemo((): string | null => {
-    const t = (biasData?.bias_4h as any)?.last_swing_time as number | undefined;
+    const t = biasData?.bias_d1?.last_swing_time ?? undefined;
     if (!t || !brokerNow) return null;
     const mins = Math.round((brokerNow - t) / 60);
     if (mins < 60) return `${mins}m ago`;
@@ -200,7 +200,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   }, [biasData?.bias_4h, brokerNow]);
 
     const swingAgeColor = useMemo((): string => {
-    const t = (biasData?.bias_4h as any)?.last_swing_time as number | undefined;
+    const t = biasData?.bias_d1?.last_swing_time ?? undefined;
     if (!t || !brokerNow) return "text-slate-600";
     const mins = Math.round((brokerNow - t) / 60);
     if (mins <= 480) return "text-slate-500";

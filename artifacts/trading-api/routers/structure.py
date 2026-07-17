@@ -173,7 +173,8 @@ async def get_patterns(
         swings = detect_swings(df, fractal_n=2 if interval == "w1" else 3 if interval in ("1h", "4h", "d1") else 5)
         current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
         zones = detect_zones(swings, interval, current_price)
-        patterns = detect_candle_patterns(df, swings, zones)
+        _prox = {"15m": 6, "1h": 10, "4h": 15, "d1": 20, "w1": 30}
+        patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_prox.get(interval, 6))
         return {"symbol": symbol, "interval": interval, "patterns": patterns}
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))

@@ -94,7 +94,7 @@ export interface TradingAnalysisResponse {
 export interface SRLevel {
   price: number;
   kind: "support" | "resistance";
-  timeframe: "15m" | "1h" | "4h"| "d1";
+  timeframe: "15m" | "1h" | "4h"| "d1"| "w1";
   touches: number;
   score?: number;
 }
@@ -147,6 +147,7 @@ export interface MTFBias {
   current_price: number | null;
   last_high_price: number | null;
   last_low_price: number | null;
+  last_swing_time?: number | null;
 }
 
 export interface MTFBiasResponse {
