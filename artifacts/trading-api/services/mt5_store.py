@@ -110,7 +110,7 @@ def store_candles(symbol: str, interval: str, df: pd.DataFrame) -> None:
         if existing is not None and len(existing) > 0:
             combined = (
                 pd.concat([existing, incoming], ignore_index=True)
-                  .drop_duplicates(subset=["time"])
+                  .drop_duplicates(subset=["time"], keep="last")
                   .sort_values("time")
                   .reset_index(drop=True)
             )
