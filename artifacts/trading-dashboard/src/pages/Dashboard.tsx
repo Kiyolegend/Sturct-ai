@@ -18,11 +18,11 @@ const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
 };
 
 const CANDLE_LIMITS: Record<string, number> = {
-  "5m":  2000,
-  "15m": 2000,
-  "1h":  2000,
-  "4h":  1500,
-  "d1":  1200,
+  "5m":  500,
+  "15m": 500,
+  "1h":  400,
+  "4h":  400,
+  "d1":  365,
 };
 
 export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetups?: ActiveSetup[]; symbol: string; setSymbol: (s: string) => void }) {

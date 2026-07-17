@@ -49,11 +49,11 @@ SYMBOLS = [
 
 # Settings
 CANDLE_COUNT = {
-    "5m":  15,
-    "15m": 15,
-    "1h":  15,
-    "4h":  15,
-    "d1":  15,
+    "5m":  400,
+    "15m": 400,
+    "1h":  300,
+    "4h":  300,
+    "d1":  365,
 }
 PUSH_INTERVAL = 5  # seconds
 
