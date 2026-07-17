@@ -3,8 +3,8 @@ from fastapi import APIRouter, Query, HTTPException
 import asyncio
 import time
 from services.data_service import fetch_ohlc, candles_to_dict
-from services.structure_cache import set_result as _cache_set
-from services.structure_cache import get_result as _cache_get
+
+
 from services.zigzag_engine import detect_swings, swings_to_zigzag_lines
 from services.structure_engine import classify_structure
 from services.trend_engine import detect_trend
@@ -19,9 +19,9 @@ from services.candle_pattern_engine import detect_candle_patterns
 router = APIRouter()
 
 async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
-    cached = _cache_get(symbol, interval)
-    if cached:
-        return cached
+    
+    
+        
     df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
     tf_fractal_n = 3 if interval in ("1h", "4h", "d1") else 5
     swings = detect_swings(df, fractal_n=tf_fractal_n)
@@ -61,7 +61,7 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
         "trendlines": trendlines,
         "zones": zones,
     }
-    _cache_set(symbol, interval, result)
+    
     return result
 
 @router.get("/structure")
