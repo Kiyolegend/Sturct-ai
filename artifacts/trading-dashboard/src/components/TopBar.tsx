@@ -46,6 +46,7 @@ interface TopBarProps {
   pattern1h?:  CandlePattern | null;
   pattern4h?:  CandlePattern | null;
   patternd1?:  CandlePattern | null;
+  patternw1?:  CandlePattern | null;
   activeSetups?: ActiveSetup[];
 }
 
