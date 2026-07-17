@@ -24,7 +24,7 @@ const SYMBOLS = [
 
 type TrendDir = "bullish" | "bearish" | "neutral";
 
-const WARNING_THRESHOLDS = { "15m": 0.003, "1h": 0.005, "4h": 0.008, "d1": 0.015 };
+const WARNING_THRESHOLDS = { "15m": 0.003, "1h": 0.005, "4h": 0.008, "d1": 0.015, "w1": 0.025 };
 
 function dotColor(trend?: TrendDir, isLoading?: boolean) {
   if (trend === "bullish") return "bg-green-400 shadow-[0_0_4px_rgba(74,222,128,0.6)]";
@@ -81,13 +81,14 @@ function HeatmapRow({
   const warn1h  = isWarning(data?.bias_1h.trend,  data?.bias_1h.current_price,  data?.bias_1h.last_high_price,  data?.bias_1h.last_low_price,  WARNING_THRESHOLDS["1h"]);
   const warn4h  = isWarning(data?.bias_4h.trend,  data?.bias_4h.current_price,  data?.bias_4h.last_high_price,  data?.bias_4h.last_low_price,  WARNING_THRESHOLDS["4h"]);
   const warnd1  = isWarning(data?.bias_d1?.trend,  data?.bias_d1?.current_price,  data?.bias_d1?.last_high_price,  data?.bias_d1?.last_low_price,  WARNING_THRESHOLDS["d1"]);
+  const warnw1 = isWarning(data?.bias_w1?.trend, data?.bias_w1?.current_price, data?.bias_w1?.last_high_price, data?.bias_w1?.last_low_price, WARNING_THRESHOLDS["w1"]);
 
   const warnTag = (w: boolean) => (w ? " ⚠" : "");
   const tooltip = isLoading
     ? `${display}: loading…`
     : isError
       ? `${display}: data not yet available`
-      : `${display}\n15M: ${trendLabel(data?.bias_15m.trend)}${warnTag(warn15)}   1H: ${trendLabel(data?.bias_1h.trend)}${warnTag(warn1h)}   4H: ${trendLabel(data?.bias_4h.trend)}${warnTag(warn4h)}  D1: ${trendLabel(data?.bias_d1?.trend)}${warnTag(warnd1)}`;
+      : `${display}\n15M: ${trendLabel(data?.bias_15m.trend)}${warnTag(warn15)}   1H: ${trendLabel(data?.bias_1h.trend)}${warnTag(warn1h)}   4H: ${trendLabel(data?.bias_4h.trend)}${warnTag(warn4h)}  D1: ${trendLabel(data?.bias_d1?.trend)}${warnTag(warnd1)} W1: ${trendLabel(data?.bias_w1?.trend)}${warnTag(warnw1)}`;
 
   // Flash ring when any strategy is active
   
@@ -122,6 +123,7 @@ function HeatmapRow({
         <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_1h.trend,  isLoading), warn1h  && WARNING_CLASS)} />
         <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_4h.trend,  isLoading), warn4h  && WARNING_CLASS)} />
         <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_d1?.trend,  isLoading), warnd1  && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_w1?.trend, isLoading), warnw1 && WARNING_CLASS)} />
       </div>
     </button>
   );
@@ -155,6 +157,7 @@ export function HeatmapSidebar({
             <span className="text-[8px] font-mono text-white/30 w-2 text-center">1H</span>
             <span className="text-[8px] font-mono text-white/30 w-2 text-center">4H</span>
             <span className="text-[8px] font-mono text-white/30 w-2 text-center">D1</span>
+            <span className="text-[8px] font-mono text-white/30 w-2 text-center">W1</span>
           </div>
         </div>
 

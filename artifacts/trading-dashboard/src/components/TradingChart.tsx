@@ -624,7 +624,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
       const filtered = currentPrice === null ? [] : data.zones.filter(z => {
         if (z.timeframe === "d1" && timeframe !== "d1") return false;
         if (z.timeframe === "d1" && !toggles.d1Zones) return false;
-        if (z.timeframe === "w1" && timeframe !== "w1") return false; 
+        
         if (z.timeframe === "w1" && !toggles.w1Zones) return false;
         const withinProximity = Math.abs(z.center - currentPrice) / currentPrice <= PROXIMITY_PCT;
         return z.strength >= STRENGTH_MIN && z.touches <= MAX_TOUCHES && withinProximity;

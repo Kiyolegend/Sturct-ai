@@ -34,7 +34,7 @@ export function PanicButton({ onRevoked }: { onRevoked: () => void }) {
   };
 
   return (
-    <div style={{ position: "fixed", bottom: 16, right: 16, zIndex: 9999, fontFamily: "'Roboto Mono', monospace" }}>
+    <div style={{ position: "fixed", top: 60, right: 16, zIndex: 9999, fontFamily: "'Roboto Mono', monospace" }}>
       {!open ? (
         <button onClick={() => setOpen(true)} style={panicBtnStyle} title="Revoke all remote access sessions">
           Panic

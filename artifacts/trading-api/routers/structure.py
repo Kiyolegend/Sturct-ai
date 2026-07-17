@@ -259,6 +259,7 @@ async def get_mtf_bias(
             fetch_ohlc(symbol=symbol, interval="1h", outputsize=150),
             fetch_ohlc(symbol=symbol, interval="4h", outputsize=150),
             fetch_ohlc(symbol=symbol, interval="d1",  outputsize=365),
+            fetch_ohlc(symbol=symbol, interval="w1",  outputsize=300),
         )
 
         def _bias(df, fractal_n: int = 5):
@@ -299,6 +300,7 @@ async def get_mtf_bias(
         t1h  = _bias(df_1h,  fractal_n=3)
         t4h  = _bias(df_4h,  fractal_n=3)
         td1  = _bias(df_d1,  fractal_n=3)
+        tw1  = _bias(df_w1,  fractal_n=2)
 
         
 
@@ -308,6 +310,7 @@ async def get_mtf_bias(
             "bias_1h": t1h,
             "bias_4h": t4h,
             "bias_d1": td1,
+            "bias_w1": tw1,
         }
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
