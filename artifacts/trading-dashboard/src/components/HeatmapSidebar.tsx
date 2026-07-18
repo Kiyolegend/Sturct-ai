@@ -20,6 +20,9 @@ const SYMBOLS = [
   { display: "NZDUSD", api: "NZD/USD" },   
   { display: "AUDJPY", api: "AUD/JPY" },   
   { display: "CADJPY", api: "CAD/JPY" }, 
+  { display: "XAUUSD", api: "XAU/USD" },
+  { display: "BTCUSD", api: "BTC/USD" },
+
 ];
 
 type TrendDir = "bullish" | "bearish" | "neutral";

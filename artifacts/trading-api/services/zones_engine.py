@@ -21,12 +21,10 @@ ZONE_WIDTH_PIPS = 3.0  # pip-neutral half-width of zone around center
 
 
 def _pip_size(price: float) -> float:
-    """
-    Infer pip size from current price.
-    JPY pairs trade 100–200 → pip = 0.01
-    All other pairs trade 0.5–2.0 → pip = 0.0001
-    """
-    return 0.01 if price > 50 else 0.0001
+    if price > 10_000: return 1.0
+    if price > 500:    return 0.1
+    if price > 50:     return 0.01
+    return 0.0001
 
 
 def detect_zones(swings: list[SwingPoint], timeframe: str = "1h", current_price: float | None = None) -> list[dict]:

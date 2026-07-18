@@ -25,7 +25,10 @@ import pandas as pd
 
 
 def _pip_size(price: float) -> float:
-    return 0.01 if price > 50 else 0.0001
+    if price > 10_000: return 1.0    # Crypto  (BTC ~65 000)
+    if price > 500:    return 0.1    # Gold    (XAU ~2 350)
+    if price > 50:     return 0.01   # JPY pairs (USD/JPY ~150)
+    return 0.0001                    # Standard FX (EUR/USD ~1.08)
 
 
 def _body(row) -> float:

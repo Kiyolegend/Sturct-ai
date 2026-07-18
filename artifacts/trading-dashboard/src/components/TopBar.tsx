@@ -63,6 +63,8 @@ const SYMBOLS = [
   { display: "NZDUSD",  api: "NZD/USD" },   
   { display: "AUDJPY",  api: "AUD/JPY" },   
   { display: "CADJPY",  api: "CAD/JPY" },
+  { display: "XAUUSD",  api: "XAU/USD" },
+  { display: "BTCUSD",  api: "BTC/USD" }, 
 ];
 
 function BiasBadge({ label, trend }: { label: string; trend?: TrendDir }) {

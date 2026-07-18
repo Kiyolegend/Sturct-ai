@@ -161,6 +161,15 @@ async def get_zones(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def _get_proximity(symbol: str, interval: str) -> float:
+    """Return proximity_pips appropriate for the symbol's asset class."""
+    _BTC = {"15m": 50,  "1h": 100, "4h": 200, "d1": 500,  "w1": 1000}
+    _XAU = {"15m": 20,  "1h": 40,  "4h": 80,  "d1": 200,  "w1": 400}
+    _FX  = {"15m": 6,   "1h": 10,  "4h": 15,  "d1": 20,   "w1": 30}
+    sym = symbol.upper()
+    if "BTC" in sym: return _BTC.get(interval, 50)
+    if "XAU" in sym: return _XAU.get(interval, 20)
+    return _FX.get(interval, 6)
 
 @router.get("/patterns")
 async def get_patterns(
@@ -173,8 +182,7 @@ async def get_patterns(
         swings = detect_swings(df, fractal_n=2 if interval == "w1" else 3 if interval in ("1h", "4h", "d1") else 5)
         current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
         zones = detect_zones(swings, interval, current_price)
-        _prox = {"15m": 6, "1h": 10, "4h": 15, "d1": 20, "w1": 30}
-        patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_prox.get(interval, 6))
+        patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_get_proximity(symbol, interval))
         return {"symbol": symbol, "interval": interval, "patterns": patterns}
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -194,13 +202,9 @@ async def get_pattern_summary(
             fetch_ohlc(symbol=symbol, interval="d1", outputsize=365),
             fetch_ohlc(symbol=symbol, interval="w1", outputsize=300),
         )
-        _PROXIMITY = {"15m": 6, "1h": 10, "4h": 15, "d1": 20, "w1": 30}
-
         def _last_pattern(df, fractal_n: int, interval: str):
-            swings = detect_swings(df, fractal_n=fractal_n)
-            current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
-            zones = detect_zones(swings, interval, current_price)
-            patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_PROXIMITY.get(interval, 6))
+    ...
+    patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_get_proximity(symbol, interval))
             return patterns[0] if patterns else None
 
         return {

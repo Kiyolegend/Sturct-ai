@@ -45,6 +45,8 @@ SYMBOLS = [
     {"mt5_name": "NZDUSDm", "api_symbol": "NZD/USD"},
     {"mt5_name": "AUDJPYm", "api_symbol": "AUD/JPY"},
     {"mt5_name": "CADJPYm", "api_symbol": "CAD/JPY"},
+    {"mt5_name": "XAUUSDm", "api_symbol": "XAU/USD"},
+    {"mt5_name": "BTCUSDm", "api_symbol": "BTC/USD"},
 ]
 
 # Settings
@@ -239,7 +241,10 @@ _breakeven_tracker: dict[int, dict] = {}
 _pending_be:        dict[int, dict] = {}   # LIMIT framework orders waiting to fill
 
 def _pip(price: float) -> float:
-    return 0.01 if price > 50 else 0.0001
+    if price > 10_000: return 1.0    # BTC
+    if price > 500:    return 0.1    # Gold
+    if price > 50:     return 0.01   # JPY pairs
+    return 0.0001                    # Standard FX
 
 
 def _report(order_id, ticket, status, message, fill_price=None):

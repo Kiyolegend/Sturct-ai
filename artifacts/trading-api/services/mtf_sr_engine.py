@@ -66,12 +66,10 @@ DEDUP_PIPS = 10
 
 
 def _pip_size(price: float) -> float:
-    """
-    Infer pip size from current price.
-    JPY pairs trade 100–200, all others trade 0.5–2.0.
-    This avoids needing the symbol name while being 100% reliable for forex.
-    """
-    return 0.01 if price > 50 else 0.0001
+    if price > 10_000: return 1.0
+    if price > 500:    return 0.1
+    if price > 50:     return 0.01
+    return 0.0001
 
 
 def _cluster_levels(swing_data: list[dict], threshold: float) -> list[dict]:

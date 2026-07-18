@@ -131,7 +131,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     const level382 = fibD1Levels.find(f => f.pct === 38.2)?.price;
     const level618 = fibD1Levels.find(f => f.pct === 61.8)?.price;
     if (!level382 || !level618) return null;
-    const pip = price > 50 ? 0.01 : 0.0001;
+    const pip = price > 10000 ? 1 : price > 500 ? 0.1 : price > 50 ? 0.01 : 0.0001;
     if (price > level382) return Math.round((price - level382) / pip);
     if (price < level618) return Math.round((level618 - price) / pip);
     return null;
@@ -183,7 +183,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     const level382 = fibLevels.find(f => f.pct === 38.2)?.price;
     const level618 = fibLevels.find(f => f.pct === 61.8)?.price;
     if (!level382 || !level618) return null;
-    const pip = price > 50 ? 0.01 : 0.0001;
+    const pip = price > 10000 ? 1 : price > 500 ? 0.1 : price > 50 ? 0.01 : 0.0001;
     if (price > level382) return Math.round((price - level382) / pip);
     if (price < level618) return Math.round((level618 - price) / pip);
     return null;

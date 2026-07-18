@@ -8,8 +8,10 @@ from __future__ import annotations
 
 
 def _pip(price: float) -> float:
-    """0.01 for JPY pairs (price > 50), 0.0001 for everything else."""
-    return 0.01 if price > 50 else 0.0001
+    if price > 10_000: return 1.0
+    if price > 500:    return 0.1
+    if price > 50:     return 0.01
+    return 0.0001
 
 
 def detect_order_blocks(
