@@ -344,6 +344,13 @@ async def _evaluate_pair(symbol: str) -> dict:
                 "symbol": symbol, "d1": d1_dir, "price": current_price,
                 **exhaustion,
             }
+        if entry_p is None:
+            return {
+                "status": "WATCHING",
+                "reason": f"D1 {d1_dir} ✓  4H CHoCH ✓ — waiting for 1H entry zone",
+                "symbol": symbol, "d1": d1_dir, "price": current_price,
+                **exhaustion,
+            }
 
         # ── STEP 4: Structural SL ────────────────────────────────────────────
         # Minimum SL distance — a D1-based trade needs room to breathe.
@@ -473,7 +480,7 @@ async def _run_loop() -> None:
                                 "price":      result["entry"],
                                 "sl":         result["sl"],
                                 "tp":         result["tp"],
-                                "lots":       _calc_lots(symbol, result["entry"], result["sl"], current_price),
+                                "lots": _calc_lots(symbol, result["entry"], result["sl"], result["price"]),
                                 "comment":    "STRUCT.ai-Auto",
                             })
                             _pair_status[symbol]["order_id"] = order_id

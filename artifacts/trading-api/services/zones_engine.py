@@ -53,14 +53,13 @@ def detect_zones(swings: list[SwingPoint], timeframe: str = "1h", current_price:
     # Determine pip size — use current_price if given, otherwise estimate from swings
     if current_price is not None:
         pip = _pip_size(current_price)
+        ref = current_price
     else:
-        median_price = sorted(s["price"] for s in swings)[len(swings) // 2]
-        pip = _pip_size(median_price)
+        ref = sorted(s["price"] for s in swings)[len(swings) // 2]
+        pip = _pip_size(ref)
 
-        ref = current_price if current_price else (sorted(s["price"] for s in swings)[len(swings)//2])
-        cluster_threshold = _cluster_pips(ref)   * pip
-        zone_width        = _zone_width_pips(ref) * pip
-
+    cluster_threshold = _cluster_pips(ref)    * pip
+    zone_width        = _zone_width_pips(ref) * pip
     # Timeframe strength weights
     tf_strength = {"w1": 5, "d1": 4, "4h": 3, "1h": 2, "15m": 1, "5m": 0}
     base_strength = tf_strength.get(timeframe, 1)
