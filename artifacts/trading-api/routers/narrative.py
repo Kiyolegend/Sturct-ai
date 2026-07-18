@@ -147,7 +147,7 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
     )
     if not current_price:
         raise HTTPException(status_code=503, detail=f"No data available for {symbol}")
-    pip_size = 0.01 if current_price > 50 else 0.0001
+    pip_size = 1.0 if current_price > 10_000 else 0.1 if current_price > 500 else 0.01 if current_price > 50 else 0.0001
 
     # ── Extract analysis fields ───────────────────────────────────────────────
     trend_4h = r4h.get("trend") or {}

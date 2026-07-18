@@ -203,10 +203,11 @@ async def get_pattern_summary(
             fetch_ohlc(symbol=symbol, interval="w1", outputsize=300),
         )
         def _last_pattern(df, fractal_n: int, interval: str):
-    ...
-    patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_get_proximity(symbol, interval))
+            swings = detect_swings(df, fractal_n=fractal_n)
+            current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
+            zones = detect_zones(swings, interval, current_price)
+            patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_get_proximity(symbol, interval))
             return patterns[0] if patterns else None
-
         return {
             "symbol": symbol,
             "pattern_15m": _last_pattern(df_15m, 5, "15m"),

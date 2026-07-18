@@ -74,7 +74,10 @@ const SR_TF_CONFIG: Record<string, { proximity: number; maxEach: number }> = {
 
 // ── Exported: pip size helper ─────────────────────────────────────────────────
 export function pipSize(price: number): number {
-  return price > 50 ? 0.01 : 0.0001;
+  if (price > 10_000) return 1.0;    // BTC (~65 000)
+  if (price > 500)    return 0.1;    // Gold (~2 350)
+  if (price > 50)     return 0.01;   // JPY pairs (~150)
+  return 0.0001;                     // Standard FX (~1.08)
 }
 
 
@@ -365,13 +368,11 @@ containerRef.current?.addEventListener('click', handleChartClick);
 
     if (uniqueCandles.length > 0) {
       const latestClose = (uniqueCandles[uniqueCandles.length - 1] as any).close as number;
-      const pip = pipSize(latestClose);
-      const isJpy = pip === 0.01;
       candleSeriesRef.current.applyOptions({
         priceFormat: {
-          type: 'price',
-          precision: isJpy ? 3 : 5,
-          minMove:   isJpy ? 0.001 : 0.00001,
+          type:      'price',
+          precision: latestClose > 500  ? 2 : latestClose > 50 ? 3 : 5,
+          minMove:   latestClose > 500  ? 0.01 : latestClose > 50 ? 0.001 : 0.00001,
         },
       });
     }
