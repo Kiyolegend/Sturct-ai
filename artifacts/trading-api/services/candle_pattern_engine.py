@@ -109,11 +109,11 @@ def detect_candle_patterns(
 
         # 2) Engulfing
         prev_top, prev_bottom = max(prev["open"], prev["close"]), min(prev["open"], prev["close"])
-        if is_bull and prev["close"] < prev["open"] and row["close"] >= prev_top and row["open"] <= prev_bottom:
+        if is_bull and prev["close"] < prev["open"] and row["close"] > prev_top and row["open"] < prev_bottom:
             results.append({"time": time_val, "index": i, "pattern": "engulfing",
                              "direction": "bullish", "price": float(row["close"]),
                              "context": "Bullish candle engulfed the prior bearish candle at a level."})
-        elif is_bear and prev["close"] > prev["open"] and row["close"] <= prev_bottom and row["open"] >= prev_top:
+        elif is_bear and prev["close"] > prev["open"] and row["close"] < prev_bottom and row["open"] > prev_top:
             results.append({"time": time_val, "index": i, "pattern": "engulfing",
                              "direction": "bearish", "price": float(row["close"]),
                              "context": "Bearish candle engulfed the prior bullish candle at a level."})

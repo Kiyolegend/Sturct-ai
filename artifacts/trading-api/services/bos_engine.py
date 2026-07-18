@@ -35,11 +35,12 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
     # For each swing high/low, scan subsequent candles for a close beyond it
     for label_item in structure_labels:
         level = label_item["price"]
+        level_key = round(level, 5)
         label = label_item["label"]
         
         swing_idx = label_item["index"]
 
-        if level in broken_levels:
+        if level_key in broken_levels:
             continue
 
         # Only check candles AFTER the swing point
@@ -58,7 +59,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
                         "level_broken": round(level, 5),
                         "wick_extreme":  round(float(df["high"].values[i]), 5),
                     })
-                broken_levels.add(level)
+                broken_levels.add(level_key)
                 break
 
             # Bearish BOS: close below a swing LOW (LL or HL)
@@ -72,7 +73,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
                         "level_broken": round(level, 5),
                         "wick_extreme":  round(float(df["low"].values[i]), 5),
                     })
-                broken_levels.add(level)
+                broken_levels.add(level_key)
                 break
     
     bos_events.sort(key=lambda e: e.get("time", 0)) 

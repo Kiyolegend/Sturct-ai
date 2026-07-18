@@ -223,14 +223,26 @@ def _api_to_mt5(api_symbol: str) -> str | None:
 ORDERS_URL    = f"{API_BASE_URL}/trading-api/trade/pending"
 
 
-def _get_filling_mode(mt5_sym: str):
+def _get_filling_mode(mt5_sym: str, order_type: str = "MARKET"):
+    """
+    MARKET orders prefer IOC (partial fills acceptable in fast markets).
+    LIMIT/pending orders prefer FOK (must fill fully or not at all).
+    """
     info = mt5.symbol_info(mt5_sym)
     if info:
         fm = info.filling_mode
-        if fm & 2:
-            return mt5.ORDER_FILLING_IOC
-        if fm & 1:
-            return mt5.ORDER_FILLING_FOK
+        if order_type != "MARKET":
+            # LIMIT orders: prefer FOK, fall back to IOC
+            if fm & 1:
+                return mt5.ORDER_FILLING_FOK
+            if fm & 2:
+                return mt5.ORDER_FILLING_IOC
+        else:
+            # MARKET orders: prefer IOC
+            if fm & 2:
+                return mt5.ORDER_FILLING_IOC
+            if fm & 1:
+                return mt5.ORDER_FILLING_FOK
     return mt5.ORDER_FILLING_IOC
 
 RESULT_URL    = f"{API_BASE_URL}/trading-api/trade/result"
@@ -310,7 +322,7 @@ def _execute_order(order: dict):
         "deviation":    10,
         "comment":      order.get("comment", "STRUCT.ai"),
         "type_time":    mt5.ORDER_TIME_GTC,
-        "type_filling": _get_filling_mode(mt5_sym),
+        "type_filling": _get_filling_mode(mt5_sym, order_type=o_type),
     }
     result = mt5.order_send(req)
     if result and result.retcode == mt5.TRADE_RETCODE_DONE:
@@ -369,11 +381,11 @@ def _check_breakeven_all():
         pip    = _pip(entry)
         if one_r <= 0:
             continue
-        rates = mt5.copy_rates_from_pos(info["symbol"], mt5.TIMEFRAME_M15, 1, 1)
-        if not rates:
+        # Use live tick instead of the last completed bar to avoid up-to-15-min delay
+        tick_data = mt5.symbol_info_tick(info["symbol"])
+        if not tick_data:
             continue
-        close = float(rates[0]["close"])
-        if info["direction"] == "BUY":
+        close = tick_data.bid if info["direction"] == "BUY" else tick_data.ask
             if close < entry + 1.5 * one_r:
                 continue
             new_sl = round(entry + pip, 5)
@@ -546,7 +558,7 @@ def run():
         _sync_positions()
 
         elapsed = time.time() - t0
-        time.sleep(max(0, PUSH_INTERVAL - elapsed))
+        time.sleep(max(0.5, PUSH_INTERVAL - elapsed))   # always sleep ≥ 0.5s
 
 
 # ================================

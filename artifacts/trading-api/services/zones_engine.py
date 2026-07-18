@@ -66,10 +66,51 @@ def detect_zones(swings: list[SwingPoint], timeframe: str = "1h", current_price:
 
     # Pair prices with times, then sort by price so the seed-based clustering
     # always compares against the lowest price in the cluster (deterministic).
-    pairs = sorted(zip([s["price"] for s in swings], [s["time"] for s in swings]),
-                   key=lambda x: x[0])
-    levels = [p[0] for p in pairs]
-    times  = [p[1] for p in pairs]
+    # --- BUG-017 fix: separate high swings (supply) from low swings (demand) ---
+    high_swings = [s for s in swings if s.get("kind") == "high"]
+    low_swings  = [s for s in swings if s.get("kind") == "low"]
+
+    def _cluster_swings(swing_list: list, zone_kind: str) -> list[dict]:
+        if not swing_list:
+            return []
+        pairs = sorted(
+            zip([s["price"] for s in swing_list], [s["time"] for s in swing_list]),
+            key=lambda p: p[0],
+        )
+        lvls  = [p[0] for p in pairs]
+        tms   = [p[1] for p in pairs]
+
+        used     = [False] * len(lvls)
+        clusters = []
+
+        for i in range(len(lvls)):
+            if used[i]:
+                continue
+            cluster_prices = [lvls[i]]
+            cluster_times  = [tms[i]]
+            for j in range(i + 1, len(lvls)):
+                if not used[j]:
+                    cluster_mean = sum(cluster_prices) / len(cluster_prices)
+                    diff = lvls[j] - cluster_mean          # sorted → always ≥ 0
+                    if diff > cluster_threshold:            # BUG-018: early exit
+                        break
+                    cluster_prices.append(lvls[j])
+                    cluster_times.append(tms[j])
+                    used[j] = True
+            used[i] = True
+
+            if len(cluster_prices) >= 2:
+                center = sum(cluster_prices) / len(cluster_prices)
+                clusters.append({
+                    "center":     center,
+                    "touches":    len(cluster_prices),
+                    "first_time": min(cluster_times),
+                    "last_time":  max(cluster_times),
+                    "kind":       zone_kind,              # BUG-017: supply | demand
+                })
+        return clusters
+
+    all_clusters = _cluster_swings(high_swings, "supply") + _cluster_swings(low_swings, "demand")
 
     # Cluster nearby levels
     clusters: list[dict] = []

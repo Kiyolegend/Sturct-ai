@@ -183,7 +183,7 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
     if not swings:
         return []
 
-        # Build a time → bar_index lookup for recency calculation
+
     def get_bar_index(swing: dict) -> int:
         # swing["index"] is the bar position already stored by detect_swings()
         return int(swing.get("index", total_bars // 2))

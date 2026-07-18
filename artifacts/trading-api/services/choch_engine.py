@@ -33,10 +33,6 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
 
     choch_events = []
     
-
-        # Find only the MOST RECENT HL and MOST RECENT LH
-        # Scan ALL HLs (not just the most recent) so multiple CHoCH events in the
-    # lookback window are all detected — important for fast-moving markets.
     hl_levels = [l for l in structure_labels if l["label"] == "HL"]
     lh_levels = [l for l in structure_labels if l["label"] == "LH"]
 

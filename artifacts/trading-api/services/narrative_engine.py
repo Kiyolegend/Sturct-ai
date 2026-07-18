@@ -107,14 +107,20 @@ def _swing_context(
         return {}
 
     is_bull = bias_4h == "bullish"
-    leg_pips = round(leg_size / pip_size)
+    # For Gold/BTC, show price distance in natural units ($, not tiny pips)
+    if pip_size >= 0.1:   # Gold (0.1) or BTC (1.0)
+        leg_pips = round(leg_size, 1)   # dollar distance, 1 decimal
+        _leg_unit = "$"
+    else:
+        leg_pips = round(leg_size / pip_size)
+        _leg_unit = "pips"
 
     if is_bull:
         retrace_pct = round(((hi_price - current_price) / leg_size) * 100)
     else:
         retrace_pct = round(((current_price - lo_price) / leg_size) * 100)
 
-    in_window = 38 <= retrace_pct <= 70
+    f"The 4H leg covered {leg_pips} {_leg_unit}"
 
     # Negative retrace = price has broken beyond the swing extreme (active expansion)
     if retrace_pct < 0:
@@ -126,7 +132,7 @@ def _swing_context(
         return {
             "leg_pips":    leg_pips,
             "retrace_pct": retrace_pct,
-            "in_window":   False,
+            f"The 4H leg covered {leg_pips} {_leg_unit}"
             "description": desc,
         }
 

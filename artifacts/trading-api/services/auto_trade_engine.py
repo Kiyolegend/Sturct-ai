@@ -25,7 +25,7 @@ from services.structure_engine import classify_structure
 from services.trend_engine import detect_trend
 from services.choch_engine import detect_choch
 from services.framework_checker import detect_order_blocks, _pip
-from services.framework_checker import _pip
+
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +40,8 @@ _paper_mode:  bool = True
 _pair_status: dict[str, dict] = {}
 _trade_log:   list[dict] = []
 _fired_ids:   set[str] = set()
+_fired_times: dict[str, float] = {} 
+_FIRED_TTL_S: float = 7 * 24 * 3600
 _bg_task: Optional[asyncio.Task] = None
 
 
@@ -280,6 +282,15 @@ async def _evaluate_pair(symbol: str) -> dict:
                 "symbol": symbol, "d1": d1_dir, "price": current_price,
                 **exhaustion,
             }
+                # BUG-035: verify no subsequent 4H BOS in the opposite direction has invalidated the CHoCH
+        choch_dir = latest_4h_choch.get("direction")   # "bullish" or "bearish"
+        invalidating_bos = [
+            b for b in bos_4h
+            if b["direction"] != choch_dir
+            and b["time"] > latest_4h_choch["time"]
+        ]
+        if invalidating_bos:
+            return {"status": "WATCHING", "reason": f"4H CHoCH invalidated by subsequent 4H BOS {invalidating_bos[-1]['direction']}"}
 
         from services.mt5_store import get_latest_timestamp as _broker_now
         _now = _broker_now() or int(time.time())
@@ -465,6 +476,13 @@ async def _run_loop() -> None:
                 sid = result.get("signal_id", "")
                 if sid and sid not in _fired_ids:
                     _fired_ids.add(sid)
+                    _fired_times[sid] = time.time()
+                # Prune stale IDs
+                now_t = time.time()
+                expired = [k for k, v in _fired_times.items() if now_t - v > _FIRED_TTL_S]
+                for k in expired:
+                    _fired_ids.discard(k)
+                    del _fired_times[k]
                     entry = {**result, "fired_at": int(time.time()), "paper_mode": _paper_mode}
                     _trade_log.insert(0, entry)
                     if len(_trade_log) > 50:

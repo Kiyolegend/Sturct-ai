@@ -89,10 +89,16 @@ def detect_trend(structure_labels: list[dict]) -> dict:
         else:
             confidence = 75
 
+    elif last_high_label == "EQH" and last_low_label == "HL":
+        # Weakly bullish: lows rising, highs just stalling (pre-breakout or distribution)
+        trend = "bullish"
+        confidence = 40
+    elif last_high_label == "LH" and last_low_label == "EQL":
+        # Weakly bearish: highs falling, lows just holding (breakdown or support holding)
+        trend = "bearish"
+        confidence = 40
     else:
-        # Mixed: one side says bullish, the other says bearish
-        # e.g. HH + LL (transition — highs still rising but lows starting to drop)
-        #  or  LH + HL (consolidation — highs dropping but lows still rising)
+        # Genuinely mixed: e.g. HH+LL or LH+HL — transition forming
         trend = "neutral"
         confidence = 50
 

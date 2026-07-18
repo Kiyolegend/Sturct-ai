@@ -84,8 +84,9 @@ def detect_order_blocks(
                     centre = (c["high"] + c["low"]) / 2
                     if abs(centre - current_price) / current_price <= proximity:
                         # Mitigated = price already closed back below the OB low
+                        mit_buf = 50 * pip if current_price > 10_000 else 5 * pip if current_price > 500 else 2 * pip
                         mitigated = any(
-                            fc["close"] < c["low"] - 2 * pip
+                            fc["close"] < c["low"] - mit_buf
                             for fc in candles[i + 1:]
                         )
                         if not mitigated:
@@ -112,8 +113,9 @@ def detect_order_blocks(
                 if (brk["high"] - brk["low"]) >= 1.5 * avg_range:
                     centre = (c["high"] + c["low"]) / 2
                     if abs(centre - current_price) / current_price <= proximity:
+                        mit_buf = 50 * pip if current_price > 10_000 else 5 * pip if current_price > 500 else 2 * pip
                         mitigated = any(
-                            fc["close"] > c["high"] + 2 * pip
+                            fc["close"] > c["high"] + mit_buf
                             for fc in candles[i + 1:]
                         )
                         if not mitigated:

@@ -31,14 +31,23 @@ from datetime import datetime as _dt
 
 
 # (session_name, start_hour_utc_inclusive, end_hour_utc_exclusive)
-def _live_sessions():
-    """Return session UTC hours adjusted for live DST offsets."""
-    lo = int(_dt.now(ZoneInfo("Europe/London")).utcoffset().total_seconds() // 3600)
-    ny = int(_dt.now(ZoneInfo("America/New_York")).utcoffset().total_seconds() // 3600)
+from zoneinfo import ZoneInfo
+from datetime import datetime as _dt
+
+
+def _session_hours_for_ts(ts: pd.Timestamp) -> list[tuple]:
+    """Return (name, start_utc_h, end_utc_h) tuples using the DST offsets
+    that were actually in effect at the moment of this candle."""
+    dt = ts.to_pydatetime()
+    if dt.tzinfo is None:
+        from datetime import timezone
+        dt = dt.replace(tzinfo=timezone.utc)
+    lo = int(dt.astimezone(ZoneInfo("Europe/London")).utcoffset().total_seconds() // 3600)
+    ny = int(dt.astimezone(ZoneInfo("America/New_York")).utcoffset().total_seconds() // 3600)
     return [
-        ("asian",  0,       9      ),
-        ("london", 8  - lo, 17 - lo),
-        ("ny",     8  - ny, 17 - ny),
+        ("asian",  0,        9       ),
+        ("london", 8  - lo,  17 - lo ),
+        ("ny",     8  - ny,  17 - ny ),
     ]
 
 

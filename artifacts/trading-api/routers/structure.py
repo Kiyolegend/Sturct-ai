@@ -6,6 +6,8 @@ from services.data_service import fetch_ohlc, candles_to_dict
 
 
 from services.zigzag_engine import detect_swings, swings_to_zigzag_lines
+from services.zigzag_engine import detect_swings, TF_FRACTAL_N
+tf_fractal_n = TF_FRACTAL_N.get(interval, 5)
 from services.structure_engine import classify_structure
 from services.trend_engine import detect_trend
 from services.bos_engine import detect_bos
@@ -334,7 +336,7 @@ async def get_bos_choch(
     """
     1H Break of Structure + Change of Character levels.
     Returns the last 4 BOS events and last 2 CHOCH events.
-    Only includes events from the last 48 hours (stale sweeps are excluded).
+    Only includes events from the last 72 hours (stale sweeps are excluded).
     """
     try:
         df = await fetch_ohlc(symbol=symbol, interval="1h", outputsize=outputsize)
@@ -348,7 +350,7 @@ async def get_bos_choch(
         choch_events = detect_choch(df, swings, structure_labels, trend_data["trend"], lookback_hours=72, fractal_n=3)
 
         now = int(df.iloc[-1]["time"].timestamp())
-        max_age = 72 * 3600  # 48 hours in seconds
+        max_age = 72 * 3600  # 72 hours in seconds
 
         tagged_bos = [{"type": "BOS", **e} for e in bos_events[-4:] if now - e["time"] <= max_age]
         tagged_choch = [{"type": "CHOCH", **e} for e in choch_events[-2:] if now - e["time"] <= max_age]

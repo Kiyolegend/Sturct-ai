@@ -14,6 +14,9 @@ import numpy as np
 from typing import TypedDict
 
 FRACTAL_N = 5  # bars on each side to confirm a swing point
+TF_FRACTAL_N: dict[str, int] = {
+    "w1": 2, "d1": 3, "4h": 3, "1h": 3, "15m": 5, "5m": 5
+}
 
 
 class SwingPoint(TypedDict):
@@ -37,20 +40,20 @@ def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoi
     raw_pivots: list[SwingPoint] = []
 
     for i in range(n, len(df) - n):
-        window_highs = highs[i - n: i + n + 1]
-        window_lows = lows[i - n: i + n + 1]
+        # Build neighbor windows excluding the center bar for strict comparison
+        neighbors_h = np.concatenate([highs[i - n:i], highs[i + 1:i + n + 1]])
+        neighbors_l = np.concatenate([lows[i - n:i], lows[i + 1:i + n + 1]])
 
-        # Swing High: current high is the maximum in the window
-        if highs[i] == window_highs.max():
+        # Swing High: center bar strictly greater than ALL neighbors
+        if highs[i] > neighbors_h.max():
             raw_pivots.append({
                 "index": i,
                 "time": int(ts_unix[i]),
                 "price": float(round(highs[i], 5)),
                 "kind": "high",
             })
-
-        # Swing Low: current low is the minimum in the window
-        if lows[i] == window_lows.min():
+        # elif prevents the same candle emitting both high AND low simultaneously
+        elif lows[i] < neighbors_l.min():
             raw_pivots.append({
                 "index": i,
                 "time": int(ts_unix[i]),
