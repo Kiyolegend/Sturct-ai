@@ -25,6 +25,7 @@ from services.structure_engine import classify_structure
 from services.trend_engine import detect_trend
 from services.choch_engine import detect_choch
 from services.framework_checker import detect_order_blocks, _pip
+from services.framework_checker import _pip
 
 log = logging.getLogger(__name__)
 
@@ -178,7 +179,31 @@ def _check_exhaustion(df_d1: object, labels_d1: list, current_price: float, is_b
         "exhaustion_signal": score >= 50,
         "exhaustion_detail": " · ".join(detail) if detail else "none",
     }
+def _calc_lots(symbol: str, entry: float, sl: float, current_price: float) -> float:
+    """
+    Risk 1% of a nominal $10,000 account per trade.
+    Lot sizing is instrument-aware: BTC and Gold have very different pip values.
+    Replace ACCOUNT_BALANCE with your real account size or make it configurable.
+    """
+    ACCOUNT_BALANCE = 10_000.0
+    RISK_PCT        = 0.01          # 1% risk per trade
+    risk_cash       = ACCOUNT_BALANCE * RISK_PCT   # e.g. $100
 
+    pip   = _pip(current_price)
+    sl_pips = abs(entry - sl) / pip
+    if sl_pips <= 0:
+        return 0.02
+
+    # Approximate pip value per lot (USD per pip per standard lot)
+    if "BTC" in symbol:    pip_value_per_lot = 1.0    # $1 per pip per lot (1 BTC contract)
+    elif "XAU" in symbol:  pip_value_per_lot = 10.0   # $1 per 0.1 pip × 100oz = $10/pip/lot
+    elif "JPY" in symbol:  pip_value_per_lot = 9.0    # approx $9/pip/lot at current JPY rates
+    else:                  pip_value_per_lot = 10.0   # standard FX: $10/pip/standard lot
+
+    lots = risk_cash / (sl_pips * pip_value_per_lot)
+    # Clamp to broker limits
+    lots = max(0.01, min(round(lots, 2), 0.5))
+    return lots
 
 # ── Core evaluation for one pair ──────────────────────────────────────────────
 
@@ -256,7 +281,9 @@ async def _evaluate_pair(symbol: str) -> dict:
                 **exhaustion,
             }
 
-        choch_age_h = (int(time.time()) - latest_4h_choch["time"]) / 3600
+        from services.mt5_store import get_latest_timestamp as _broker_now
+        _now = _broker_now() or int(time.time())
+        choch_age_h = (_now - latest_4h_choch["time"]) / 3600
         if choch_age_h > 48:
             return {
                 "status": "WATCHING",
@@ -292,7 +319,7 @@ async def _evaluate_pair(symbol: str) -> dict:
         choch_1h_valid  = (
             latest_1h_choch is not None
             and latest_1h_choch["direction"] == d1_dir
-            and (int(time.time()) - latest_1h_choch["time"]) < 8 * 3600
+            and (_now - latest_1h_choch["time"]) < 8 * 3600
         )
 
         entry_p: Optional[float] = None
@@ -305,10 +332,15 @@ async def _evaluate_pair(symbol: str) -> dict:
             entry_p      = round(float(latest_1h_choch["price"]), 5)
             entry_source = "1H CHoCH"
 
-        if entry_p is None:
+        # Verify 1H structure is not actively opposing the trade direction.
+        # If 1H is clearly in the opposite direction, the OB/CHoCH entry is
+        # inside a broken structure — skip until 1H realigns.
+        trend_1h = trend_1h_data.get("trend", "neutral")
+        opposing = (is_bull and trend_1h == "bearish") or (not is_bull and trend_1h == "bullish")
+        if opposing:
             return {
                 "status": "WATCHING",
-                "reason": f"D1 {d1_dir} ✓  4H CHoCH ✓ — waiting for 1H entry zone",
+                "reason": f"D1 {d1_dir} ✓  4H CHoCH ✓ — 1H structure ({trend_1h}) conflicts, waiting for realignment",
                 "symbol": symbol, "d1": d1_dir, "price": current_price,
                 **exhaustion,
             }
@@ -441,7 +473,7 @@ async def _run_loop() -> None:
                                 "price":      result["entry"],
                                 "sl":         result["sl"],
                                 "tp":         result["tp"],
-                                "lots":       0.02,
+                                "lots":       _calc_lots(symbol, result["entry"], result["sl"], current_price),
                                 "comment":    "STRUCT.ai-Auto",
                             })
                             _pair_status[symbol]["order_id"] = order_id

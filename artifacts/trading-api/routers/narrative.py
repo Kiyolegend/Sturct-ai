@@ -77,7 +77,7 @@ async def _analyse_timeframe(symbol: str, interval: str, outputsize: int) -> dic
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
         if df is None or len(df) < 5:
             return {}
-        fractal_n     = 3 if interval in ("1h", "4h") else 5
+        fractal_n     = 3 if interval in ("1h", "4h", "d1") else 5
         swings        = detect_swings(df, fractal_n=fractal_n)
         labels        = classify_structure(swings)
         trend         = detect_trend(labels)

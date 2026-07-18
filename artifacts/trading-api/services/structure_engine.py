@@ -39,22 +39,27 @@ def classify_structure(swings: list[SwingPoint]) -> list[dict]:
 
         if swing["kind"] == "high":
             if prev_high is not None:
-                if swing["price"] > prev_high:
+                # Use a 2-pip tolerance so near-equal highs (double tops) are caught
+                _pip = 1.0 if swing["price"] > 10_000 else 0.1 if swing["price"] > 500 else 0.01 if swing["price"] > 50 else 0.0001
+                _tol = 2 * _pip
+                if swing["price"] > prev_high + _tol:
                     label = LABEL_HH
-                elif swing["price"] == prev_high:
+                elif abs(swing["price"] - prev_high) <= _tol:
                     label = LABEL_EQH
                 else:
-                    label = LABEL_LH        
+                    label = LABEL_LH
             prev_high = swing["price"]
 
         else:  # "low"
             if prev_low is not None:
-                if swing["price"] > prev_low:
-                    label = LABEL_HL
-                elif swing["price"] == prev_low:
+                _pip = 1.0 if swing["price"] > 10_000 else 0.1 if swing["price"] > 500 else 0.01 if swing["price"] > 50 else 0.0001
+                _tol = 2 * _pip
+                if swing["price"] < prev_low - _tol:
+                    label = LABEL_LL
+                elif abs(swing["price"] - prev_low) <= _tol:
                     label = LABEL_EQL
                 else:
-                    label = LABEL_LL
+                    label = LABEL_HL
             prev_low = swing["price"]
 
         if label:

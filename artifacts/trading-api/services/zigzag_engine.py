@@ -76,11 +76,14 @@ def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoi
             alternating.append(pivot)
 
     # Filter: remove swings smaller than 5 pips from the previous swing
-    MIN_SWING_PIPS = 5
     if len(alternating) >= 2:
         p   = alternating[0]["price"]
         pip = 1.0 if p > 10_000 else 0.1 if p > 500 else 0.01 if p > 50 else 0.0001
-        min_move = MIN_SWING_PIPS * pip
+        # Minimum swing scaled by asset class: BTC needs $100+, Gold $5+, FX 5 pips
+        if p > 10_000:  min_pips = 100   # BTC
+        elif p > 500:   min_pips = 50    # Gold
+        else:           min_pips = 5     # JPY + standard FX
+        min_move = min_pips * pip
         sized = [alternating[0]]
         for pt in alternating[1:]:
                if abs(pt["price"] - sized[-1]["price"]) >= min_move:

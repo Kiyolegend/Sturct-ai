@@ -52,17 +52,48 @@ from .zigzag_engine import detect_swings
 #   JPY pairs  (USD/JPY, EUR/JPY, GBP/JPY) → price ~100–200 → pip_size = 0.01
 #   Other pairs (EUR/USD, GBP/USD, etc.)   → price ~0.5–2.0 → pip_size = 0.0001
 # Keys: (cluster_pips, min_touches, max_dist_pips, recency_decay_bars)
-TF_CONFIG = {
+def _tf_config(timeframe: str, price: float) -> dict:
+    """Return SR config with thresholds scaled to the instrument's price class."""
+    pip = _pip_size(price)
+
+    if price > 10_000:   # BTC — targets in dollars: 4H=$500, 1H=$200, 15m=$100
+        targets = {
+            "w1":  (2000, 50000), "d1":  (1000, 20000), "4h": (500, 10000),
+            "1h":  (200,  5000),  "15m": (100,  2000),
+        }
+        min_t, max_d = targets.get(timeframe, (100, 2000))
+        return {"cluster_pips": min_t / pip, "min_touches": TF_BASE[timeframe]["min_touches"],
+                "max_dist_pips": max_d / pip, "decay_bars": TF_BASE[timeframe]["decay_bars"]}
+
+    elif price > 500:    # Gold — targets in dollars: 4H=$5, 1H=$2, 15m=$1
+        targets = {
+            "w1":  (30, 500), "d1": (15, 200), "4h": (5, 80),
+            "1h":  (2,  40),  "15m": (1, 20),
+        }
+        min_t, max_d = targets.get(timeframe, (1, 20))
+        return {"cluster_pips": min_t / pip, "min_touches": TF_BASE[timeframe]["min_touches"],
+                "max_dist_pips": max_d / pip, "decay_bars": TF_BASE[timeframe]["decay_bars"]}
+
+    else:                # FX + JPY — original values, unchanged
+        cfg = TF_BASE[timeframe]
+        return {"cluster_pips": cfg["cluster_pips"], "min_touches": cfg["min_touches"],
+                "max_dist_pips": cfg["max_dist_pips"], "decay_bars": cfg["decay_bars"]}
+
+# Original FX/JPY values kept here as the base table
+TF_BASE = {
     "w1":  {"cluster_pips": 60, "min_touches": 2, "max_dist_pips": 2000, "decay_bars": 10},
-    "d1":  {"cluster_pips": 30, "min_touches": 2, "max_dist_pips": 600, "decay_bars": 20},
-    "4h":  {"cluster_pips": 15, "min_touches": 2, "max_dist_pips": 300, "decay_bars": 40},
-    "1h":  {"cluster_pips":  7, "min_touches": 3, "max_dist_pips": 200, "decay_bars": 80},
-    "15m": {"cluster_pips":  3, "min_touches": 3, "max_dist_pips": 100, "decay_bars": 150},
+    "d1":  {"cluster_pips": 30, "min_touches": 2, "max_dist_pips": 600,  "decay_bars": 20},
+    "4h":  {"cluster_pips": 15, "min_touches": 2, "max_dist_pips": 300,  "decay_bars": 40},
+    "1h":  {"cluster_pips":  7, "min_touches": 3, "max_dist_pips": 200,  "decay_bars": 80},
+    "15m": {"cluster_pips":  3, "min_touches": 3, "max_dist_pips": 100,  "decay_bars": 150},
 }
 
 # Deduplication tolerance in pips — applied pip-aware at runtime.
 # 10 pips for any pair (was hardcoded 0.10 which only worked for JPY).
-DEDUP_PIPS = 10
+def _dedup_pips(price: float) -> float:
+    if price > 10_000: return 500   # BTC: $500 dedup
+    if price > 500:    return 15    # Gold: $1.50 dedup
+    return 10                        # FX/JPY: 10 pips (unchanged)
 
 
 def _pip_size(price: float) -> float:
@@ -138,7 +169,7 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
       2. PROXIMITY FILTER: discard levels beyond the timeframe's max pip distance.
     """
     df = df_map[timeframe]
-    cfg = TF_CONFIG[timeframe]
+    cfg = _tf_config(timeframe, current_price)
 
     # Determine pip size from current price — no symbol name required
     pip = _pip_size(current_price)
@@ -205,7 +236,7 @@ def deduplicate_across_timeframes(all_levels: list[dict], current_price: float) 
     TF_RANK = {"w1": 5, "d1": 4, "4h": 3, "1h": 2, "15m": 1}
 
     # Pip-aware dedup: always 10 pips regardless of pair
-    dedup_threshold = DEDUP_PIPS * _pip_size(current_price)
+    dedup_threshold = _dedup_pips(current_price) * _pip_size(current_price)
 
     # Sort so higher timeframes come first, then by score within same TF
     sorted_levels = sorted(

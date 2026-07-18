@@ -42,10 +42,17 @@ def detect_order_blocks(
     min_size = 20 * pip if is_d1 else 5 * pip
 
     # How close to current price the OB centre must be
-    proximity = (
-        min(0.02,  300 * pip / current_price) if is_d1
-        else min(0.015, 60 * pip / current_price)
-    )
+    # Proximity expressed as fraction of current_price.
+    # BTC and Gold need much larger windows because their pip is tiny vs price.
+    if current_price > 10_000:   # BTC
+        proximity = 0.03 if is_d1 else 0.015   # 3% / 1.5% of price (~$1950 / $975)
+    elif current_price > 500:    # Gold
+        proximity = 0.015 if is_d1 else 0.008  # 1.5% / 0.8% of price (~$35 / $19)
+    else:                        # FX and JPY — original formula
+        proximity = (
+            min(0.02,  300 * pip / current_price) if is_d1
+            else min(0.015, 60 * pip / current_price)
+        )
 
     results: list[dict] = []
 
@@ -146,3 +153,104 @@ def detect_order_blocks(
         {"type": o["type"], "top": o["top"], "bottom": o["bottom"], "time": o["time"]}
         for o in bull + bear
     ]
+
+def compute_framework_status(
+    symbol: str,
+    r4h: dict,
+    r1h: dict,
+    r15m: dict,
+    r5m: dict,
+    broker_ts: int = 0,
+    sr_levels: list | None = None,
+    news_blocked: bool = False,
+) -> dict:
+    """
+    Evaluate whether a limit-order framework setup is ready.
+    Returns {"limit_ready": bool, "limit_rr": float, "reason": str}
+    """
+    try:
+        trend_4h  = (r4h.get("trend")  or {}).get("trend",  "neutral")
+        trend_1h  = (r1h.get("trend")  or {}).get("trend",  "neutral")
+        trend_15m = (r15m.get("trend") or {}).get("trend",  "neutral")
+
+        # Must have at least 2 timeframes aligned
+        directions = [trend_4h, trend_1h, trend_15m]
+        bull = directions.count("bullish")
+        bear = directions.count("bearish")
+        aligned_count = max(bull, bear)
+        if aligned_count < 2:
+            return {"limit_ready": False, "limit_rr": 0.0, "reason": "No multi-TF alignment"}
+
+        direction = "bullish" if bull >= bear else "bearish"
+
+        if news_blocked:
+            return {"limit_ready": False, "limit_rr": 0.0, "reason": "News block active"}
+
+        # Need a recent CHoCH on 15M in the aligned direction
+        choch_15m = r15m.get("choch") or []
+        import time as _time
+        now = broker_ts or int(_time.time())
+        recent_choch = any(
+            c.get("direction") == direction and now - c.get("time", 0) <= 4 * 3600
+            for c in choch_15m
+        )
+        if not recent_choch:
+            return {"limit_ready": False, "limit_rr": 0.0, "reason": "No recent 15M CHoCH"}
+
+        # Need an OB on 1H in the aligned direction
+        df_1h = r1h.get("df")
+        if df_1h is None or len(df_1h) < 10:
+            return {"limit_ready": False, "limit_rr": 0.0, "reason": "No 1H data"}
+
+        current_price = float(df_1h["close"].iloc[-1])
+        pip = _pip(current_price)
+
+        candles = []
+        for _, row in df_1h.iterrows():
+            candles.append({
+                "time":  int(row["time"].value // 10**9) if hasattr(row["time"], "value") else int(row["time"]),
+                "open":  float(row["open"]),
+                "high":  float(row["high"]),
+                "low":   float(row["low"]),
+                "close": float(row["close"]),
+            })
+
+        obs = detect_order_blocks(candles, current_price, "1h")
+        ob  = next((o for o in obs if o["type"] == direction), None)
+        if not ob:
+            return {"limit_ready": False, "limit_rr": 0.0, "reason": "No 1H OB in aligned direction"}
+
+        entry = (ob["top"] + ob["bottom"]) / 2
+        # SL below OB for bullish, above for bearish
+        sl_dist = 15 * pip
+        sl = (ob["bottom"] - sl_dist) if direction == "bullish" else (ob["top"] + sl_dist)
+
+        # TP: nearest opposing S/R level
+        tp = None
+        for lvl in (sr_levels or []):
+            p = lvl.get("price", 0)
+            if direction == "bullish" and p > entry:
+                if tp is None or p < tp:
+                    tp = p
+            elif direction == "bearish" and p < entry:
+                if tp is None or p > tp:
+                    tp = p
+
+        if tp is None:
+            tp = entry + 50 * pip if direction == "bullish" else entry - 50 * pip
+
+        risk   = abs(entry - sl)
+        reward = abs(tp - entry)
+        rr     = round(reward / risk, 1) if risk > 0 else 0.0
+
+        if rr < 1.5:
+            return {"limit_ready": False, "limit_rr": rr, "reason": f"R:R {rr} too low"}
+
+        return {
+            "limit_ready": True,
+            "limit_rr":    rr,
+            "reason":      f"{aligned_count}/3 TF aligned {direction}, 1H OB present, R:R {rr}",
+        }
+
+    except Exception as e:
+        return {"limit_ready": False, "limit_rr": 0.0, "reason": f"Error: {e}"}

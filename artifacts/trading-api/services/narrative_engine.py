@@ -116,6 +116,20 @@ def _swing_context(
 
     in_window = 38 <= retrace_pct <= 70
 
+    # Negative retrace = price has broken beyond the swing extreme (active expansion)
+    if retrace_pct < 0:
+        side = "high" if is_bull else "low"
+        desc = (
+            f"The 4H leg covered {leg_pips} pips. Price has broken beyond the recent "
+            f"4H swing {side} — currently in active expansion ({abs(retrace_pct)}% beyond the extreme)."
+        )
+        return {
+            "leg_pips":    leg_pips,
+            "retrace_pct": retrace_pct,
+            "in_window":   False,
+            "description": desc,
+        }
+
     if retrace_pct < 20:
         desc = (
             f"The 4H leg covered {leg_pips} pips. Price has barely pulled back "
