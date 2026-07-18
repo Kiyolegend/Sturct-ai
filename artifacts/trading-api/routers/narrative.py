@@ -288,7 +288,7 @@ async def get_pair_sweep():
             )
             if not current_price:
                 return symbol, {"error": "no data"}
-            pip_size = 0.01 if current_price > 50 else 0.0001
+            pip_size = 1.0 if current_price > 10_000 else 0.1 if current_price > 500 else 0.01 if current_price > 50 else 0.0001
             bias_4h  = (r4h.get("trend")  or {}).get("trend",  "neutral")
             bias_1h  = (r1h.get("trend")  or {}).get("trend",  "neutral")
             bias_15m = (r15m.get("trend") or {}).get("trend",  "neutral")

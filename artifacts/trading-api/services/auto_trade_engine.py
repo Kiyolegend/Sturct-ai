@@ -158,12 +158,11 @@ def _check_exhaustion(df_d1: object, labels_d1: list, current_price: float, is_b
         # Check 4 — Round number trap
         try:
             pip = _pip(current_price)
-            if current_price > 50:        # JPY pairs
-                step    = 5.0
-                nearest = round(current_price / step) * step
-            else:                         # non-JPY
-                step    = 0.05
-                nearest = round(current_price / step) * step
+            if current_price > 10_000:    step = 1_000.0   # Crypto — BTC respects $1000 round numbers
+            elif current_price > 500:     step = 50.0      # Gold — respects $50 round numbers
+            elif current_price > 50:      step = 5.0       # JPY pairs
+            else:                         step = 0.05      # Standard FX
+            nearest = round(current_price / step) * step
             dist_pips = abs(current_price - nearest) / pip
             if dist_pips <= 30:
                 score += 10
@@ -366,7 +365,10 @@ async def _evaluate_pair(symbol: str) -> dict:
         elif not is_bull and d1_lo and d1_lo < entry_p:
             tp_p = round(d1_lo, 5)
         if tp_p is None:
-            fb = 80 * pip if "JPY" in symbol else 50 * pip
+            if   "BTC" in symbol: fb = 2000 * pip   # BTC: 2000 × $1.00 = $2000 fallback TP
+            elif "XAU" in symbol: fb = 300  * pip   # Gold: 300 × $0.10 = $30 fallback TP
+            elif "JPY" in symbol: fb = 80   * pip   # JPY: 80 pips
+            else:                 fb = 50   * pip   # Standard FX: 50 pips
             tp_p = round(entry_p + fb if is_bull else entry_p - fb, 5)
 
         # ── STEP 6: R:R check ────────────────────────────────────────────────

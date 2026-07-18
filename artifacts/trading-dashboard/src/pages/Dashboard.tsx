@@ -381,7 +381,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
               />
 
 
-                            {!goldenZoneAlert && pipsToZone !== null && pipsToZone <= 80 && (
+                            {!goldenZoneAlert && pipsToZone !== null && pipsToZone <= (symbol.includes("BTC") ? 500 : 80) && (
                 <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full flex items-center gap-2 backdrop-blur-md border border-white/10 bg-white/5 font-mono text-xs text-slate-400 tracking-wide pointer-events-none">
                   <span className="text-yellow-400 animate-pulse">◎</span>
                   {pipsToZone} pips to golden zone
@@ -391,7 +391,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                 </div>
               )}
 
-              {!goldenZoneAlertD1 && pipsToZoneD1 !== null && pipsToZoneD1 <= 200 && (
+              {!goldenZoneAlertD1 && pipsToZoneD1 !== null && pipsToZoneD1 <= (symbol.includes("BTC") ? 2000 : 200) && (
                 <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full flex items-center gap-2 backdrop-blur-md border border-sky-500/20 bg-sky-500/5 font-mono text-xs text-slate-400 tracking-wide pointer-events-none">
                   <span className="text-sky-400 animate-pulse">◎</span>
                   {pipsToZoneD1} pips to D1 golden zone
