@@ -43,6 +43,7 @@ interface TradingChartProps {
   fibLevels?: FibLevel[];
   fibD1Levels?: FibLevel[];
   timeframe: string;
+  broken?: boolean;
 }
 
 // ── Exported so TradeTeller can reuse them without duplicating logic ──────────
@@ -630,7 +631,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
         : null;
 
       const STRENGTH_MIN  = 0.65;
-      const MAX_TOUCHES   = 2;
+      
       const PROXIMITY_PCT = 0.015;
 
       const filtered = currentPrice === null ? [] : data.zones.filter(z => {
@@ -639,7 +640,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
         
         if (z.timeframe === "w1" && !toggles.w1Zones) return false;
         const withinProximity = Math.abs(z.center - currentPrice) / currentPrice <= PROXIMITY_PCT;
-        return z.strength >= STRENGTH_MIN && z.touches <= MAX_TOUCHES && withinProximity;
+        return !z.broken && z.strength >= STRENGTH_MIN && withinProximity;
       });
 
       const supplyZones = filtered
