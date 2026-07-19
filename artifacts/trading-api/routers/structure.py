@@ -211,11 +211,11 @@ async def get_pattern_summary(
             return patterns[0] if patterns else None
         return {
             "symbol": symbol,
-            "pattern_15m": _last_pattern(df_15m, 5, "15m"),
-            "pattern_1h": _last_pattern(df_1h, 3, "1h"),
-            "pattern_4h": _last_pattern(df_4h, 3, "4h"),
-            "pattern_d1": _last_pattern(df_d1, 3, "d1"),
-            "pattern_w1":  _last_pattern(df_w1,  2, "w1"),
+            "pattern_15m": _last_pattern(df_15m, TF_FRACTAL_N.get("15m", 5), "15m"),
+            "pattern_1h":  _last_pattern(df_1h,  TF_FRACTAL_N.get("1h",  5), "1h"),
+            "pattern_4h":  _last_pattern(df_4h,  TF_FRACTAL_N.get("4h",  5), "4h"),
+            "pattern_d1":  _last_pattern(df_d1,  TF_FRACTAL_N.get("d1",  5), "d1"),
+            "pattern_w1":  _last_pattern(df_w1,  TF_FRACTAL_N.get("w1",  5), "w1"),
         }
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))

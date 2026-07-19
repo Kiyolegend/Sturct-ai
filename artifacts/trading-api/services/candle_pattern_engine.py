@@ -110,7 +110,7 @@ def detect_candle_patterns(
         body = _body(row)
         upper_wick, lower_wick = _upper_wick(row), _lower_wick(row)
         is_bull, is_bear = row["close"] > row["open"], row["close"] < row["open"]
-        time_val = int(pd.Timestamp(row["time"]).timestamp())
+        time_val = int(row["time"].value // 10**9) if hasattr(row["time"], "value") else int(row["time"])
 
         # 1) Rejection / pin bar
         if body > 0 and lower_wick >= 2 * body and lower_wick > upper_wick and is_bull:
