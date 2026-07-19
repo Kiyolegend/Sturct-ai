@@ -139,6 +139,4 @@ def detect_zones(swings: list[SwingPoint], timeframe: str = "1h", current_price:
     zones.sort(key=lambda z: z["strength"], reverse=True)
     return zones
 
-    # Sort by strength descending
-    zones.sort(key=lambda z: z["strength"], reverse=True)
-    return zones
+    

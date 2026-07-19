@@ -25,6 +25,7 @@ from services.zones_engine import detect_zones
 from services.mtf_sr_engine import compute_mtf_sr_levels
 from services.session_engine import compute_sessions
 from services.narrative_engine import generate_narrative, build_environment
+from services.mt5_store import get_latest_timestamp
 
 router = APIRouter()
 
@@ -358,7 +359,7 @@ async def get_pair_sweep():
                 pairs[symbol] = env
                 continue
             pairs[symbol] = env
-            env_broker_ts = broker_ts if (broker_ts := int(env.get("broker_time", 0))) else int(time.time())
+            env_broker_ts = broker_ts if (broker_ts := int(env.get("broker_time", 0))) else (get_latest_timestamp() or int(time.time()))
             if env_broker_ts > sweep_broker_ts:
                 sweep_broker_ts = env_broker_ts
             if symbol not in _env_history:

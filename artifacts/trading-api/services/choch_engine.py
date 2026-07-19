@@ -43,7 +43,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
     if trend in ("bullish", "neutral"):
         for last_hl in hl_levels:
             level = last_hl["price"]
-            if level in broken_hl:
+            if round(level, 5) in broken_hl:
                 continue
             swing_idx = last_hl["index"]
             for i in range(swing_idx + fractal_n + 1, len(df)):
@@ -56,14 +56,14 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
                         "broken_label": "HL",
                         "wick_extreme": round(float(df["low"].values[i]), 5),
                     })
-                    broken_hl.add(level)
+                    broken_hl.add(round(level, 5))
                     break
 
     # Bullish CHOCH: close breaks ABOVE any LH (only in bearish/neutral trend)
     if trend in ("bearish", "neutral"):
         for last_lh in lh_levels:
             level = last_lh["price"]
-            if level in broken_lh:
+            if round(level, 5) in broken_lh:
                 continue
             swing_idx = last_lh["index"]
             for i in range(swing_idx + fractal_n + 1, len(df)):
@@ -76,7 +76,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
                         "broken_label": "LH",
                         "wick_extreme": round(float(df["high"].values[i]), 5),
                     })
-                    broken_lh.add(level)
+                    broken_lh.add(round(level, 5))
                     break
 
     choch_events.sort(key=lambda e: e.get("time", 0))
