@@ -31,58 +31,28 @@ from datetime import datetime as _dt
 
 
 # (session_name, start_hour_utc_inclusive, end_hour_utc_exclusive)
-from zoneinfo import ZoneInfo
-from datetime import datetime as _dt
 
-
-def _session_hours_for_ts(ts: pd.Timestamp) -> list[tuple]:
-    """Return (name, start_utc_h, end_utc_h) tuples using the DST offsets
-    that were actually in effect at the moment of this candle."""
-    dt = ts.to_pydatetime()
-    if dt.tzinfo is None:
-        from datetime import timezone
-        dt = dt.replace(tzinfo=timezone.utc)
-    lo = int(dt.astimezone(ZoneInfo("Europe/London")).utcoffset().total_seconds() // 3600)
-    ny = int(dt.astimezone(ZoneInfo("America/New_York")).utcoffset().total_seconds() // 3600)
-    return [
-        ("asian",  0,        9       ),
-        ("london", 8  - lo,  17 - lo ),
-        ("ny",     8  - ny,  17 - ny ),
-    ]
 
 
 def compute_sessions(df: pd.DataFrame, max_per_session: int = 5) -> list[dict]:
-    """
-    Given an OHLC DataFrame with UTC timestamps, return the most recent
-    completed and in-progress trading sessions.
-
-    Each returned dict:
-      session    : "asian" | "london" | "ny"
-      start_time : unix timestamp of first candle in session
-      end_time   : unix timestamp of last candle in session (or current if ongoing)
-      high       : highest wick price within the session
-      low        : lowest  wick price within the session
-    """
     times = pd.to_datetime(df["time"], utc=True)
+    df = df.copy()
+    df["_utc_time"] = times
+    df["_date"]     = times.dt.date
 
     all_sessions: list[dict] = []
 
-    for session_name, start_h, end_h in _live_sessions():
-        mask = (times.dt.hour >= start_h) & (times.dt.hour < end_h)
-        session_df = df[mask].copy()
-        session_times = times[mask]
+    for date, day_group in df.groupby("_date"):
+        representative_ts = day_group["_utc_time"].iloc[0]
+        sessions = _session_hours_for_ts(representative_ts)
 
-        if session_df.empty:
-            continue
-
-        session_df["_date"] = session_times.dt.date
-
-        for date, group in session_df.groupby("_date"):
+        for session_name, start_h, end_h in sessions:
+            mask  = (day_group["_utc_time"].dt.hour >= start_h) & \
+                    (day_group["_utc_time"].dt.hour <  end_h)
+            group = day_group[mask]
             if len(group) < 2:
                 continue
-
-            g_times = session_times[group.index]
-
+            g_times = group["_utc_time"]
             all_sessions.append({
                 "session":    session_name,
                 "start_time": int(g_times.min().timestamp()),
@@ -91,10 +61,8 @@ def compute_sessions(df: pd.DataFrame, max_per_session: int = 5) -> list[dict]:
                 "low":        round(float(group["low"].min()),  5),
             })
 
-    # Sort chronologically
     all_sessions.sort(key=lambda x: x["start_time"])
 
-    # Keep most recent max_per_session per session type
     per_type: dict[str, list] = {"asian": [], "london": [], "ny": []}
     for row in reversed(all_sessions):
         stype = row["session"]
@@ -104,5 +72,4 @@ def compute_sessions(df: pd.DataFrame, max_per_session: int = 5) -> list[dict]:
     merged = []
     for lst in per_type.values():
         merged.extend(lst)
-
     return sorted(merged, key=lambda x: x["start_time"])

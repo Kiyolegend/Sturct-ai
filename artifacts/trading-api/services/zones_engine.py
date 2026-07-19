@@ -112,54 +112,36 @@ def detect_zones(swings: list[SwingPoint], timeframe: str = "1h", current_price:
 
     all_clusters = _cluster_swings(high_swings, "supply") + _cluster_swings(low_swings, "demand")
 
-    # Cluster nearby levels
-    clusters: list[dict] = []
-
-    used = [False] * len(levels)
-
-    for i in range(len(levels)):
-        if used[i]:
-            continue
-
-        cluster_prices = [levels[i]]
-        cluster_times = [times[i]]
-
-        for j in range(i + 1, len(levels)):
-            if not used[j]:
-                cluster_mean = sum(cluster_prices) / len(cluster_prices)
-                if abs(levels[j] - cluster_mean) <= cluster_threshold:
-                    cluster_prices.append(levels[j])
-                    cluster_times.append(times[j])
-                    used[j] = True
-                
-                
-
-        used[i] = True
-
-        if len(cluster_prices) >= 2:
-            center = sum(cluster_prices) / len(cluster_prices)
-            touches = len(cluster_prices)
-            clusters.append({
-                "center": center,
-                "touches": touches,
-                "first_time": min(cluster_times),
-                "last_time": max(cluster_times),
-            })
-
     zones = []
-    for cluster in clusters:
-        half_w = zone_width + (cluster["touches"] * pip * 0.1)
+    for cluster in all_clusters:
+        half_w   = zone_width + (cluster["touches"] * pip * 0.1)
         strength = min(base_strength + cluster["touches"], 5)
+        top      = round(cluster["center"] + half_w, 5)
+        bottom   = round(cluster["center"] - half_w, 5)
+
+        # BUG-019: mark zones that price has fully traded through
+        broken = False
+        if current_price is not None:
+            if cluster["kind"] == "supply" and current_price > top:
+                broken = True
+            elif cluster["kind"] == "demand" and current_price < bottom:
+                broken = True
+
         zones.append({
-            "top": round(cluster["center"] + half_w, 5),
-            "bottom": round(cluster["center"] - half_w, 5),
-            "center": round(cluster["center"], 5),
-            "touches": cluster["touches"],
-            "strength": strength,
-            "timeframe": timeframe,
+            "top":        top,
+            "bottom":     bottom,
+            "center":     round(cluster["center"], 5),
+            "kind":       cluster["kind"],
+            "touches":    cluster["touches"],
+            "strength":   strength,
+            "broken":     broken,
+            "timeframe":  timeframe,
             "start_time": cluster["first_time"],
-            "end_time": cluster["last_time"],
+            "end_time":   cluster["last_time"],
         })
+
+    zones.sort(key=lambda z: z["strength"], reverse=True)
+    return zones
 
     # Sort by strength descending
     zones.sort(key=lambda z: z["strength"], reverse=True)

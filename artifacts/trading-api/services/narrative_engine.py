@@ -107,12 +107,12 @@ def _swing_context(
         return {}
 
     is_bull = bias_4h == "bullish"
-    # For Gold/BTC, show price distance in natural units ($, not tiny pips)
+    # For Gold/BTC show price distance in dollar terms, not tiny pips
     if pip_size >= 0.1:   # Gold (0.1) or BTC (1.0)
-        leg_pips = round(leg_size, 1)   # dollar distance, 1 decimal
+        leg_pips  = round(leg_size, 1)
         _leg_unit = "$"
     else:
-        leg_pips = round(leg_size / pip_size)
+        leg_pips  = round(leg_size / pip_size)
         _leg_unit = "pips"
 
     if is_bull:
@@ -120,45 +120,45 @@ def _swing_context(
     else:
         retrace_pct = round(((current_price - lo_price) / leg_size) * 100)
 
-    f"The 4H leg covered {leg_pips} {_leg_unit}"
+    in_window = 38 <= retrace_pct <= 70
 
     # Negative retrace = price has broken beyond the swing extreme (active expansion)
     if retrace_pct < 0:
         side = "high" if is_bull else "low"
         desc = (
-            f"The 4H leg covered {leg_pips} pips. Price has broken beyond the recent "
+            f"The 4H leg covered {leg_pips} {_leg_unit}. Price has broken beyond the recent "
             f"4H swing {side} — currently in active expansion ({abs(retrace_pct)}% beyond the extreme)."
         )
         return {
             "leg_pips":    leg_pips,
             "retrace_pct": retrace_pct,
-            f"The 4H leg covered {leg_pips} {_leg_unit}"
+            "in_window":   in_window,
             "description": desc,
         }
 
     if retrace_pct < 20:
         desc = (
-            f"The 4H leg covered {leg_pips} pips. Price has barely pulled back "
+            f"The 4H leg covered {leg_pips} {_leg_unit}. Price has barely pulled back "
             f"({retrace_pct}% retrace) — the move is still extended."
         )
     elif retrace_pct < 38:
         desc = (
-            f"The 4H leg covered {leg_pips} pips. Price is at a {retrace_pct}% retrace — "
+            f"The 4H leg covered {leg_pips} {_leg_unit}. Price is at a {retrace_pct}% retrace — "
             f"approaching the typical structural pullback zone (38%) but not there yet."
         )
     elif retrace_pct <= 70:
         desc = (
-            f"The 4H leg covered {leg_pips} pips. Price is at a {retrace_pct}% retrace — "
+            f"The 4H leg covered {leg_pips} {_leg_unit}. Price is at a {retrace_pct}% retrace — "
             f"inside the typical structural pullback zone (38–70%)."
         )
     elif retrace_pct <= 85:
         desc = (
-            f"The 4H leg covered {leg_pips} pips. Price has retraced {retrace_pct}% — "
+            f"The 4H leg covered {leg_pips} {_leg_unit}. Price has retraced {retrace_pct}% — "
             f"deeper than a typical pullback."
         )
     else:
         desc = (
-            f"The 4H leg covered {leg_pips} pips. Price has retraced {retrace_pct}% — "
+            f"The 4H leg covered {leg_pips} {_leg_unit}. Price has retraced {retrace_pct}% — "
             f"this deep a pullback often signals the prior trend leg is exhausted."
         )
 
@@ -168,7 +168,6 @@ def _swing_context(
         "in_window":   in_window,
         "description": desc,
     }
-
 
 # ── Session Context ───────────────────────────────────────────────────────────
 

@@ -5,9 +5,8 @@ import time
 from services.data_service import fetch_ohlc, candles_to_dict
 
 
-from services.zigzag_engine import detect_swings, swings_to_zigzag_lines
-from services.zigzag_engine import detect_swings, TF_FRACTAL_N
-tf_fractal_n = TF_FRACTAL_N.get(interval, 5)
+from services.zigzag_engine import detect_swings, swings_to_zigzag_lines, TF_FRACTAL_N
+
 from services.structure_engine import classify_structure
 from services.trend_engine import detect_trend
 from services.bos_engine import detect_bos

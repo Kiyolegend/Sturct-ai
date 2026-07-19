@@ -25,6 +25,7 @@ from services.structure_engine import classify_structure
 from services.trend_engine import detect_trend
 from services.choch_engine import detect_choch
 from services.framework_checker import detect_order_blocks, _pip
+from services.bos_engine import detect_bos
 
 
 log = logging.getLogger(__name__)
@@ -282,15 +283,25 @@ async def _evaluate_pair(symbol: str) -> dict:
                 "symbol": symbol, "d1": d1_dir, "price": current_price,
                 **exhaustion,
             }
-                # BUG-035: verify no subsequent 4H BOS in the opposite direction has invalidated the CHoCH
-        choch_dir = latest_4h_choch.get("direction")   # "bullish" or "bearish"
+                        # BUG-035: check no subsequent 4H BOS in the opposite direction has invalidated the CHoCH
+        bos_4h = detect_bos(
+            df_4h, swings_4h, labels_4h,
+            trend_4h_data.get("trend", "neutral"),
+            lookback_hours=336, fractal_n=3,
+        )
+        choch_dir = latest_4h_choch.get("direction")
         invalidating_bos = [
             b for b in bos_4h
             if b["direction"] != choch_dir
             and b["time"] > latest_4h_choch["time"]
         ]
         if invalidating_bos:
-            return {"status": "WATCHING", "reason": f"4H CHoCH invalidated by subsequent 4H BOS {invalidating_bos[-1]['direction']}"}
+            return {
+                "status": "WATCHING",
+                "reason": f"4H CHoCH invalidated by subsequent 4H BOS {invalidating_bos[-1]['direction']}",
+                "symbol": symbol, "d1": d1_dir, "price": current_price,
+                **exhaustion,
+            }
 
         from services.mt5_store import get_latest_timestamp as _broker_now
         _now = _broker_now() or int(time.time())

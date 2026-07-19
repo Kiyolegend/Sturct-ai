@@ -381,11 +381,12 @@ def _check_breakeven_all():
         pip    = _pip(entry)
         if one_r <= 0:
             continue
-        # Use live tick instead of the last completed bar to avoid up-to-15-min delay
+        # Use live tick instead of last completed bar — avoids up-to-15-min BE delay
         tick_data = mt5.symbol_info_tick(info["symbol"])
         if not tick_data:
             continue
         close = tick_data.bid if info["direction"] == "BUY" else tick_data.ask
+        if info["direction"] == "BUY":
             if close < entry + 1.5 * one_r:
                 continue
             new_sl = round(entry + pip, 5)
