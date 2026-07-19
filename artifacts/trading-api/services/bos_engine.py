@@ -39,6 +39,8 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
         label = label_item["label"]
         
         swing_idx = label_item["index"]
+        if times_arr and times_arr[swing_idx] < times_arr[-1] - (lookback_hours * 3600):
+            continue
 
         if level_key in broken_levels:
             continue

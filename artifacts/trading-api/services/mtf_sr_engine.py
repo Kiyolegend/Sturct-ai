@@ -45,7 +45,7 @@ Recency decay:
 """
 
 import math
-from .zigzag_engine import detect_swings
+from .zigzag_engine import detect_swings, TF_FRACTAL_N
 
 # Per-timeframe config stored in pips (symbol-agnostic).
 # pip_size is computed at runtime from current_price — no symbol name needed:
@@ -179,7 +179,7 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
     decay_bars  = cfg["decay_bars"]
     total_bars  = len(df)
 
-    swings = detect_swings(df, fractal_n=3 if timeframe in ("1h", "4h", "d1") else 5)
+    swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(timeframe, 5))
     if not swings:
         return []
 
