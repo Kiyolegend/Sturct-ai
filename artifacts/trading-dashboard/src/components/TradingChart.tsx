@@ -630,7 +630,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
         ? data.candles[data.candles.length - 1].close
         : null;
 
-      const STRENGTH_MIN  = 0.65;
+      const STRENGTH_MIN  = 3;
       
       const PROXIMITY_PCT = 0.015;
 

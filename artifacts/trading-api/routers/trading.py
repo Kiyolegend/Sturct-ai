@@ -48,7 +48,7 @@ _VALID_SYMBOLS = {
     "USD/JPY", "EUR/USD", "GBP/USD",
     "AUD/USD", "USD/CHF", "EUR/JPY",
     "GBP/JPY", "USD/CAD", "NZD/USD",
-    "AUD/JPY", "CAD/JPY",
+    "AUD/JPY", "CAD/JPY", "XAU/USD", "BTC/USD",
 }
 
 

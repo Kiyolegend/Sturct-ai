@@ -19,11 +19,13 @@ from .zigzag_engine import SwingPoint
 # Per-asset-class pip multipliers — FX baseline stays the same.
 # Gold and BTC need much larger multipliers because their pip ($0.10 / $1.00)
 # is tiny relative to their actual price swings.
-def _cluster_pips(price: float) -> float:
-    if price > 10_000: return 200.0   # BTC: $200 cluster tolerance
-    if price > 500:    return 30.0    # Gold: $3 cluster tolerance
-    if price > 50:     return 1.5     # JPY: 1.5 pips (unchanged)
-    return 1.5                         # Standard FX: 1.5 pips (unchanged)
+def _cluster_pips(price: float, timeframe: str = "1h") -> float:
+    tf_scale = {"5m": 1.0, "15m": 1.5, "1h": 3.0, "4h": 8.0, "d1": 20.0, "w1": 50.0}
+    scale = tf_scale.get(timeframe, 1.0)
+    if price > 10_000: return 200.0 * scale
+    if price > 500:    return 30.0  * scale
+    if price > 50:     return 1.5   * scale
+    return 1.5 * scale
 
 def _zone_width_pips(price: float) -> float:
     if price > 10_000: return 300.0   # BTC: $300 half-width
@@ -54,7 +56,7 @@ def detect_zones(swings: list[SwingPoint], timeframe: str = "1h", current_price:
         ref = sorted(s["price"] for s in swings)[len(swings) // 2]
         pip = _pip_size(ref)
 
-    cluster_threshold = _cluster_pips(ref)    * pip
+    cluster_threshold = _cluster_pips(ref, timeframe) * pip
     zone_width        = _zone_width_pips(ref) * pip
     # Timeframe strength weights
     tf_strength = {"w1": 5, "d1": 4, "4h": 3, "1h": 2, "15m": 1, "5m": 0}
