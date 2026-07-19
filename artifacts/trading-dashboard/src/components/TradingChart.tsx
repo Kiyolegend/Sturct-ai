@@ -13,7 +13,7 @@ import {
   SeriesMarker,
   ISeriesMarkersPluginApi,
 } from 'lightweight-charts';
-import type { TradingAnalysisResponse, SRLevel, SessionBox, BosChochResponse } from '@/hooks/use-trading-api';
+import type { TradingAnalysisResponse, SRLevel, SessionBox, BosChochResponse, TrendlineSegment } from '@/hooks/use-trading-api';
 import type { ToggleState } from '@/components/TopBar';
 
 const SESSION_STYLE: Record<string, { bg: string; border: string; label: string; textColor: string }> = {
@@ -394,7 +394,15 @@ containerRef.current?.addEventListener('click', handleChartClick);
     trendlineSeriesRefs.current = [];
 
     
-    const addTrendlines = (lines: typeof data.trendlines.bullish, color: string) => {
+    // Adapter: backend now returns a single trendline object (or null) per direction,
+    // not an array. Normalise to an array so the drawing logic stays unchanged.
+    const toLines = (tl: TrendlineSegment | null): { from_time: number; from_price: number; to_time: number; to_price: number }[] => {
+      if (!tl) return [];                            // null → nothing to draw
+      if (tl.valid === false || tl.invalidated) return []; // invalid/broken → skip
+      return [tl];                                   // single object → wrap in array
+    };
+
+    const addTrendlines = (lines: { from_time: number; from_price: number; to_time: number; to_price: number }[], color: string) => {
       lines.forEach(line => {
         if (line.from_time === line.to_time) return;
         const s = chartRef.current!.addSeries(LineSeries, {
@@ -405,16 +413,16 @@ containerRef.current?.addEventListener('click', handleChartClick);
           s.setData([
             { time: line.from_time as Time, value: line.from_price },
             { time: line.to_time as Time, value: line.to_price },
-             ] as any);
-             trendlineSeriesRefs.current.push(s);
+          ] as any);
+          trendlineSeriesRefs.current.push(s);
         } catch {
           chartRef.current?.removeSeries(s);
         }
       });
-    };           
-                
-    addTrendlines(data.trendlines.bullish, 'rgba(38,166,154,0.65)');
-    addTrendlines(data.trendlines.bearish, 'rgba(239,83,80,0.65)');
+    };
+
+    addTrendlines(toLines(data.trendlines.bullish), 'rgba(38,166,154,0.65)');
+    addTrendlines(toLines(data.trendlines.bearish), 'rgba(239,83,80,0.65)');
 
     if (markersPluginRef.current) {
       if (toggles.labels) {

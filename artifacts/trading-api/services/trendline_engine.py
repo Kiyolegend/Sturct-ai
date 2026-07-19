@@ -86,10 +86,4 @@ def compute_trendlines(
         "bearish": bearish,
     }
 
-    latest_time = int(df["time"].iloc[-1].timestamp()) if len(df) > 0 else None
-    trendlines = compute_trendlines(
-        structure_labels,
-        current_price=current_price,
-        latest_time=latest_time,
-        bar_seconds={"5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "d1": 86400, "w1": 604800}.get(interval, 900),
-    )
+    
