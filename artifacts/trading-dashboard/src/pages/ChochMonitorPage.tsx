@@ -3,7 +3,7 @@
  * Route: /choch  (opens in new tab from TopBar)
  */
 
-import { useChoch, type ChochEvent } from "@/hooks/use-trading-api";
+import { useChoch, useBrokerTime, type ChochEvent } from "@/hooks/use-trading-api";
 import { useChochAlerts, dismissChochAlert } from "@/hooks/use-choch-alerts";
 import { LoginGate } from "@/components/LoginGate";
 import { X } from "lucide-react";
@@ -15,15 +15,15 @@ const PAIRS = [
 
 function fmt(p: number) { return p > 50 ? p.toFixed(3) : p.toFixed(5); }
 
-function timeAgo(unixSec: number) {
-  const age = Math.floor(Date.now() / 1000) - unixSec;
+function timeAgo(unixSec: number, nowSec: number) {
+  const age = nowSec - unixSec;
   if (age < 60) return `${age}s ago`;
   if (age < 3600) return `${Math.floor(age / 60)}m ago`;
   return `${(age / 3600).toFixed(1)}h ago`;
 }
 
-function countdown(expiresAt: number) {
-  const remain = expiresAt - Math.floor(Date.now() / 1000);
+function countdown(expiresAt: number, nowSec: number) {
+  const remain = expiresAt - nowSec;
   if (remain <= 0) return "⚠ EXPIRED";
   const h = Math.floor(remain / 3600);
   const m = Math.floor((remain % 3600) / 60);
@@ -32,14 +32,14 @@ function countdown(expiresAt: number) {
 
 // ── Single cell showing one timeframe's CHoCH ─────────────────────────────────
 
-function ChochCell({ event, validitySec }: { event: ChochEvent | null; validitySec: number }) {
+function ChochCell({ event, validitySec, brokerNow }: { event: ChochEvent | null; validitySec: number; brokerNow: number }) {
   if (!event) return (
     <div style={{ textAlign: "center", color: "#1f2937", fontSize: 11 }}>—</div>
   );
   const bull = event.direction === "bullish";
   const color = bull ? "#26a69a" : "#ef5350";
   const expiresAt = event.time + validitySec;
-  const valid = countdown(expiresAt);
+  const valid = countdown(expiresAt, brokerNow);
   const expired = valid === "⚠ EXPIRED";
   return (
     <div style={{
@@ -51,7 +51,7 @@ function ChochCell({ event, validitySec }: { event: ChochEvent | null; validityS
         {bull ? "▲ BULL" : "▼ BEAR"}
       </div>
       <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>{fmt(event.price)}</div>
-      <div style={{ fontSize: 9, color: "#475569", marginTop: 3 }}>{timeAgo(event.time)}</div>
+      <div style={{ fontSize: 9, color: "#475569", marginTop: 3 }}>{timeAgo(event.time, brokerNow)}</div>
       <div style={{ fontSize: 9, color: expired ? "#ef5350" : "#374151", marginTop: 1 }}>{valid}</div>
     </div>
   );
@@ -62,6 +62,8 @@ function ChochCell({ event, validitySec }: { event: ChochEvent | null; validityS
 function ChochPairRow({ symbol }: { symbol: string }) {
   const { data: d1h, isLoading: l1h } = useChoch(symbol, "1h");
   const { data: d4h, isLoading: l4h } = useChoch(symbol, "4h");
+  const { data: brokerTimeData } = useBrokerTime();
+  const brokerNow = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
   const latest1h = d1h?.choch?.length ? d1h.choch[d1h.choch.length - 1] : null;
   const latest4h = d4h?.choch?.length ? d4h.choch[d4h.choch.length - 1] : null;
   return (
@@ -78,10 +80,10 @@ function ChochPairRow({ symbol }: { symbol: string }) {
       </div>
       {l1h
         ? <div style={{ fontSize: 10, color: "#374151" }}>loading…</div>
-        : <ChochCell event={latest1h} validitySec={8 * 3600} />}
+        : <ChochCell event={latest1h} validitySec={8 * 3600} brokerNow={brokerNow} />}
       {l4h
         ? <div style={{ fontSize: 10, color: "#374151" }}>loading…</div>
-        : <ChochCell event={latest4h} validitySec={48 * 3600} />}
+        : <ChochCell event={latest4h} validitySec={48 * 3600} brokerNow={brokerNow} />}
     </div>
   );
 }
@@ -90,6 +92,8 @@ function ChochPairRow({ symbol }: { symbol: string }) {
 
 function ActiveAlerts() {
   const alerts = useChochAlerts();
+  const { data: brokerTimeData } = useBrokerTime();
+  const brokerNow = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
   if (alerts.length === 0) return (
     <div style={{ textAlign: "center", padding: "20px 0", color: "#1f2937", fontSize: 11, letterSpacing: "0.1em" }}>
       NO ACTIVE ALERTS
@@ -118,7 +122,7 @@ function ActiveAlerts() {
             <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>
               {fmt(a.price)} — {a.brokenLabel} broken
             </div>
-            <div style={{ fontSize: 10, color: "#475569", marginTop: 3 }}>{countdown(a.expiresAt)}</div>
+            <div style={{ fontSize: 10, color: "#475569", marginTop: 3 }}>{countdown(a.expiresAt, brokerNow)}</div>
           </div>
         );
       })}

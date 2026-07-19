@@ -15,6 +15,9 @@ let alerts: ChochAlert[] = [];
 const dismissed = new Set<string>(
   JSON.parse(localStorage.getItem("struct_choch_dismissed") ?? "[]")
 );
+
+let lastBrokerNow = 0;
+export function setBrokerNow(t: number) { lastBrokerNow = t; }
 const listeners: Array<() => void> = [];
 
 function persist() {
@@ -36,8 +39,7 @@ export function dismissChochAlert(id: string) {
   emit();
 }
 
-function pruneExpired() {
-  const now = Math.floor(Date.now() / 1000);
+function pruneExpired(now: number) {
   const before = alerts.length;
   alerts = alerts.filter((a) => a.expiresAt > now);
   if (alerts.length !== before) emit();
@@ -48,7 +50,10 @@ export function useChochAlerts() {
   useEffect(() => {
     const rerender = () => force((n) => n + 1);
     listeners.push(rerender);
-    const interval = setInterval(() => { pruneExpired(); rerender(); }, 30_000);
+  const interval = setInterval(() => {
+    pruneExpired(lastBrokerNow || Math.floor(Date.now() / 1000));
+    rerender();
+  }, 30_000);
     return () => {
       listeners.splice(listeners.indexOf(rerender), 1);
       clearInterval(interval);

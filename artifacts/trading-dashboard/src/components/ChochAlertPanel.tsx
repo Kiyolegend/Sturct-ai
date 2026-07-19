@@ -1,10 +1,11 @@
 import { useChochAlerts, dismissChochAlert } from "@/hooks/use-choch-alerts";
+import { useBrokerTime } from "@/hooks/use-trading-api";
 import { X } from "lucide-react";
 
 function fmt(p: number) { return p > 50 ? p.toFixed(3) : p.toFixed(5); }
 
-function countdown(expiresAt: number) {
-  const remain = expiresAt - Math.floor(Date.now() / 1000);
+function countdown(expiresAt: number, nowSec: number) {
+  const remain = expiresAt - nowSec;
   if (remain <= 0) return "expired";
   const h = Math.floor(remain / 3600);
   const m = Math.floor((remain % 3600) / 60);
@@ -13,6 +14,8 @@ function countdown(expiresAt: number) {
 
 export function ChochAlertPanel() {
   const alerts = useChochAlerts();
+  const { data: brokerTimeData } = useBrokerTime();
+  const brokerNow = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
   if (alerts.length === 0) return null;
 
   return (
@@ -33,7 +36,7 @@ export function ChochAlertPanel() {
             <div className="text-[11px] opacity-80">
               {fmt(a.price)} — {a.brokenLabel} broken
             </div>
-            <div className="text-[10px] opacity-60 mt-0.5">{countdown(a.expiresAt)}</div>
+            <div className="text-[10px] opacity-60 mt-0.5">{countdown(a.expiresAt, brokerNow)}</div>
           </button>
         );
       })}

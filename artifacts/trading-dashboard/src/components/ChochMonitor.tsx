@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useMemo, useRef } from "react";
-import { useChoch, type ChochEvent } from "@/hooks/use-trading-api";
+import { useChoch, useBrokerTime, type ChochEvent } from "@/hooks/use-trading-api";
 import { useToast } from "@/hooks/use-toast";
 import { addChochAlert } from "@/hooks/use-choch-alerts";
 
@@ -41,6 +41,7 @@ function fireSystemNotification(title: string, body: string) {
 
 export function ChochMonitor() {
   const { toast } = useToast();
+  const { data: brokerTimeData } = useBrokerTime();
   const permRequested = useRef(false);
 
   // 11 symbols × 2 timeframes = 22 hooks (must be static — no loops allowed)
@@ -123,7 +124,7 @@ export function ChochMonitor() {
         const isBull         = latest.direction === "bullish";
         const emoji          = isBull ? "🟢" : "🔴";
         const dirLabel       = isBull ? "BULLISH" : "BEARISH";
-        const nowSec         = Math.floor(Date.now() / 1000);
+        const nowSec = brokerTimeData?.broker_time ?? Math.floor(Date.now() / 1000);
         const ageSec         = nowSec - latestTime;
         const validitySec    = tf === "1h" ? 8 * 3600 : 48 * 3600;
         const remainingSec   = validitySec - ageSec;
