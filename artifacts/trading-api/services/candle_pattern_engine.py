@@ -24,11 +24,7 @@ from __future__ import annotations
 import pandas as pd
 
 
-def _pip_size(price: float) -> float:
-    if price > 10_000: return 1.0    # Crypto  (BTC ~65 000)
-    if price > 500:    return 0.1    # Gold    (XAU ~2 350)
-    if price > 50:     return 0.01   # JPY pairs (USD/JPY ~150)
-    return 0.0001                    # Standard FX (EUR/USD ~1.08)
+from services.pip_utils import pip_size as _pip_size
 
 
 def _body(row) -> float:
@@ -54,6 +50,23 @@ def _collect_levels(swings: list[dict], zones: list[dict]) -> list[float]:
         levels.append(z["top"])
         levels.append(z["bottom"])
     return levels
+
+def _collect_high_levels(swings: list[dict], zones: list[dict]) -> list[float]:
+    """Supply levels only — swing highs + supply zone tops. For bearish sweeps."""
+    lvls: list[float] = [s["price"] for s in (swings or []) if s.get("kind") == "high"]
+    for z in (zones or []):
+        if z.get("kind") == "supply":
+            lvls.append(z["top"])
+    return lvls
+
+
+def _collect_low_levels(swings: list[dict], zones: list[dict]) -> list[float]:
+    """Demand levels only — swing lows + demand zone bottoms. For bullish sweeps."""
+    lvls: list[float] = [s["price"] for s in (swings or []) if s.get("kind") == "low"]
+    for z in (zones or []):
+        if z.get("kind") == "demand":
+            lvls.append(z["bottom"])
+    return lvls
 
 
 def _touches_any_level(row, levels: list[float], tolerance: float) -> bool:
@@ -82,6 +95,8 @@ def detect_candle_patterns(
     levels = _collect_levels(swings, zones or [])
     if not levels:
         return []
+    high_levels = _collect_high_levels(swings, zones or [])
+    low_levels  = _collect_low_levels(swings, zones or [])
 
     window = df.tail(lookback + 1).reset_index(drop=True)
     results: list[dict] = []

@@ -32,11 +32,7 @@ def _zone_width_pips(price: float) -> float:
     return 3.0                         # Standard FX: 3 pips (unchanged)
 
 
-def _pip_size(price: float) -> float:
-    if price > 10_000: return 1.0
-    if price > 500:    return 0.1
-    if price > 50:     return 0.01
-    return 0.0001
+from .pip_utils import pip_size as _pip_size
 
 
 def detect_zones(swings: list[SwingPoint], timeframe: str = "1h", current_price: float | None = None) -> list[dict]:

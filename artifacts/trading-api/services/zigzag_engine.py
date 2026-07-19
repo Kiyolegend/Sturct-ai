@@ -36,10 +36,18 @@ def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoi
     lows = df["low"].values
     times = df["time"].values
     ts_unix = df["time"].astype("datetime64[s]").astype("int64").values
+    
+    # BUG-055: spike filter — candles whose H-L range exceeds 5× the median
+    # candle range are data errors or flash crashes; exclude from pivot detection.
+    _ranges    = highs - lows
+    _med_range = float(np.median(_ranges[_ranges > 0])) if np.any(_ranges > 0) else 0.0
+    _spike     = (_ranges > 5.0 * _med_range) if _med_range > 0 else np.zeros(len(_ranges), dtype=bool)
 
     raw_pivots: list[SwingPoint] = []
 
     for i in range(n, len(df) - n):
+        if _spike[i]:
+            continue  # skip spike candles
         # Build neighbor windows excluding the center bar for strict comparison
         neighbors_h = np.concatenate([highs[i - n:i], highs[i + 1:i + n + 1]])
         neighbors_l = np.concatenate([lows[i - n:i], lows[i + 1:i + n + 1]])
