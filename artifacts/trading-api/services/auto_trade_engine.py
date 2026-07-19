@@ -488,17 +488,10 @@ async def _run_loop() -> None:
                 if sid and sid not in _fired_ids:
                     _fired_ids.add(sid)
                     _fired_times[sid] = time.time()
-                # Prune stale IDs
-                now_t = time.time()
-                expired = [k for k, v in _fired_times.items() if now_t - v > _FIRED_TTL_S]
-                for k in expired:
-                    _fired_ids.discard(k)
-                    del _fired_times[k]
                     entry = {**result, "fired_at": int(time.time()), "paper_mode": _paper_mode}
                     _trade_log.insert(0, entry)
                     if len(_trade_log) > 50:
                         _trade_log.pop()
-
                     if not _paper_mode:
                         try:
                             from routers.trading import queue_order
@@ -509,7 +502,7 @@ async def _run_loop() -> None:
                                 "price":      result["entry"],
                                 "sl":         result["sl"],
                                 "tp":         result["tp"],
-                                "lots": _calc_lots(symbol, result["entry"], result["sl"], result["price"]),
+                                "lots":       _calc_lots(symbol, result["entry"], result["sl"], result["price"]),
                                 "comment":    "STRUCT.ai-Auto",
                             })
                             _pair_status[symbol]["order_id"] = order_id
@@ -518,6 +511,13 @@ async def _run_loop() -> None:
                             log.error(f"[AutoTrade] Failed to queue order: {e}")
                     else:
                         log.info(f"[AutoTrade] PAPER: {symbol} {result['direction']} entry={result['entry']} R:R={result['rr']}")
+
+                # Prune stale IDs — runs every cycle
+                now_t   = time.time()
+                expired = [k for k, v in _fired_times.items() if now_t - v > _FIRED_TTL_S]
+                for k in expired:
+                    _fired_ids.discard(k)
+                    del _fired_times[k]
 
         if _enabled:
             await asyncio.sleep(60)
