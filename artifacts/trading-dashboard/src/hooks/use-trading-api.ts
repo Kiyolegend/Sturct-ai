@@ -53,16 +53,19 @@ export interface ChochEvent {
 }
 
 export interface TrendlineSegment {
+  valid: boolean;
+  slope: number;
+  intercept: number;
   from_time: number;
   from_price: number;
   to_time: number;
   to_price: number;
-  kind: "bullish" | "bearish";
+  touches: number;
+  invalidated: boolean;
 }
-
 export interface TrendlinesData {
-  bullish: TrendlineSegment[];
-  bearish: TrendlineSegment[];
+  bullish: TrendlineSegment | null;   // single object now, not array
+  bearish: TrendlineSegment | null;
 }
 
 export interface Zone {

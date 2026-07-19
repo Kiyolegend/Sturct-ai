@@ -393,6 +393,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
     trendlineSeriesRefs.current.forEach(s => { try { chartRef.current?.removeSeries(s); } catch {} });
     trendlineSeriesRefs.current = [];
 
+    
     const addTrendlines = (lines: typeof data.trendlines.bullish, color: string) => {
       lines.forEach(line => {
         if (line.from_time === line.to_time) return;
