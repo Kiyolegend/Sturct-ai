@@ -161,7 +161,7 @@ def detect_candle_patterns(
     # 5) Inside bar — only checked on the LAST closed candle, direction-agnostic
     last, prior = window.iloc[-1], window.iloc[-2]
     if last["high"] <= prior["high"] and last["low"] >= prior["low"] and _touches_any_level(last, levels, tolerance):
-        results.append({"time": int(pd.Timestamp(last["time"]).timestamp()), "index": len(window) - 1,
+        results.append({"time": int(last["time"].value // 10**9) if hasattr(last["time"], "value") else int(last["time"]), "index": len(window) - 1,
                          "pattern": "inside_bar", "direction": "neutral", "price": float(last["close"]),
                          "context": "Range compression at a structural level — often precedes a breakout."})
 

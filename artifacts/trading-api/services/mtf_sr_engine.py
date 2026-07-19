@@ -46,6 +46,7 @@ Recency decay:
 
 import math
 from .zigzag_engine import detect_swings, TF_FRACTAL_N
+from .pip_utils import pip_size as _pip_size
 
 # Per-timeframe config stored in pips (symbol-agnostic).
 # pip_size is computed at runtime from current_price — no symbol name needed:
@@ -96,11 +97,7 @@ def _dedup_pips(price: float) -> float:
     return 10                        # FX/JPY: 10 pips (unchanged)
 
 
-def _pip_size(price: float) -> float:
-    if price > 10_000: return 1.0
-    if price > 500:    return 0.1
-    if price > 50:     return 0.01
-    return 0.0001
+
 
 
 def _cluster_levels(swing_data: list[dict], threshold: float) -> list[dict]:
