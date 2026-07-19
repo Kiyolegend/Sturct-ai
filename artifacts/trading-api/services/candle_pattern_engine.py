@@ -133,15 +133,15 @@ def detect_candle_patterns(
                              "direction": "bearish", "price": float(row["close"]),
                              "context": "Bearish candle engulfed the prior bullish candle at a level."})
 
-        # 3) Liquidity sweep / fakey
-        if any(row["high"] > lvl + tolerance and row["close"] < lvl for lvl in levels):
+        # 3) Liquidity sweep / fakey — zone-kind aware (BUG-027)
+        if high_levels and any(row["high"] > lvl + tolerance and row["close"] < lvl for lvl in high_levels):
             results.append({"time": time_val, "index": i, "pattern": "liquidity_sweep",
                              "direction": "bearish", "price": float(row["high"]),
-                             "context": "Wick swept above a level and closed back below it — liquidity grab."})
-        if any(row["low"] < lvl - tolerance and row["close"] > lvl for lvl in levels):
+                             "context": "Wick swept above a supply level and closed back below it — liquidity grab."})
+        if low_levels and any(row["low"] < lvl - tolerance and row["close"] > lvl for lvl in low_levels):
             results.append({"time": time_val, "index": i, "pattern": "liquidity_sweep",
                              "direction": "bullish", "price": float(row["low"]),
-                             "context": "Wick swept below a level and closed back above it — liquidity grab."})
+                             "context": "Wick swept below a demand level and closed back above it — liquidity grab."})
 
         # 4) Displacement
         recent = [_range(window.iloc[j]) for j in range(max(0, i - 5), i)]
