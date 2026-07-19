@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useChoch, useBrokerTime, type ChochEvent } from "@/hooks/use-trading-api";
 import { useToast } from "@/hooks/use-toast";
-import { addChochAlert } from "@/hooks/use-choch-alerts";
+import { addChochAlert, setBrokerNow } from "@/hooks/use-choch-alerts";
 
 function fmt(p: number): string {
   return p > 50 ? p.toFixed(3) : p.toFixed(5);
@@ -42,6 +42,9 @@ function fireSystemNotification(title: string, body: string) {
 export function ChochMonitor() {
   const { toast } = useToast();
   const { data: brokerTimeData } = useBrokerTime();
+  useEffect(() => {
+  if (brokerTimeData?.broker_time) setBrokerNow(brokerTimeData.broker_time);
+}, [brokerTimeData]);
   const permRequested = useRef(false);
 
   // 11 symbols × 2 timeframes = 22 hooks (must be static — no loops allowed)
