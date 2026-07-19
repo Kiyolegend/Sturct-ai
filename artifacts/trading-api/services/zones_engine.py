@@ -22,7 +22,7 @@ from .zigzag_engine import SwingPoint
 def _cluster_pips(price: float, timeframe: str = "1h") -> float:
     tf_scale = {"5m": 1.0, "15m": 1.5, "1h": 3.0, "4h": 8.0, "d1": 20.0, "w1": 50.0}
     scale = tf_scale.get(timeframe, 1.0)
-    if price > 10_000: return 200.0 * scale
+    if price > 10_000: return min(200.0 * scale, 3000.0)
     if price > 500:    return 30.0  * scale
     if price > 50:     return 1.5   * scale
     return 1.5 * scale
