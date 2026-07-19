@@ -74,11 +74,10 @@ def _to_unix(t) -> int:
     The bridge stores time as datetime64[ns] (tz-naive pd.Timestamp),
     so .timestamp() is the normal path. The other branches are safety nets.
     """
-    if hasattr(t, "timestamp"):      # pd.Timestamp — normal path
-        return int(t.timestamp())
+    if hasattr(t, "value"):          # pd.Timestamp / numpy datetime64 — use raw nanoseconds
+        return int(t.value // 10 ** 9)  # avoids tz-naive .timestamp() assuming local tz
     if hasattr(t, "item"):           # numpy datetime64 scalar
-        return int(pd.Timestamp(t).timestamp())
-    return int(t)                    # already an integer
+        return int(pd.Timestamp(t).value // 10 ** 9)
 
 
 # ---------------------------------------------------------------------------

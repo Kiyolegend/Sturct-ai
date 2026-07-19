@@ -131,7 +131,8 @@ export function detectOrderBlocks(candles: any[], currentPrice: number, isD1 = f
         if (dist <= proximity) {
           // PRIORITY 3 — mitigation needs a clear close beyond boundary (2-pip buffer)
           //              prevents shallow wick sweeps from killing valid OBs
-          const mitigated = candles.slice(i + 1).some((fc: any) => fc.close < c.low - 2 * pip);
+          const mitBuf = currentPrice > 10_000 ? 50 * pip : currentPrice > 500 ? 5 * pip : 2 * pip;
+          const mitigated = candles.slice(i + 1).some((fc: any) => fc.close < c.low - mitBuf);
           if (!mitigated) {
             const touchCount    = candles.slice(i + 1).filter((fc: any) => fc.low <= c.high && fc.high >= c.low).length;
             const strengthScore = avgRange > 0 ? (breakCandle.high - breakCandle.low) / avgRange : 1.0;
@@ -158,7 +159,8 @@ export function detectOrderBlocks(candles: any[], currentPrice: number, isD1 = f
 
         if (dist <= proximity) {
           // PRIORITY 3 — mitigation with 2-pip buffer (symmetric)
-          const mitigated = candles.slice(i + 1).some((fc: any) => fc.close > c.high + 2 * pip);
+          const mitBuf = currentPrice > 10_000 ? 50 * pip : currentPrice > 500 ? 5 * pip : 2 * pip;
+          const mitigated = candles.slice(i + 1).some((fc: any) => fc.close > c.high + mitBuf);
           if (!mitigated) {
             const touchCount    = candles.slice(i + 1).filter((fc: any) => fc.low <= c.high && fc.high >= c.low).length;
             const strengthScore = avgRange > 0 ? (breakCandle.high - breakCandle.low) / avgRange : 1.0;
