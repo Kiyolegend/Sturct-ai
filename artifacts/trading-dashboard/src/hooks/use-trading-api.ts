@@ -77,6 +77,7 @@ export interface Zone {
   timeframe: string;
   start_time: number;
   end_time: number;
+  broken?: boolean;
 }
 
 export interface TradingAnalysisResponse {
