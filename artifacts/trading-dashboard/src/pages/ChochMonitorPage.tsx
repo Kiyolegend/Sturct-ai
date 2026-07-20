@@ -11,6 +11,7 @@ import { X } from "lucide-react";
 const PAIRS = [
   "USD/JPY", "EUR/USD", "GBP/USD", "EUR/JPY", "GBP/JPY",
   "AUD/USD", "USD/CAD", "USD/CHF", "NZD/USD", "AUD/JPY", "CAD/JPY",
+  "XAU/USD", "BTC/USD",
 ];
 
 function fmt(p: number) { return p > 50 ? p.toFixed(3) : p.toFixed(5); }
@@ -150,7 +151,7 @@ export function ChochMonitorPage() {
               STRUCT<span style={{ color: "#3b82f6" }}>.ai</span>
             </span>
             <span style={{ fontSize: 10, color: "#94a3b8", letterSpacing: "0.14em", textTransform: "uppercase" }}>
-              CHoCH Monitor · 11 Pairs
+              CHoCH Monitor · 13 Pairs
             </span>
           </div>
           <a href="/" style={{ fontSize: 11, color: "#94a3b8", textDecoration: "none" }}>
