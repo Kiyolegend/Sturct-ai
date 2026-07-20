@@ -45,10 +45,12 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     bos_events = detect_bos(df, swings, structure_labels, trend_data["trend"], lookback_hours=_bos_hours, fractal_n=tf_fractal_n)
     _choch_hours = {"5m": 8, "15m": 24, "1h": 72, "4h": 336, "d1": 4320, "w1": 43800}.get(interval, 24)
     choch_events = detect_choch(df, swings, structure_labels, trend, lookback_hours=_choch_hours, fractal_n=tf_fractal_n)
-    trendlines = compute_trendlines(structure_labels)
-    zigzag_lines = swings_to_zigzag_lines(swings)
     current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
-    zones = detect_zones(swings, interval, current_price)
+    latest_time   = int(df["time"].astype("datetime64[s]").astype("int64").iloc[-1]) if len(df) > 0 else None
+    _bar_secs     = {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "d1": 86400, "w1": 604800}.get(interval, 900)
+    trendlines    = compute_trendlines(structure_labels, current_price=current_price, latest_time=latest_time, bar_seconds=_bar_secs)
+    zigzag_lines  = swings_to_zigzag_lines(swings)
+    zones         = detect_zones(swings, interval, current_price)
     candles = candles_to_dict(df)
     result = {
         "current_price": current_price,
