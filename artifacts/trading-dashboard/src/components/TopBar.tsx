@@ -371,20 +371,13 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
           ))}
         </div>
           <div className="flex items-center gap-1 bg-[#161e2c] rounded-lg p-1 border border-white/5">
-           <button onClick={() => toggleLayer('d1Zones')} aria-pressed={toggles.d1Zones}
-             className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
-              toggles.d1Zones ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
-             title="Toggle D1 supply/demand zones">D1Z</button>
+           
            <button onClick={() => toggleLayer('d1SR')} aria-pressed={toggles.d1SR}
              className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
               toggles.d1SR ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
              title="Toggle D1 S/R levels (shows on all timeframes)">D1R</button>
           </div>
           <div className="flex items-center gap-1 bg-[#161e2c] rounded-lg p-1 border border-white/5">
-            <button onClick={() => toggleLayer('w1Zones')} aria-pressed={toggles.w1Zones}
-              className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
-                toggles.w1Zones ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
-              title="Toggle W1 supply/demand zones">W1Z</button>
             <button onClick={() => toggleLayer('w1SR')} aria-pressed={toggles.w1SR}
               className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
                 toggles.w1SR ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
