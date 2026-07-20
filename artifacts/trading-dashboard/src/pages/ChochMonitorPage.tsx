@@ -56,6 +56,7 @@ function ChochCell({ event, validitySec, brokerNow }: { event: ChochEvent | null
       <div style={{ fontSize: 9, color: expired ? "#ef5350" : "#94a3b8", whiteSpace: "nowrap" }}>{valid}</div>
     </div>
   );
+}
 
 // ── One row per pair ───────────────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ function ChochPairRow({ symbol }: { symbol: string }) {
   const latest4h = d4h?.choch?.length ? d4h.choch[d4h.choch.length - 1] : null;
   return (
     <div style={{
+      display: "grid",
       gridTemplateColumns: "80px 1fr 1fr",
       gap: 6, alignItems: "center",
       padding: "5px 10px",
