@@ -80,6 +80,20 @@ export interface Zone {
   broken?: boolean;
 }
 
+export interface ZoneMTF extends Zone {
+  kind: "supply" | "demand";
+}
+
+export interface ZonesMTFResponse {
+  symbol: string;
+  zones_w1: ZoneMTF[];
+  zones_d1: ZoneMTF[];
+  zones_4h: ZoneMTF[];
+  zones_1h: ZoneMTF[];
+}
+
+
+
 export interface TradingAnalysisResponse {
   symbol: string;
   interval: string;
@@ -121,6 +135,23 @@ export function useSRLevels(symbol: string = "USD/JPY") {
       const params = new URLSearchParams({ symbol, outputsize: "300" });
       const res = await fetch(`/trading-api/sr-levels?${params.toString()}`);
       if (!res.ok) throw new Error(`${res.status}: SR levels API error: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: 5 * 60 * 1000,
+    retry: (failureCount, error) =>
+      !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
+    retryDelay: patientRetryDelay,
+    staleTime: 4 * 60 * 1000,
+  });
+}
+
+export function useZonesMTF(symbol: string = "USD/JPY") {
+  return useQuery<ZonesMTFResponse, Error>({
+    queryKey: ["zones-mtf", symbol],
+    queryFn: async () => {
+      const params = new URLSearchParams({ symbol });
+      const res = await fetch(`/trading-api/zones-mtf?${params.toString()}`);
+      if (!res.ok) throw new Error(`${res.status}: Zones MTF error: ${await res.text()}`);
       return res.json();
     },
     refetchInterval: 5 * 60 * 1000,

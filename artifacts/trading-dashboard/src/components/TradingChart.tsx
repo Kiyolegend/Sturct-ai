@@ -30,6 +30,13 @@ const OB_BEARISH = { bg: 'rgba(192,132,252,0.15)', border: 'rgba(192,132,252,0.8
 
 const FVG_BULLISH = { bg: 'rgba(34,211,238,0.10)',  border: 'rgba(34,211,238,0.55)', label: 'FVG BULL', textColor: 'rgba(34,211,238,0.90)' };
 const FVG_BEARISH = { bg: 'rgba(232,121,249,0.10)', border: 'rgba(232,121,249,0.55)', label: 'FVG BEAR', textColor: 'rgba(232,121,249,0.90)' };
+// MTF Zone overlays — color-coded by source timeframe
+const MTF_ZONE_COLORS: Record<string, { bg: string; border: string; label: string }> = {
+  w1: { bg: 'rgba(147,51,234,0.12)',  border: 'rgba(168,85,247,0.60)',  label: 'W1' },
+  d1: { bg: 'rgba(59,130,246,0.12)',  border: 'rgba(96,165,250,0.60)',  label: 'D1' },
+  '4h': { bg: 'rgba(34,197,94,0.12)', border: 'rgba(74,222,128,0.60)', label: '4H' },
+  '1h': { bg: 'rgba(234,179,8,0.12)', border: 'rgba(250,204,21,0.60)', label: '1H' },
+};
 
 interface TradingChartProps {
   data: TradingAnalysisResponse | undefined;
@@ -44,6 +51,12 @@ interface TradingChartProps {
   fibD1Levels?: FibLevel[];
   timeframe: string;
   broken?: boolean;
+  mtfZones?: {
+    zones_w1: any[];
+    zones_d1: any[];
+    zones_4h: any[];
+    zones_1h: any[];
+  };
 }
 
 // ── Exported so TradeTeller can reuse them without duplicating logic ──────────
@@ -244,7 +257,7 @@ export function detectFVGs(candles: any[], currentPrice: number, isD1 = false): 
   }));
 }
 
-export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine, fibLevels, fibD1Levels, timeframe }: TradingChartProps) {
+export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine, fibLevels, fibD1Levels, timeframe, mtfZones }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -687,6 +700,70 @@ containerRef.current?.addEventListener('click', handleChartClick);
         );
       });
     }
+    
+        // ── MTF Zone overlays (W1 / D1 / 4H / 1H) ────────────────────────────
+    const MTF_LAYERS: [string, keyof ToggleState, any[]][] = [
+      ['w1', 'zonesW1', mtfZones?.zones_w1 ?? []],
+      ['d1', 'zonesD1', mtfZones?.zones_d1 ?? []],
+      ['4h', 'zones4h', mtfZones?.zones_4h ?? []],
+      ['1h', 'zones1h', mtfZones?.zones_1h ?? []],
+    ];
+
+    const PROXIMITY_MTF = 0.025; // 2.5% proximity — wider than current-TF zones
+
+    for (const [tf, toggleKey, zoneList] of MTF_LAYERS) {
+      if (!toggles[toggleKey] || !zoneList.length || currentPrice === null) continue;
+      const tfColors = MTF_ZONE_COLORS[tf];
+      if (!tfColors) continue;
+
+      const nearby = (zoneList as any[]).filter(z =>
+        !z.broken &&
+        z.strength >= 2 &&
+        Math.abs(z.center - currentPrice) / currentPrice <= PROXIMITY_MTF
+      );
+
+      const supply = nearby
+        .filter(z => z.center > currentPrice)
+        .sort((a: any, b: any) => a.center - b.center)
+        .slice(0, 2);
+      const demand = nearby
+        .filter(z => z.center <= currentPrice)
+        .sort((a: any, b: any) => b.center - a.center)
+        .slice(0, 2);
+
+      [...supply, ...demand].forEach((zone: any, idx: number) => {
+        const isSupply = zone.center > currentPrice;
+        const y1 = priceSeries.priceToCoordinate(zone.top);
+        const y2 = priceSeries.priceToCoordinate(zone.bottom);
+        if (y1 === null || y2 === null) return;
+        const containerWidth = containerRef.current?.clientWidth ?? 0;
+        const top = Math.min(y1, y2);
+        const height = Math.abs(y2 - y1);
+        if (height < 2) return;
+        elements.push(
+          <div key={`mtf-${tf}-${isSupply ? 's' : 'd'}-${idx}`} style={{
+            position: 'absolute', left: 0, top,
+            width: containerWidth,
+            height: Math.max(height, 3),
+            background: tfColors.bg,
+            borderTop:    `1px dashed ${tfColors.border}`,
+            borderBottom: `1px dashed ${tfColors.border}`,
+            boxSizing: 'border-box', pointerEvents: 'none',
+          }}>
+            <span style={{
+              position: 'absolute', top: 2, right: 6,
+              fontSize: '8px', fontWeight: 700,
+              letterSpacing: '0.06em', color: tfColors.border,
+              fontFamily: 'monospace', lineHeight: 1,
+              userSelect: 'none', opacity: 0.9,
+            }}>
+              {tfColors.label} {isSupply ? 'S' : 'D'}
+            </span>
+          </div>
+        );
+      });
+    }
+
 
     if (toggles.ob && computedOBs.length) {
       const containerWidth = containerRef.current?.clientWidth ?? 0;

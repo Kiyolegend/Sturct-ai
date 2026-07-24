@@ -164,6 +164,42 @@ async def get_zones(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/zones-mtf")
+async def get_zones_mtf(
+    symbol: str = Query(default="USD/JPY"),
+):
+    """
+    Multi-timeframe supply/demand zones.
+    Returns W1, D1, 4H, and 1H zones so the dashboard can overlay
+    higher-timeframe zones on any active chart timeframe.
+    """
+    try:
+        df_w1, df_d1, df_4h, df_1h = await asyncio.gather(
+            fetch_ohlc(symbol=symbol, interval="w1", outputsize=300),
+            fetch_ohlc(symbol=symbol, interval="d1", outputsize=365),
+            fetch_ohlc(symbol=symbol, interval="4h", outputsize=400),
+            fetch_ohlc(symbol=symbol, interval="1h", outputsize=400),
+        )
+
+        def _zones(df, interval: str) -> list:
+            if len(df) == 0:
+                return []
+            swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 3))
+            current_price = float(df["close"].iloc[-1])
+            return detect_zones(swings, interval, current_price)
+
+        return {
+            "symbol": symbol,
+            "zones_w1": _zones(df_w1, "w1"),
+            "zones_d1": _zones(df_d1, "d1"),
+            "zones_4h": _zones(df_4h, "4h"),
+            "zones_1h": _zones(df_1h, "1h"),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 def _get_proximity(symbol: str, interval: str) -> float:
     """Return proximity_pips appropriate for the symbol's asset class."""
     _BTC = {"15m": 50,  "1h": 100, "4h": 200, "d1": 500,  "w1": 1000}

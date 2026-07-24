@@ -6,7 +6,7 @@ import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
 
 
-import { useTradingAnalysis, useSRLevels, useMTFBias, usePatternSummary, useSessions, useBrokerTime, type ActiveSetup } from "@/hooks/use-trading-api";
+import { useTradingAnalysis, useSRLevels, useMTFBias, usePatternSummary, useSessions, useBrokerTime, useZonesMTF, type ActiveSetup } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
 
 const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
@@ -32,7 +32,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const [toggles, setToggles] = useState<ToggleState>({
     zigzag:   true,
     labels:   true,
-    zones:    true,
+    zones:    false,
     sr15m:    true,
     sr1h:     true,
     sr4h:     true,
@@ -46,6 +46,10 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
     d1SR:     true,
     w1Zones:  false,
     w1SR:     true,
+    zonesW1:  true,   // Weekly zones ON by default — most important
+    zonesD1:  true,   // Daily zones ON by default  — most important
+    zones4h:  true,   // 4H zones ON by default
+    zones1h:  false,  // 1H zones OFF by default — enable manually
   });
 
   
@@ -56,6 +60,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const brokerNow = brokerTimeData?.broker_time ?? 0;
 
   const { data, isLoading, error, refetch, isRefetching } = useTradingAnalysis(symbol, timeframe, CANDLE_LIMITS[timeframe] ?? 500);
+  const { data: zonesMTFData } = useZonesMTF(symbol);
   const { data: srData }       = useSRLevels(symbol);
   const { data: biasData }     = useMTFBias(symbol);
   const { data: patternData }  = usePatternSummary(symbol);
@@ -378,6 +383,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                 fibLevels={fibLevels}
                 fibD1Levels={fibD1Levels}
                 timeframe={timeframe}
+                mtfZones={zonesMTFData}
               />
 
 

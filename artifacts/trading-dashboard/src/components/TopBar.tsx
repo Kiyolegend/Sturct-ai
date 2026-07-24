@@ -25,6 +25,11 @@ export interface ToggleState {
   d1SR: boolean;  // D1 S/R levels (cross-timeframe)
   w1Zones:  boolean;
   w1SR:     boolean;
+   // MTF zone overlays — overlay higher-TF zones on any chart timeframe
+  zonesW1: boolean;  // Weekly zones — dark purple
+  zonesD1: boolean;  // Daily zones  — blue
+  zones4h: boolean;  // 4H zones     — green
+  zones1h: boolean;  // 1H zones     — yellow
 }
 
 type TrendDir = "bullish" | "bearish" | "neutral";
@@ -383,6 +388,49 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
                 toggles.w1SR ? "text-white bg-white/10" : "text-white/40 hover:text-white/70")}
               title="Toggle W1 S/R levels (shows on all timeframes)">W1R</button>
           </div>
+      </div>
+      <div className="flex items-center gap-1 bg-[#161e2c] rounded-lg p-1 border border-white/5">
+        <span className="px-1 text-[9px] font-bold text-white/30 uppercase tracking-wider select-none">MTF-Z</span>
+        <button
+          onClick={() => toggleLayer('zonesW1')}
+          aria-pressed={toggles.zonesW1}
+          className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+            toggles.zonesW1
+              ? "bg-purple-900/50 text-purple-300 border border-purple-500/40"
+              : "text-white/40 hover:text-white/70"
+          )}
+          title="Overlay Weekly supply/demand zones — dark purple"
+        >W1Z</button>
+        <button
+          onClick={() => toggleLayer('zonesD1')}
+          aria-pressed={toggles.zonesD1}
+          className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+            toggles.zonesD1
+              ? "bg-blue-900/50 text-blue-300 border border-blue-500/40"
+              : "text-white/40 hover:text-white/70"
+          )}
+          title="Overlay Daily supply/demand zones — blue"
+        >D1Z</button>
+        <button
+          onClick={() => toggleLayer('zones4h')}
+          aria-pressed={toggles.zones4h}
+          className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+            toggles.zones4h
+              ? "bg-emerald-900/50 text-emerald-300 border border-emerald-500/40"
+              : "text-white/40 hover:text-white/70"
+          )}
+          title="Overlay 4H supply/demand zones — green"
+        >4HZ</button>
+        <button
+          onClick={() => toggleLayer('zones1h')}
+          aria-pressed={toggles.zones1h}
+          className={cn("px-2 py-1.5 rounded-md text-[10px] font-bold transition-colors",
+            toggles.zones1h
+              ? "bg-yellow-900/50 text-yellow-300 border border-yellow-500/40"
+              : "text-white/40 hover:text-white/70"
+          )}
+          title="Overlay 1H supply/demand zones — yellow"
+        >1HZ</button>
       </div>
 
       {/* RIGHT: Framework alerts + Bias + API + Bridge + Analysis */}
