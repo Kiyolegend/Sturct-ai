@@ -803,7 +803,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
         const isConfluence = confluenceTFs.length > 0;
 
         // Skip if already rendered as part of a higher-TF confluence
-        if (rendered.has(zoneKey) && !isConfluence) return;
+        if (rendered.has(zoneKey)) return;
         rendered.add(zoneKey);
 
         const y1 = priceSeries.priceToCoordinate(zone.top);

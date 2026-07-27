@@ -253,9 +253,9 @@ def _compute_freshness(cluster, top, bottom, broken, df, df_time_int):
         try:
             last_ts   = cluster["last_time"]
             future_df = df[df_time_int > last_ts]
-            for _, candle in future_df.iterrows():
-                if candle["low"] <= top and candle["high"] >= bottom:
-                    retest_count += 1
+            retest_count = int(
+                ((future_df["low"] <= top) & (future_df["high"] >= bottom)).sum()
+            )
         except Exception:
             retest_count = 0
 
