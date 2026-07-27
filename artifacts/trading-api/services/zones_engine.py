@@ -255,6 +255,8 @@ def _compute_freshness(cluster, top, bottom, broken, df, df_time_int):
             last_ts   = cluster["last_time"]
             future_df = df[df_time_int > last_ts].reset_index(drop=True)
             count = 0
+            last_retest_bar = -9999
+            MIN_BARS_BETWEEN_RETESTS = 3
             for i in range(1, len(future_df)):
                 prev_close   = float(future_df.loc[i - 1, "close"])
                 prev_outside = prev_close > top or prev_close < bottom
@@ -265,8 +267,9 @@ def _compute_freshness(cluster, top, bottom, broken, df, df_time_int):
                     float(row["close"]) >= bottom and
                     float(row["close"]) <= top
                 )
-                if prev_outside and enters_zone:
+                if prev_outside and enters_zone and (i - last_retest_bar) >= MIN_BARS_BETWEEN_RETESTS:
                     count += 1
+                    last_retest_bar = i
             retest_count = count
         except Exception:
             retest_count = 0
@@ -292,8 +295,8 @@ def _compute_departure(cluster, pip, df, df_time_int):
         last_ts   = cluster["last_time"]
         future_df = df[df_time_int > last_ts].head(20)
 
-        if len(future_df) == 0:
-            return 0
+        if len(future_df) < 5:
+            return None
 
         center = cluster["center"]
         if cluster["kind"] == "supply":
@@ -335,8 +338,11 @@ def _compute_quality(timeframe, departure_pips, status, touches, retest_count, c
 
     # Departure strength — ceiling from shared _MAX_DEP table, keyed by asset class
     asset_dep = _MAX_DEP.get(_asset_class(current_price), _MAX_DEP["fx"])
-    md = max(asset_dep.get(timeframe, 50), 1)
-    dep_score = min(25, round((departure_pips / md) * 25))
+    if departure_pips is None:
+        dep_score = 12  # not enough future bars yet — neutral, neither reward nor penalise
+    else:
+        md = max(asset_dep.get(timeframe, 50), 1)
+        dep_score = min(25, round((departure_pips / md) * 25))
 
     # Freshness
     freshness_pts = {"fresh": 25, "tested_once": 18, "tested_multiple": 10, "broken": 0}

@@ -100,9 +100,9 @@ def _dedup_pips(price: float) -> float:
 # Same philosophy as _MAX_DEP in zones_engine.py.
 _MAX_REJECTION: dict[str, dict[str, float]] = {
     "crypto": {"w1": 3000, "d1": 1000, "4h": 400, "1h": 150, "15m": 60},
-    "metal":  {"w1":  200, "d1":   80, "4h":  30, "1h":  15, "15m":  8},
-    "jpy":    {"w1":   80, "d1":   25, "4h":  10, "1h":   5, "15m":  3},
-    "fx":     {"w1":   80, "d1":   25, "4h":  10, "1h":   5, "15m":  3},
+    "metal":  {"w1":  400, "d1":  150, "4h":  60, "1h":  30, "15m": 12},
+    "jpy":    {"w1":   80, "d1":   60, "4h":  35, "1h":  20, "15m": 10},
+    "fx":     {"w1":   80, "d1":   60, "4h":  35, "1h":  20, "15m": 10},
 }
 
 _LOOKAHEAD_BARS: dict[str, int] = {
@@ -231,8 +231,9 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
         # swing["index"] is the bar position already stored by detect_swings()
         return int(swing.get("index", total_bars // 2))
 
-    all_swing_data = [{"price": s["price"], "bar_index": get_bar_index(s)} for s in swings]
-    all_clusters = _cluster_levels(all_swing_data, threshold)
+    high_data = [{"price": s["price"], "bar_index": get_bar_index(s)} for s in swings if s["kind"] == "high"]
+    low_data  = [{"price": s["price"], "bar_index": get_bar_index(s)} for s in swings if s["kind"] == "low"]
+    all_clusters = _cluster_levels(high_data, threshold) + _cluster_levels(low_data, threshold)
     levels: list[dict] = []
 
     for c in all_clusters:
