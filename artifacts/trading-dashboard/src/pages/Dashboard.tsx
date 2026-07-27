@@ -6,7 +6,7 @@ import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
 
 
-import { useTradingAnalysis, useSRLevels, useMTFBias, usePatternSummary, useSessions, useBrokerTime, useZonesMTF, type ActiveSetup } from "@/hooks/use-trading-api";
+import { useTradingAnalysis, useSRLevels, useMTFBias, usePatternSummary, useSessions, useBrokerTime, useZonesMTF, type ActiveSetup, useConfluence, type ConfluenceHit } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
 
 const MARKET_CLOSED_THRESHOLDS: Record<string, number> = {
@@ -65,6 +65,12 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const { data: biasData }     = useMTFBias(symbol);
   const { data: patternData }  = usePatternSummary(symbol);
   const { data: sessionsData } = useSessions(symbol, (timeframe === "d1" || timeframe === "w1") ? "5m" : timeframe);
+  const { data: confluenceData } = useConfluence(symbol);
+  const confluencePrices = useMemo(
+    () => new Set((confluenceData?.confluence ?? []).map((h: ConfluenceHit) => h.price)),
+    [confluenceData],
+  );
+
   
   
 
@@ -384,6 +390,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
                 fibD1Levels={fibD1Levels}
                 timeframe={timeframe}
                 mtfZones={zonesMTFData}
+                confluencePrices={confluencePrices}
               />
 
 

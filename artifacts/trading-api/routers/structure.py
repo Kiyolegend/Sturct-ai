@@ -16,6 +16,7 @@ from services.zones_engine import detect_zones
 from services.mtf_sr_engine import compute_mtf_sr_levels
 from services.session_engine import compute_sessions
 from services.candle_pattern_engine import detect_candle_patterns
+from services.confluence_engine import find_confluence
 
 router = APIRouter()
 
@@ -434,3 +435,52 @@ async def get_sr_levels(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 # === FILE END ===
+
+
+@router.get("/confluence")
+async def get_confluence(
+    symbol:     str = Query(default="USD/JPY"),
+    outputsize: int = Query(default=300, ge=50, le=1000),
+):
+    """
+    Detect confluence points: S/R levels that fall inside S/D zones.
+    Only returns aligned hits (resistance in supply, support in demand).
+    """
+    try:
+        df_15m, df_1h, df_4h, df_d1, df_w1 = await asyncio.gather(
+            fetch_ohlc(symbol=symbol, interval="15m", outputsize=outputsize),
+            fetch_ohlc(symbol=symbol, interval="1h",  outputsize=outputsize),
+            fetch_ohlc(symbol=symbol, interval="4h",  outputsize=outputsize),
+            fetch_ohlc(symbol=symbol, interval="d1",  outputsize=365),
+            fetch_ohlc(symbol=symbol, interval="w1",  outputsize=300),
+        )
+        df_map = {"15m": df_15m, "1h": df_1h, "4h": df_4h, "d1": df_d1, "w1": df_w1}
+
+        # Current price from smallest available TF
+        current_price = float(df_15m["close"].iloc[-1])
+
+        # S/R levels across all timeframes
+        sr_levels = compute_mtf_sr_levels(df_map)
+
+        # Zones across all timeframes
+        all_zones: list[dict] = []
+        for tf, df in [
+            ("15m", df_15m), ("1h", df_1h), ("4h", df_4h),
+            ("d1", df_d1),   ("w1", df_w1),
+        ]:
+            swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(tf, 5))
+            zones  = detect_zones(swings, tf, current_price, df=df)
+            all_zones.extend(zones)
+
+        hits = find_confluence(sr_levels, all_zones, current_price)
+
+        return {
+            "symbol":     symbol,
+            "count":      len(hits),
+            "confluence": hits,
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

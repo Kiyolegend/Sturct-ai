@@ -64,6 +64,7 @@ interface TradingChartProps {
     zones_d1: any[];
     zones_4h: any[];
     zones_1h: any[];
+    confluencePrices?: Set<number>;
   };
 }
 
@@ -265,7 +266,7 @@ export function detectFVGs(candles: any[], currentPrice: number, isD1 = false): 
   }));
 }
 
-export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine, fibLevels, fibD1Levels, timeframe, mtfZones }: TradingChartProps) {
+export function TradingChart({ data, srLevels, sessions, toggles, bosChochData, onPriceClick, slLine, tpLine, fibLevels, fibD1Levels, timeframe, mtfZones, confluencePrices }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -524,18 +525,19 @@ containerRef.current?.addEventListener('click', handleChartClick);
         .slice(0, cfg.maxEach);
 
       [...resistance, ...support].forEach(level => {
+        const isC = confluencePrices?.has(level.price) ?? false;
         const line = candleSeriesRef.current!.createPriceLine({
-          price: level.price,
-          color: SR_COLORS[level.kind],
-          lineWidth: tf === 'w1' || tf === 'd1' ? 3 : tf === '4h' ? 2 : 1,
-          lineStyle: LineStyle.Solid,
+          price:            level.price,
+          color:            isC ? '#f59e0b' : SR_COLORS[level.kind],
+          lineWidth:        isC ? 2 : (tf === 'w1' || tf === 'd1' ? 3 : tf === '4h' ? 2 : 1),
+          lineStyle:        LineStyle.Solid,
           axisLabelVisible: true,
-          title: `${TF_LABEL[tf]} ${level.kind === 'resistance' ? 'R' : 'S'}`,
+          title:            `${isC ? '⚡ ' : ''}${TF_LABEL[tf]} ${level.kind === 'resistance' ? 'R' : 'S'}`,
         });
         srPriceLinesRef.current.push(line);
       });
     });
-  }, [srLevels, data, toggles.sr15m, toggles.sr1h, toggles.sr4h, toggles.d1SR, toggles.w1SR]);
+  }, [srLevels, data, toggles.sr15m, toggles.sr1h, toggles.sr4h, toggles.d1SR, toggles.w1SR, confluencePrices]);
 
     // ── Effect 4: BOS / CHOCH lines (current timeframe) ──────────────────────
   useEffect(() => {

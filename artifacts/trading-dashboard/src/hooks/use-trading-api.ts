@@ -592,3 +592,42 @@ export function useAutoTradeLog() {
     staleTime: 9_000,
   });
 }
+
+
+// ── Confluence ────────────────────────────────────────────────────────────────
+
+export interface ConfluenceHit {
+  price:            number;
+  kind:             "support" | "resistance";
+  aligned:          boolean;
+  sr_timeframe:     string;
+  sr_score:         number;
+  zone_timeframe:   string;
+  zone_quality:     number;
+  zone_top:         number;
+  zone_bottom:      number;
+  zone_kind:        "supply" | "demand";
+  zone_status:      string;
+  confluence_score: number;
+}
+
+export interface ConfluenceResponse {
+  symbol:     string;
+  count:      number;
+  confluence: ConfluenceHit[];
+}
+
+export function useConfluence(symbol: string = "USD/JPY") {
+  return useQuery<ConfluenceResponse, Error>({
+    queryKey: ["confluence", symbol],
+    queryFn: async () => {
+      const params = new URLSearchParams({ symbol, outputsize: "300" });
+      const res = await fetch(`/trading-api/confluence?${params.toString()}`);
+      if (!res.ok) throw new Error(`${res.status}: Confluence API error: ${await res.text()}`);
+      return res.json();
+    },
+    refetchInterval: 5 * 60 * 1000,  // 5 min — endpoint runs all 5 TFs in parallel
+    retry: 1,
+    staleTime: 4 * 60 * 1000,
+  });
+}
