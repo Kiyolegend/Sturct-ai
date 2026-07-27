@@ -171,11 +171,15 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
 
     # Determine pip size from current price — no symbol name required
     pip = _pip_size(current_price)
-    threshold  = cfg["cluster_pips"]  * pip   # e.g. 15 pips for 4H
+    threshold  = max(cfg["cluster_pips"] * pip, 0.2 * atr)   # ATR-aware: widens during volatile conditions  
     max_dist   = cfg["max_dist_pips"] * pip   # e.g. 300 pips for 4H
     min_touches = cfg["min_touches"]
     decay_bars  = cfg["decay_bars"]
     total_bars  = len(df)
+    try:
+        atr = float(df["high"].sub(df["low"]).rolling(14).mean().iloc[-1])
+    except Exception:
+        atr = 0.0
 
     swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(timeframe, 5))
     if not swings:
