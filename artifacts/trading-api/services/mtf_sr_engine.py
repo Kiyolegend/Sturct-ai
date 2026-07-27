@@ -46,7 +46,7 @@ Recency decay:
 
 import math
 from .zigzag_engine import detect_swings, TF_FRACTAL_N
-from .pip_utils import pip_size as _pip_size
+from .pip_utils import pip_size as _pip_size, asset_class as _asset_class
 
 # Per-timeframe config stored in pips (symbol-agnostic).
 # pip_size is computed at runtime from current_price — no symbol name needed:
@@ -96,6 +96,18 @@ def _dedup_pips(price: float) -> float:
     if price > 500:    return 15    # Gold: $1.50 dedup
     return 10                        # FX/JPY: 10 pips (unchanged)
 
+# Per-asset rejection normalization ceiling (pips) — "what avg pip departure = full 1.0 score?"
+# Same philosophy as _MAX_DEP in zones_engine.py.
+_MAX_REJECTION: dict[str, dict[str, float]] = {
+    "crypto": {"w1": 3000, "d1": 1000, "4h": 400, "1h": 150, "15m": 60},
+    "metal":  {"w1":  200, "d1":   80, "4h":  30, "1h":  15, "15m":  8},
+    "jpy":    {"w1":   80, "d1":   25, "4h":  10, "1h":   5, "15m":  3},
+    "fx":     {"w1":   80, "d1":   25, "4h":  10, "1h":   5, "15m":  3},
+}
+
+_LOOKAHEAD_BARS: dict[str, int] = {
+    "w1": 3, "d1": 5, "4h": 8, "1h": 10, "15m": 15,
+}
 
 
 
@@ -155,20 +167,18 @@ def _recency_score(last_bar_index: int, total_bars: int, decay_bars: float) -> f
     return round(math.exp(-bars_ago / decay_bars), 4)
 
 def _compute_rejection_strength(bar_indices: list, touch_prices: list,
-                                  df, pip: float, kind: str) -> float:
-    """
-    For each touch, measure how far price moved away in the 10 bars after.
-    Supply touch: measure drop (center - future_low).
-    Demand touch: measure rise (future_high - center).
-    Returns average departure in pips, capped at 1.0 (normalised against 50-pip ceiling).
-    """
+                                  df, pip: float, kind: str,
+                                  current_price: float = 1.0,
+                                  timeframe: str = "1h") -> float:
     if df is None or pip == 0 or not bar_indices:
         return 0.0
     departures = []
     total = len(df)
+    lookahead = _LOOKAHEAD_BARS.get(timeframe, 10)
+    ceiling   = _MAX_REJECTION[_asset_class(current_price)].get(timeframe, 10)
     try:
         for bi, tp in zip(bar_indices, touch_prices):
-            end = min(bi + 11, total)
+            end = min(bi + lookahead + 1, total)
             if end <= bi + 1:
                 continue
             future = df.iloc[bi + 1 : end]
@@ -182,7 +192,7 @@ def _compute_rejection_strength(bar_indices: list, touch_prices: list,
     if not departures:
         return 0.0
     avg = sum(departures) / len(departures)
-    return min(1.0, avg / 50.0)   # normalise: 50-pip avg = full score
+    return min(1.0, avg / max(ceiling, 1))
 
 
 def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list[dict]:
@@ -250,7 +260,8 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
         )
         touch_component     = min(weighted_touches / 8.0, 1.0) * 0.3
         rejection_component = _compute_rejection_strength(
-            c["bar_indices"], c["touch_prices"], df, pip, kind
+            c["bar_indices"], c["touch_prices"], df, pip, kind,
+            current_price=current_price, timeframe=timeframe
         ) * 0.2
         final_score = round(score * 0.5 + touch_component + rejection_component, 4)
         if final_score < 0.15:
