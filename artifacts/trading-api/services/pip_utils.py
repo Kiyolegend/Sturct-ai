@@ -11,3 +11,15 @@ def pip_size(price: float) -> float:
     if price > 500:    return 0.1    # Gold    (XAU ~2 350)
     if price > 50:     return 0.01   # JPY pairs (USD/JPY ~150)
     return 0.0001                    # Standard FX (EUR/USD ~1.08)
+
+
+def asset_class(price: float) -> str:
+    """
+    Single source of truth for instrument classification by price level.
+    Returns one of: "crypto", "metal", "jpy", "fx"
+    Use this everywhere instead of repeating the same if/elif thresholds.
+    """
+    if price > 10_000: return "crypto"   # BTC, ETH etc
+    if price > 500:    return "metal"    # Gold, Silver etc
+    if price > 50:     return "jpy"      # JPY pairs (USD/JPY ~150)
+    return "fx"                          # Standard FX (EUR/USD ~1.08)

@@ -29,7 +29,7 @@ def _zone_width_pips(price: float) -> float:
     return 3.0
 
 
-from .pip_utils import pip_size as _pip_size
+from .pip_utils import pip_size as _pip_size, asset_class as _asset_class
 
 
 def _df_time_ints(df):
@@ -174,6 +174,7 @@ def detect_zones(
             status=status,
             touches=cluster["touches"],
             retest_count=retest_count,
+            current_price=ref,
         )
 
         zones.append({
@@ -306,7 +307,17 @@ def _compute_departure(cluster, pip, df, df_time_int):
         return 0
 
 
-def _compute_quality(timeframe, departure_pips, status, touches, retest_count):
+# Per-asset departure ceilings — "how many pips = full 25pts on this timeframe?"
+# Keyed by asset_class() string so the entire engine shares one classification.
+_MAX_DEP: dict[str, dict[str, int]] = {
+    "crypto": {"w1": 6000, "d1": 2000, "4h": 600, "1h": 250, "15m": 100, "5m": 50},
+    "metal":  {"w1": 1500, "d1":  500, "4h": 150, "1h":  70, "15m":  30, "5m": 15},
+    "jpy":    {"w1":  300, "d1":   80, "4h":  30, "1h":  15, "15m":   8, "5m":  5},
+    "fx":     {"w1":  300, "d1":   80, "4h":  30, "1h":  15, "15m":   8, "5m":  5},
+}
+
+
+def _compute_quality(timeframe, departure_pips, status, touches, retest_count, current_price: float = 1.0):
     """
     Quality score 0–100. No age penalty — a 6-month-old Weekly zone that
     has never been retested can still score very high.
@@ -322,9 +333,9 @@ def _compute_quality(timeframe, departure_pips, status, touches, retest_count):
     tf_pts = {"w1": 25, "d1": 20, "4h": 15, "1h": 10, "15m": 5, "5m": 0}
     tfw = tf_pts.get(timeframe, 5)
 
-    # Departure strength (calibrated per timeframe)
-    max_dep = {"w1": 1000, "d1": 500, "4h": 80, "1h": 40, "15m": 20, "5m": 10}
-    md = max(max_dep.get(timeframe, 50), 1)
+    # Departure strength — ceiling from shared _MAX_DEP table, keyed by asset class
+    asset_dep = _MAX_DEP.get(_asset_class(current_price), _MAX_DEP["fx"])
+    md = max(asset_dep.get(timeframe, 50), 1)
     dep_score = min(25, round((departure_pips / md) * 25))
 
     # Freshness
