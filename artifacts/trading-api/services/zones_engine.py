@@ -252,15 +252,21 @@ def _compute_freshness(cluster, top, bottom, broken, df, df_time_int):
     if df is not None and df_time_int is not None:
         try:
             last_ts   = cluster["last_time"]
-            future_df = df[df_time_int > last_ts]
-            retest_count = int(
-                (
-                    (future_df["low"] <= top) &
-                    (future_df["high"] >= bottom) &
-                    (future_df["close"] >= bottom) &
-                    (future_df["close"] <= top)
-                ).sum()
-            )
+            future_df = df[df_time_int > last_ts].reset_index(drop=True)
+            count = 0
+            for i in range(1, len(future_df)):
+                prev_close   = float(future_df.loc[i - 1, "close"])
+                prev_outside = prev_close > top or prev_close < bottom
+                row          = future_df.iloc[i]
+                enters_zone  = (
+                    float(row["low"])   <= top    and
+                    float(row["high"])  >= bottom and
+                    float(row["close"]) >= bottom and
+                    float(row["close"]) <= top
+                )
+                if prev_outside and enters_zone:
+                    count += 1
+            retest_count = count
         except Exception:
             retest_count = 0
 

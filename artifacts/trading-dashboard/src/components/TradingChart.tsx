@@ -715,7 +715,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
               letterSpacing: '0.06em', color: style.textColor, fontFamily: 'monospace',
               lineHeight: 1, userSelect: 'none', opacity: 0.9,
             }}>
-              {isSupply ? 'SUPPLY' : 'DEMAND'}{statusLabel ? ' ' + statusLabel : ''}
+              {((zone as any).timeframe ?? '').toUpperCase()} {isSupply ? 'SUPPLY' : 'DEMAND'}{statusLabel ? ' ' + statusLabel : ''}
             </span>
             {quality > 0 && (
               <span style={{
