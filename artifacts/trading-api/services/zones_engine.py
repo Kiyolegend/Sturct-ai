@@ -254,7 +254,12 @@ def _compute_freshness(cluster, top, bottom, broken, df, df_time_int):
             last_ts   = cluster["last_time"]
             future_df = df[df_time_int > last_ts]
             retest_count = int(
-                ((future_df["low"] <= top) & (future_df["high"] >= bottom)).sum()
+                (
+                    (future_df["low"] <= top) &
+                    (future_df["high"] >= bottom) &
+                    (future_df["close"] >= bottom) &
+                    (future_df["close"] <= top)
+                ).sum()
             )
         except Exception:
             retest_count = 0
@@ -312,7 +317,7 @@ def _compute_quality(timeframe, departure_pips, status, touches, retest_count):
     tfw = tf_pts.get(timeframe, 5)
 
     # Departure strength (calibrated per timeframe)
-    max_dep = {"w1": 500, "d1": 200, "4h": 80, "1h": 40, "15m": 20, "5m": 10}
+    max_dep = {"w1": 1000, "d1": 500, "4h": 80, "1h": 40, "15m": 20, "5m": 10}
     md = max(max_dep.get(timeframe, 50), 1)
     dep_score = min(25, round((departure_pips / md) * 25))
 
