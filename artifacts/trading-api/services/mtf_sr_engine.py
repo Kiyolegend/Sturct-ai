@@ -207,8 +207,10 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
         score = _recency_score(c["last_bar_index"], total_bars, decay_bars)
 
         # Composite score: 60% recency + 40% touch count (normalised at 5 touches)
-        touch_component = min(c["touches"] / 5.0, 1.0) * 0.4
+        touch_component = min(c["touches"] / 8.0, 1.0) * 0.4
         final_score = round(score * 0.6 + touch_component, 4)
+        if final_score < 0.15:
+            continue
 
         levels.append({
             "price":     price,
