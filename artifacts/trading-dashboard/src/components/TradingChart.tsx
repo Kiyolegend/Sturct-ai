@@ -711,9 +711,11 @@ containerRef.current?.addEventListener('click', handleChartClick);
             boxSizing: 'border-box', pointerEvents: 'none',
           }}>
             <span style={{
-              position: 'absolute', top: 2, left: 4, fontSize: '8px', fontWeight: 700,
-              letterSpacing: '0.06em', color: style.textColor, fontFamily: 'monospace',
-              lineHeight: 1, userSelect: 'none', opacity: 0.9,
+              position: 'absolute', top: '50%', left: 6, transform: 'translateY(-50%)',
+              fontSize: '11px', fontWeight: 800,
+              letterSpacing: '0.08em', color: style.textColor, fontFamily: 'monospace',
+              lineHeight: 1, userSelect: 'none',
+              background: 'rgba(0,0,0,0.45)', padding: '2px 6px', borderRadius: '3px',
             }}>
               {((zone as any).timeframe ?? '').toUpperCase()} {isSupply ? 'SUPPLY' : 'DEMAND'}{statusLabel ? ' ' + statusLabel : ''}
             </span>
@@ -835,10 +837,11 @@ containerRef.current?.addEventListener('click', handleChartClick);
           }}>
             <span style={{
               position: 'absolute', top: 2, right: 6,
-              fontSize: '8px', fontWeight: isConfluence ? 800 : 700,
-              letterSpacing: '0.06em', color: tfColors.border,
+              fontSize: '11px', fontWeight: isConfluence ? 900 : 800,
+              letterSpacing: '0.08em', color: tfColors.border,
               fontFamily: 'monospace', lineHeight: 1,
-              userSelect: 'none', opacity: 0.9,
+              userSelect: 'none',
+              background: 'rgba(0,0,0,0.45)', padding: '2px 6px', borderRadius: '3px',
             }}>
               {confluenceLabel}
             </span>
