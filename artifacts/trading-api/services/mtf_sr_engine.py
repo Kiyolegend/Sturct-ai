@@ -136,7 +136,8 @@ def _cluster_levels(swing_data: list[dict], threshold: float) -> list[dict]:
             "center": round(sum(prices) / len(prices), 5),
             "touches": len(cluster_items),
             "prices": prices,
-            "bar_indices": bar_indices,           # all touch bar positions
+            "bar_indices": bar_indices,
+            "touch_prices":   prices,           
             "last_bar_index": max(bar_indices),   # most recent touch (kept for recency score)
         })
 
@@ -152,6 +153,36 @@ def _recency_score(last_bar_index: int, total_bars: int, decay_bars: float) -> f
     """
     bars_ago = max(0, total_bars - 1 - last_bar_index)
     return round(math.exp(-bars_ago / decay_bars), 4)
+
+def _compute_rejection_strength(bar_indices: list, touch_prices: list,
+                                  df, pip: float, kind: str) -> float:
+    """
+    For each touch, measure how far price moved away in the 10 bars after.
+    Supply touch: measure drop (center - future_low).
+    Demand touch: measure rise (future_high - center).
+    Returns average departure in pips, capped at 1.0 (normalised against 50-pip ceiling).
+    """
+    if df is None or pip == 0 or not bar_indices:
+        return 0.0
+    departures = []
+    total = len(df)
+    try:
+        for bi, tp in zip(bar_indices, touch_prices):
+            end = min(bi + 11, total)
+            if end <= bi + 1:
+                continue
+            future = df.iloc[bi + 1 : end]
+            if kind == "resistance":
+                move = tp - float(future["low"].min())
+            else:
+                move = float(future["high"].max()) - tp
+            departures.append(max(0.0, move / pip))
+    except Exception:
+        return 0.0
+    if not departures:
+        return 0.0
+    avg = sum(departures) / len(departures)
+    return min(1.0, avg / 50.0)   # normalise: 50-pip avg = full score
 
 
 def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list[dict]:
@@ -169,10 +200,9 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
     df = df_map[timeframe]
     cfg = _tf_config(timeframe, current_price)
 
-    # Determine pip size from current price — no symbol name required
-    pip = _pip_size(current_price)
-    threshold  = max(cfg["cluster_pips"] * pip, 0.2 * atr)   # ATR-aware: widens during volatile conditions  
-    max_dist   = cfg["max_dist_pips"] * pip   # e.g. 300 pips for 4H
+    # FIXED (atr computed first, then used in threshold):
+    pip         = _pip_size(current_price)
+    max_dist    = cfg["max_dist_pips"] * pip
     min_touches = cfg["min_touches"]
     decay_bars  = cfg["decay_bars"]
     total_bars  = len(df)
@@ -180,6 +210,7 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
         atr = float(df["high"].sub(df["low"]).rolling(14).mean().iloc[-1])
     except Exception:
         atr = 0.0
+    threshold   = max(cfg["cluster_pips"] * pip, 0.2 * atr)
 
     swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(timeframe, 5))
     if not swings:
@@ -212,14 +243,16 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
         score = _recency_score(c["last_bar_index"], total_bars, decay_bars)
 
         # Change to:
-        # Composite score: 60% recency + 40% touch weight
-        # Each touch weighted by its own recency — old touches count less
-        weighted_touches = sum(
+        # 50% recency + 30% touch weight + 20% rejection strength
+        weighted_touches  = sum(
             math.exp(-max(0, total_bars - 1 - bi) / decay_bars)
             for bi in c["bar_indices"]
         )
-        touch_component = min(weighted_touches / 8.0, 1.0) * 0.4
-        final_score = round(score * 0.6 + touch_component, 4)
+        touch_component     = min(weighted_touches / 8.0, 1.0) * 0.3
+        rejection_component = _compute_rejection_strength(
+            c["bar_indices"], c["touch_prices"], df, pip, kind
+        ) * 0.2
+        final_score = round(score * 0.5 + touch_component + rejection_component, 4)
         if final_score < 0.15:
             continue
 
