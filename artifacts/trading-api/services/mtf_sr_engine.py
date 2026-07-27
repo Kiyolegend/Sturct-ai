@@ -136,7 +136,8 @@ def _cluster_levels(swing_data: list[dict], threshold: float) -> list[dict]:
             "center": round(sum(prices) / len(prices), 5),
             "touches": len(cluster_items),
             "prices": prices,
-            "last_bar_index": max(bar_indices),  # most recent touch
+            "bar_indices": bar_indices,           # all touch bar positions
+            "last_bar_index": max(bar_indices),   # most recent touch (kept for recency score)
         })
 
     return clusters
@@ -206,8 +207,14 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
         # Recency score (0.0 – 1.0): higher = more recently tested
         score = _recency_score(c["last_bar_index"], total_bars, decay_bars)
 
-        # Composite score: 60% recency + 40% touch count (normalised at 5 touches)
-        touch_component = min(c["touches"] / 8.0, 1.0) * 0.4
+        # Change to:
+        # Composite score: 60% recency + 40% touch weight
+        # Each touch weighted by its own recency — old touches count less
+        weighted_touches = sum(
+            math.exp(-max(0, total_bars - 1 - bi) / decay_bars)
+            for bi in c["bar_indices"]
+        )
+        touch_component = min(weighted_touches / 8.0, 1.0) * 0.4
         final_score = round(score * 0.6 + touch_component, 4)
         if final_score < 0.15:
             continue
