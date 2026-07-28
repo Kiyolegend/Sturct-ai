@@ -64,8 +64,8 @@ interface TradingChartProps {
     zones_d1: any[];
     zones_4h: any[];
     zones_1h: any[];
-    confluencePrices?: Set<number>;
   };
+  confluencePrices?: Set<number>;
 }
 
 // ── Exported so TradeTeller can reuse them without duplicating logic ──────────
@@ -224,8 +224,12 @@ export function detectFVGs(candles: any[], currentPrice: number, isD1 = false): 
   const results: (FVGData & { dist: number })[] = [];
 
   for (let i = 1; i < n - 1; i++) {
-    const prev = candles[i - 1];
-    const next = candles[i + 1];
+    const prev   = candles[i - 1];
+    const mid    = candles[i];
+    const next   = candles[i + 1];
+    const lkb    = candles.slice(Math.max(0, i - 8), i);
+    const avgRng = lkb.length ? lkb.reduce((s: number, x: any) => s + (x.high - x.low), 0) / lkb.length : 0;
+    if (avgRng > 0 && (mid.high - mid.low) < 1.2 * avgRng) continue;
 
     const bTop    = next.low;
     const bBottom = prev.high;
@@ -233,7 +237,7 @@ export function detectFVGs(candles: any[], currentPrice: number, isD1 = false): 
       const center = (bTop + bBottom) / 2;
       const dist   = Math.abs(center - currentPrice) / currentPrice;
       if (dist <= proximity) {
-        const mitigated = candles.slice(i + 2).some((c: any) => c.close <= bBottom);
+        const mitigated = candles.slice(i + 2).some((c: any) => c.close <= bBottom + (bTop - bBottom) * 0.5);
         if (!mitigated) results.push({ type: 'bullish', top: bTop, bottom: bBottom, dist });
       }
     }
@@ -244,7 +248,7 @@ export function detectFVGs(candles: any[], currentPrice: number, isD1 = false): 
       const center = (dTop + dBottom) / 2;
       const dist   = Math.abs(center - currentPrice) / currentPrice;
       if (dist <= proximity) {
-        const mitigated = candles.slice(i + 2).some((c: any) => c.close >= dTop);
+        const mitigated = candles.slice(i + 2).some((c: any) => c.close >= dTop - (dTop - dBottom) * 0.5);
         if (!mitigated) results.push({ type: 'bearish', top: dTop, bottom: dBottom, dist });
       }
     }
