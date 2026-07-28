@@ -14,6 +14,7 @@ def detect_order_blocks(
     candles: list[dict],
     current_price: float,
     timeframe: str = "1h",
+    structural_breaks: list[dict] | None = None,
 ) -> list[dict]:
     """
     Detect Order Blocks from a list of OHLC candle dicts.
@@ -79,6 +80,17 @@ def detect_order_blocks(
                 if (brk["high"] - brk["low"]) >= 1.5 * avg_range:
                     centre = (c["high"] + c["low"]) / 2
                     if abs(centre - current_price) / current_price <= proximity:
+                        # BOS gate: only accept if a bullish structural break
+                        # (BOS or CHoCH) occurred at or after this OB candle.
+                        # When structural_breaks is None, gate is skipped (backward-compatible).
+                        if structural_breaks is not None:
+                            has_sb = any(
+                                sb.get("direction") == "bullish"
+                                and sb.get("time", 0) >= c.get("time", 0)
+                                for sb in structural_breaks
+                            )
+                            if not has_sb:
+                                continue
                         # Mitigated = price already closed back below the OB low
                         mit_buf = 50 * pip if current_price > 10_000 else 5 * pip if current_price > 500 else 2 * pip
                         mitigated = any(
@@ -109,6 +121,16 @@ def detect_order_blocks(
                 if (brk["high"] - brk["low"]) >= 1.5 * avg_range:
                     centre = (c["high"] + c["low"]) / 2
                     if abs(centre - current_price) / current_price <= proximity:
+                        # BOS gate: only accept if a bearish structural break
+                        # (BOS or CHoCH) occurred at or after this OB candle.
+                        if structural_breaks is not None:
+                            has_sb = any(
+                                sb.get("direction") == "bearish"
+                                and sb.get("time", 0) >= c.get("time", 0)
+                                for sb in structural_breaks
+                            )
+                            if not has_sb:
+                                continue
                         mit_buf = 50 * pip if current_price > 10_000 else 5 * pip if current_price > 500 else 2 * pip
                         mitigated = any(
                             fc["close"] > c["high"] + mit_buf
