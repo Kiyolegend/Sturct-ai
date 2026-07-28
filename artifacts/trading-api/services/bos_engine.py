@@ -10,6 +10,8 @@ A BOS is confirmed at the candle that closes beyond the level.
 """
 import pandas as pd
 from .zigzag_engine import SwingPoint
+from .pip_utils import pip_size as _pip
+BOS_BREAK_ATR_RATIO = 0.05  # fraction of ATR-14 required as minimum break beyond level
 
 
 def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: list[dict], trend: str = "neutral", lookback_hours: int = 48, fractal_n: int = 5) -> list[dict]:
@@ -28,6 +30,10 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
     bos_events = []
     closes = df["close"].values
     times_arr = df["time"].astype("datetime64[s]").astype("int64").tolist()
+    _last_close = float(closes[-1]) if len(closes) > 0 else 1.0
+    _hl_ranges  = df["high"].values - df["low"].values
+    _atr14      = float(_hl_ranges[-14:].mean()) if len(_hl_ranges) >= 14 else float(_hl_ranges.mean()) if len(_hl_ranges) > 0 else 0.0
+    _min_break  = max(_pip(_last_close), BOS_BREAK_ATR_RATIO * _atr14)
 
     # Track which swing highs/lows have been broken already to avoid duplicates
     broken_levels: set[float] = set()
@@ -51,7 +57,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
             close = closes[i]
 
             # Bullish BOS: close above a swing HIGH (HH or LH)
-            if label in ("HH", "LH", "EQH") and close > level:
+            if label in ("HH", "LH", "EQH") and close > level + _min_break:
                 if trend in ("bullish", "neutral"):
                     bos_events.append({
                         "time": candle_time,
@@ -65,7 +71,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
                 break
 
             # Bearish BOS: close below a swing LOW (LL or HL)
-            if label in ("LL", "HL", "EQL") and close < level:
+            if label in ("LL", "HL", "EQL") and close < level - _min_break:
                 if trend in ("bearish", "neutral"):
                     bos_events.append({
                         "time": candle_time,
