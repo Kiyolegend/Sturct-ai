@@ -609,6 +609,8 @@ export interface ConfluenceHit {
   zone_kind:        "supply" | "demand";
   zone_status:      string;
   confluence_score: number;
+  has_ob:           boolean;
+  has_fvg:          boolean;
 }
 
 export interface ConfluenceResponse {

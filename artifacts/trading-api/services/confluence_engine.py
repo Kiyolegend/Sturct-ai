@@ -16,6 +16,8 @@ def find_confluence(
     sr_levels: list[dict],
     zones: list[dict],
     current_price: float,
+    obs:  list[dict] | None = None,
+    fvgs: list[dict] | None = None,
 ) -> list[dict]:
     """
     Cross-reference S/R levels with S/D zones.
@@ -62,8 +64,27 @@ def find_confluence(
             confluence_score = round(
                 level["score"] * 0.5 + (zone["quality"] / 100.0) * 0.5,
                 4,
+
             )
 
+            # OB overlap: an OB of matching direction contains this S/R price
+            has_ob = any(
+                ob["bottom"] <= price <= ob["top"]
+                and (
+                    (kind == "resistance" and ob["type"] == "bearish") or
+                    (kind == "support"    and ob["type"] == "bullish")
+                )
+                for ob in (obs or [])
+            )
+            # FVG overlap: an FVG of matching direction contains this S/R price
+            has_fvg = any(
+                fvg["bottom"] <= price <= fvg["top"]
+                and (
+                    (kind == "resistance" and fvg["type"] == "bearish") or
+                    (kind == "support"    and fvg["type"] == "bullish")
+                )
+                for fvg in (fvgs or [])
+            )
             results.append({
                 "price":            price,
                 "kind":             kind,
@@ -77,7 +98,11 @@ def find_confluence(
                 "zone_kind":        zone["kind"],
                 "zone_status":      zone.get("status", "unknown"),
                 "confluence_score": confluence_score,
+                "has_ob":           has_ob,
+                "has_fvg":          has_fvg,
             })
+
+            
 
     results.sort(key=lambda x: x["confluence_score"], reverse=True)
     return results

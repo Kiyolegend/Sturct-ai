@@ -17,6 +17,8 @@ from services.mtf_sr_engine import compute_mtf_sr_levels
 from services.session_engine import compute_sessions
 from services.candle_pattern_engine import detect_candle_patterns
 from services.confluence_engine import find_confluence
+from services.framework_checker import detect_order_blocks
+from services.fvg_engine import detect_fvgs
 
 router = APIRouter()
 
@@ -472,7 +474,30 @@ async def get_confluence(
             zones  = detect_zones(swings, tf, current_price, df=df)
             all_zones.extend(zones)
 
-        hits = find_confluence(sr_levels, all_zones, current_price)
+
+        # OBs and FVGs across all timeframes — enrich each confluence hit
+        all_obs:  list[dict] = []
+        all_fvgs: list[dict] = []
+        for tf, df in [
+            ("15m", df_15m), ("1h", df_1h), ("4h", df_4h),
+            ("d1",  df_d1),  ("w1", df_w1),
+        ]:
+            try:
+                clist = [
+                    {
+                        "time":  int(r["time"].value // 10**9) if hasattr(r["time"], "value") else int(r["time"]),
+                        "open":  float(r["open"]),  "high": float(r["high"]),
+                        "low":   float(r["low"]),   "close": float(r["close"]),
+                    }
+                    for _, r in df.iterrows()
+                ]
+                all_obs.extend(detect_order_blocks(clist, current_price, tf))
+                all_fvgs.extend(detect_fvgs(df, tf, current_price))
+            except Exception:
+                pass
+
+        hits = find_confluence(sr_levels, all_zones, current_price, obs=all_obs, fvgs=all_fvgs)
+
 
         return {
             "symbol":     symbol,

@@ -65,7 +65,7 @@ interface TradingChartProps {
     zones_4h: any[];
     zones_1h: any[];
   };
-  confluencePrices?: Set<number>;
+  confluencePrices?: Map<number, import("@/hooks/use-trading-api").ConfluenceHit>;
 }
 
 // ── Exported so TradeTeller can reuse them without duplicating logic ──────────
@@ -529,14 +529,16 @@ containerRef.current?.addEventListener('click', handleChartClick);
         .slice(0, cfg.maxEach);
 
       [...resistance, ...support].forEach(level => {
-        const isC = confluencePrices?.has(level.price) ?? false;
-        const line = candleSeriesRef.current!.createPriceLine({
+        const hit   = confluencePrices?.get(level.price);
+        const isC   = !!hit;
+        const tags  = isC ? ['⚡', hit!.has_ob ? 'OB' : '', hit!.has_fvg ? 'FVG' : ''].filter(Boolean).join(' ') : '';
+        const line  = candleSeriesRef.current!.createPriceLine({
           price:            level.price,
           color:            isC ? '#f59e0b' : SR_COLORS[level.kind],
           lineWidth:        isC ? 2 : (tf === 'w1' || tf === 'd1' ? 3 : tf === '4h' ? 2 : 1),
           lineStyle:        LineStyle.Solid,
           axisLabelVisible: true,
-          title:            `${isC ? '⚡ ' : ''}${TF_LABEL[tf]} ${level.kind === 'resistance' ? 'R' : 'S'}`,
+          title:            `${tags ? tags + ' ' : ''}${TF_LABEL[tf]} ${level.kind === 'resistance' ? 'R' : 'S'}`,
         });
         srPriceLinesRef.current.push(line);
       });

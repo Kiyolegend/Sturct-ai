@@ -67,7 +67,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
   const { data: sessionsData } = useSessions(symbol, (timeframe === "d1" || timeframe === "w1") ? "5m" : timeframe);
   const { data: confluenceData } = useConfluence(symbol);
   const confluencePrices = useMemo(
-    () => new Set((confluenceData?.confluence ?? []).map((h: ConfluenceHit) => h.price)),
+    () => new Map((confluenceData?.confluence ?? []).map((h: ConfluenceHit) => [h.price, h])),
     [confluenceData],
   );
 
