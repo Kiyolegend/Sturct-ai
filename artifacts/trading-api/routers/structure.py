@@ -499,7 +499,7 @@ async def get_confluence(
                 ]
                 all_obs.extend(detect_order_blocks(clist, current_price, tf,
                                                    structural_breaks=bos + choch))
-                all_fvgs.extend(detect_fvgs(df, tf, current_price))
+                all_fvgs.extend(detect_fvgs(df, tf, current_price, structural_breaks=bos + choch))
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(

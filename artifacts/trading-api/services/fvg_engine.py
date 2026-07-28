@@ -17,6 +17,7 @@ def detect_fvgs(
     df,
     timeframe: str = "1h",
     current_price: float | None = None,
+    structural_breaks: list[dict] | None = None,
 ) -> list[dict]:
     """
     Detect unmitigated Fair Value Gaps from an OHLC DataFrame.
@@ -81,6 +82,10 @@ def detect_fvgs(
                 future    = candles.iloc[i + 2:]
                 mitigated = len(future) > 0 and bool((future["close"] <= midpoint).any())
                 if not mitigated:
+                    if structural_breaks is not None:
+                        mid_time = int(mid["time"].value // 10**9) if hasattr(mid["time"], "value") else int(mid["time"])
+                        if not any(sb.get("direction") == "bullish" and sb.get("time", 0) >= mid_time for sb in structural_breaks):
+                            continue
                     results.append({
                         "type":      "bullish",
                         "top":       round(b_top,    5),
@@ -99,6 +104,10 @@ def detect_fvgs(
                 future    = candles.iloc[i + 2:]
                 mitigated = len(future) > 0 and bool((future["close"] >= midpoint).any())
                 if not mitigated:
+                    if structural_breaks is not None:
+                        mid_time = int(mid["time"].value // 10**9) if hasattr(mid["time"], "value") else int(mid["time"])
+                        if not any(sb.get("direction") == "bearish" and sb.get("time", 0) >= mid_time for sb in structural_breaks):
+                            continue
                     results.append({
                         "type":      "bearish",
                         "top":       round(d_top,    5),
