@@ -9,7 +9,7 @@ def pip_size(price: float) -> float:
     """Return the pip (tick) size for an instrument given its current price."""
     if price > 10_000: return 1.0    # Crypto  (BTC ~65 000)
     if price > 500:    return 0.1    # Gold    (XAU ~2 350)
-    if price > 50:     return 0.01   # JPY pairs (USD/JPY ~150)
+    if price > 5:     return 0.01   # JPY pairs (USD/JPY ~150), Silver (~25), Oil (~75)
     return 0.0001                    # Standard FX (EUR/USD ~1.08)
 
 

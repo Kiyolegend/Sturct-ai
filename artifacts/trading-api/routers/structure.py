@@ -493,8 +493,11 @@ async def get_confluence(
                 ]
                 all_obs.extend(detect_order_blocks(clist, current_price, tf))
                 all_fvgs.extend(detect_fvgs(df, tf, current_price))
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"OB/FVG computation failed for {symbol} {tf}: {e}"
+                )
 
         hits = find_confluence(sr_levels, all_zones, current_price, obs=all_obs, fvgs=all_fvgs)
 

@@ -6,7 +6,7 @@ Works for all pairs — JPY and non-JPY detected automatically from price.
 """
 from __future__ import annotations
 
-
+import logging
 from services.pip_utils import pip_size as _pip
 
 
@@ -56,6 +56,14 @@ def detect_order_blocks(
     for i in range(1, n - 3):
         c = candles[i]
 
+        # NaN guard — skip candles with missing/corrupt OHLC data from MT5
+        if any(v != v for v in (c.get("open", 0.0), c.get("high", 0.0),
+                                 c.get("low", 0.0), c.get("close", 0.0))):
+            logging.warning(
+                f"detect_order_blocks: NaN candle skipped at time={c.get('time', '?')}"
+            )
+            continue
+
         # Average range of the 10 bars before i (used for displacement check)
         lookback = candles[max(0, i - 10):i]
         avg_range = (
@@ -73,82 +81,82 @@ def detect_order_blocks(
         # A bearish candle (close < open) that is followed by a strong
         # bullish move that breaks above it — price may return to buy here.
         if c["close"] < c["open"] and (c["high"] - c["low"]) >= min_size:
-            future_high = max(x["close"] for x in next_bars)
-            if future_high > c["high"]:
-                # Displacement: the break candle must be ≥1.5× average range
-                brk = max(next_bars, key=lambda x: x["high"] - x["low"])
-                if (brk["high"] - brk["low"]) >= 1.5 * avg_range:
-                    centre = (c["high"] + c["low"]) / 2
-                    if abs(centre - current_price) / current_price <= proximity:
-                        # BOS gate: only accept if a bullish structural break
-                        # (BOS or CHoCH) occurred at or after this OB candle.
-                        # When structural_breaks is None, gate is skipped (backward-compatible).
-                        if structural_breaks is not None:
-                            has_sb = any(
-                                sb.get("direction") == "bullish"
-                                and sb.get("time", 0) >= c.get("time", 0)
-                                for sb in structural_breaks
-                            )
-                            if not has_sb:
-                                continue
-                        # Mitigated = price already closed back below the OB low
-                        mit_buf = 50 * pip if current_price > 10_000 else 5 * pip if current_price > 500 else 2 * pip
-                        mitigated = any(
-                            fc["close"] < c["low"] - mit_buf
-                            for fc in candles[i + 1:]
+            # First candle that closes above the OB high — causally correct.
+            # (replaces max(next_bars) which falsely credits later news spikes)
+            brk = next((x for x in next_bars if x["close"] > c["high"]), None)
+            if brk is not None and (brk["high"] - brk["low"]) >= 1.5 * avg_range:
+                centre = (c["high"] + c["low"]) / 2
+                if abs(centre - current_price) / current_price <= proximity:
+                    # BOS gate: only accept if a bullish structural break
+                    # (BOS or CHoCH) occurred at or after this OB candle.
+                    # When structural_breaks is None, gate is skipped (backward-compatible).
+                    if structural_breaks is not None:
+                        has_sb = any(
+                            sb.get("direction") == "bullish"
+                            and sb.get("time", 0) >= c.get("time", 0)
+                            for sb in structural_breaks
                         )
-                        if not mitigated:
-                            touches = sum(
-                                1 for fc in candles[i + 1:]
-                                if fc["low"] <= c["high"] and fc["high"] >= c["low"]
-                            )
-                            results.append({
-                                "type":     "bullish",
-                                "top":      round(c["high"], 5),
-                                "bottom":   round(c["low"],  5),
-                                "time":     c.get("time", 0),
-                                "strength": (brk["high"] - brk["low"]) / avg_range,
-                                "touches":  touches,
-                            })
+                        if not has_sb:
+                            continue
+                    # Mitigated = price already closed back below the OB low
+                    mit_buf = 50 * pip if current_price > 10_000 else 5 * pip if current_price > 500 else 2 * pip
+                    mitigated = any(
+                        fc["close"] < c["low"] - mit_buf
+                        for fc in candles[i + 1:]
+                    )
+                    if not mitigated:
+                        # Close-inside touch count — body acceptance, not wick sweeps
+                        touches = sum(
+                            1 for fc in candles[i + 1:]
+                            if c["low"] <= fc["close"] <= c["high"]
+                        )
+                        results.append({
+                            "type":     "bullish",
+                            "top":      round(c["high"], 5),
+                            "bottom":   round(c["low"],  5),
+                            "time":     c.get("time", 0),
+                            "strength": (brk["high"] - brk["low"]) / avg_range,
+                            "touches":  touches,
+                        })
 
         # ── Bearish OB ──────────────────────────────────────────────────────
         # A bullish candle (close > open) that is followed by a strong
         # bearish move that breaks below it — price may return to sell here.
         if c["close"] > c["open"] and (c["high"] - c["low"]) >= min_size:
-            future_low = min(x["close"] for x in next_bars)
-            if future_low < c["low"]:
-                brk = max(next_bars, key=lambda x: x["high"] - x["low"])
-                if (brk["high"] - brk["low"]) >= 1.5 * avg_range:
-                    centre = (c["high"] + c["low"]) / 2
-                    if abs(centre - current_price) / current_price <= proximity:
-                        # BOS gate: only accept if a bearish structural break
-                        # (BOS or CHoCH) occurred at or after this OB candle.
-                        if structural_breaks is not None:
-                            has_sb = any(
-                                sb.get("direction") == "bearish"
-                                and sb.get("time", 0) >= c.get("time", 0)
-                                for sb in structural_breaks
-                            )
-                            if not has_sb:
-                                continue
-                        mit_buf = 50 * pip if current_price > 10_000 else 5 * pip if current_price > 500 else 2 * pip
-                        mitigated = any(
-                            fc["close"] > c["high"] + mit_buf
-                            for fc in candles[i + 1:]
+            # First candle that closes below the OB low — causally correct.
+            brk = next((x for x in next_bars if x["close"] < c["low"]), None)
+            if brk is not None and (brk["high"] - brk["low"]) >= 1.5 * avg_range:
+                centre = (c["high"] + c["low"]) / 2
+                if abs(centre - current_price) / current_price <= proximity:
+                    # BOS gate: only accept if a bearish structural break
+                    # (BOS or CHoCH) occurred at or after this OB candle.
+                    if structural_breaks is not None:
+                        has_sb = any(
+                            sb.get("direction") == "bearish"
+                            and sb.get("time", 0) >= c.get("time", 0)
+                            for sb in structural_breaks
                         )
-                        if not mitigated:
-                            touches = sum(
-                                1 for fc in candles[i + 1:]
-                                if fc["low"] <= c["high"] and fc["high"] >= c["low"]
-                            )
-                            results.append({
-                                "type":     "bearish",
-                                "top":      round(c["high"], 5),
-                                "bottom":   round(c["low"],  5),
-                                "time":     c.get("time", 0),
-                                "strength": (brk["high"] - brk["low"]) / avg_range,
-                                "touches":  touches,
-                            })
+                        if not has_sb:
+                            continue
+                    mit_buf = 50 * pip if current_price > 10_000 else 5 * pip if current_price > 500 else 2 * pip
+                    mitigated = any(
+                        fc["close"] > c["high"] + mit_buf
+                        for fc in candles[i + 1:]
+                    )
+                    if not mitigated:
+                        # Close-inside touch count — body acceptance, not wick sweeps
+                        touches = sum(
+                            1 for fc in candles[i + 1:]
+                            if c["low"] <= fc["close"] <= c["high"]
+                        )
+                        results.append({
+                            "type":     "bearish",
+                            "top":      round(c["high"], 5),
+                            "bottom":   round(c["low"],  5),
+                            "time":     c.get("time", 0),
+                            "strength": (brk["high"] - brk["low"]) / avg_range,
+                            "touches":  touches,
+                        })
 
     # Keep the single best OB per side.
     # Prefer fresh (0 touches), then strongest displacement.

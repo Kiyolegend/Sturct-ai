@@ -3,15 +3,16 @@ FVG Engine — Fair Value Gap detection for the confluence layer.
 
 Mirrors detectFVGs() in TradingChart.tsx with improvements:
   - 50% mitigation threshold (midpoint fill, not full bottom edge)
-  - Displacement filter (middle candle must be >= 1.2x avg range)
+  - Displacement filter (middle candle must be >= 1.5x avg range)
 
 Returns ALL unmitigated FVGs within proximity so the confluence
 engine can cross-reference every confluence hit price against the
 full set — not capped at 1+1 like the chart rendering version.
 """
 from .pip_utils import pip_size as _pip_size
+import logging
 
-
+_logger = logging.getLogger(__name__)
 def detect_fvgs(
     df,
     timeframe: str = "1h",
@@ -54,12 +55,19 @@ def detect_fvgs(
         mid  = candles.iloc[i]
         nxt  = candles.iloc[i + 1]
 
+        # NaN guard — skip 3-candle windows with any missing OHLC from MT5
+        if (prev[["open", "high", "low", "close"]].isnull().any() or
+                mid[["open", "high", "low", "close"]].isnull().any() or
+                nxt[["open", "high", "low", "close"]].isnull().any()):
+            _logger.warning(f"detect_fvgs: NaN candle in window at index {i} — skipped")
+            continue
+
         # Displacement filter — middle candle must be impulsive
         lookback = candles.iloc[max(0, i - 8):i]
         if len(lookback) > 0:
             avg_rng = float((lookback["high"] - lookback["low"]).mean())
             mid_rng = float(mid["high"] - mid["low"])
-            if avg_rng > 0 and mid_rng < 1.2 * avg_rng:
+            if avg_rng > 0 and mid_rng < 1.5 * avg_rng:
                 continue
 
         # ── Bullish FVG: prev.high < next.low ──────────────────────────────
