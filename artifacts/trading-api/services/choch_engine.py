@@ -49,6 +49,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
             if times_arr and times_arr[swing_idx] < times_arr[-1] - (lookback_hours * 3600):
                 continue
             for i in range(swing_idx + fractal_n + 1, len(df)):
+                # No ATR buffer — CHoCH watches structural floors/ceilings, not spread-affected tops
                 if closes[i] < level:
                     choch_events.append({
                         "time": times_arr[i],
@@ -71,6 +72,7 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
             if times_arr and times_arr[swing_idx] < times_arr[-1] - (lookback_hours * 3600):
                 continue
             for i in range(swing_idx + fractal_n + 1, len(df)):
+                # No ATR buffer — CHoCH watches structural floors/ceilings, not spread-affected tops
                 if closes[i] > level:
                     choch_events.append({
                         "time": times_arr[i],
