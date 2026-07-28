@@ -21,7 +21,7 @@ def detect_order_blocks(
     Args:
         candles       — list of {open, high, low, close, time}
         current_price — latest close (used for pip size + proximity filter)
-        timeframe     — "5m", "15m", "1h", "4h", "d1"
+        timeframe     — "5m", "15m", "1h", "4h", "d1", "w1"
 
     Returns:
         list of {type, top, bottom, time}
@@ -32,7 +32,7 @@ def detect_order_blocks(
         return []
 
     pip = _pip(current_price)
-    is_d1 = timeframe == "d1"
+    is_d1 = timeframe in ("d1", "w1")
 
     # Minimum candle body size to qualify as an OB
     min_size = 20 * pip if is_d1 else 5 * pip
