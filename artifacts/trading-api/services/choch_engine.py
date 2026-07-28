@@ -33,8 +33,8 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
 
     choch_events = []
     
-    hl_levels = [l for l in structure_labels if l["label"] == "HL"]
-    lh_levels = [l for l in structure_labels if l["label"] == "LH"]
+    hl_levels = sorted([l for l in structure_labels if l["label"] == "HL"], key=lambda l: l["index"])[-3:]
+    lh_levels = sorted([l for l in structure_labels if l["label"] == "LH"], key=lambda l: l["index"])[-3:]
 
     broken_hl: set[float] = set()
     broken_lh: set[float] = set()
@@ -46,6 +46,8 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
             if round(level, 5) in broken_hl:
                 continue
             swing_idx = last_hl["index"]
+            if times_arr and times_arr[swing_idx] < times_arr[-1] - (lookback_hours * 3600):
+                continue
             for i in range(swing_idx + fractal_n + 1, len(df)):
                 if closes[i] < level:
                     choch_events.append({
@@ -66,6 +68,8 @@ def detect_choch(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: l
             if round(level, 5) in broken_lh:
                 continue
             swing_idx = last_lh["index"]
+            if times_arr and times_arr[swing_idx] < times_arr[-1] - (lookback_hours * 3600):
+                continue
             for i in range(swing_idx + fractal_n + 1, len(df)):
                 if closes[i] > level:
                     choch_events.append({
