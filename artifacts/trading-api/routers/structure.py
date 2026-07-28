@@ -464,25 +464,31 @@ async def get_confluence(
         # S/R levels across all timeframes
         sr_levels = compute_mtf_sr_levels(df_map)
 
-        # Zones across all timeframes
+        
+        # Zones, OBs, and FVGs — single pass per timeframe.
+        # BOS + CHoCH are computed here and passed as the structural gate
+        # for OB detection. No new imports needed — all already at top of file.
         all_zones: list[dict] = []
-        for tf, df in [
-            ("15m", df_15m), ("1h", df_1h), ("4h", df_4h),
-            ("d1", df_d1),   ("w1", df_w1),
-        ]:
-            swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(tf, 5))
-            zones  = detect_zones(swings, tf, current_price, df=df)
-            all_zones.extend(zones)
-
-
-        # OBs and FVGs across all timeframes — enrich each confluence hit
-        all_obs:  list[dict] = []
-        all_fvgs: list[dict] = []
+        all_obs:   list[dict] = []
+        all_fvgs:  list[dict] = []
+        _bos_lookback   = {"15m": 48, "1h": 72, "4h": 336, "d1": 8760,  "w1": 87600}
+        _choch_lookback = {"15m": 24, "1h": 72, "4h": 336, "d1": 4320,  "w1": 43800}
         for tf, df in [
             ("15m", df_15m), ("1h", df_1h), ("4h", df_4h),
             ("d1",  df_d1),  ("w1", df_w1),
         ]:
+            fractal_n = TF_FRACTAL_N.get(tf, 5)
+            swings    = detect_swings(df, fractal_n=fractal_n)
+            all_zones.extend(detect_zones(swings, tf, current_price, df=df))
             try:
+                labels = classify_structure(swings)
+                trend  = detect_trend(labels).get("trend", "neutral")
+                bos    = detect_bos(df, swings, labels, trend,
+                                    lookback_hours=_bos_lookback.get(tf, 48),
+                                    fractal_n=fractal_n)
+                choch  = detect_choch(df, swings, labels, trend,
+                                      lookback_hours=_choch_lookback.get(tf, 24),
+                                      fractal_n=fractal_n)
                 clist = [
                     {
                         "time":  int(r["time"].value // 10**9) if hasattr(r["time"], "value") else int(r["time"]),
@@ -491,7 +497,8 @@ async def get_confluence(
                     }
                     for _, r in df.iterrows()
                 ]
-                all_obs.extend(detect_order_blocks(clist, current_price, tf))
+                all_obs.extend(detect_order_blocks(clist, current_price, tf,
+                                                   structural_breaks=bos + choch))
                 all_fvgs.extend(detect_fvgs(df, tf, current_price))
             except Exception as e:
                 import logging
