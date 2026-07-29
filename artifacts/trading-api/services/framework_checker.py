@@ -35,8 +35,14 @@ def detect_order_blocks(
     pip = _pip(current_price)
     is_d1 = timeframe in ("d1", "w1")
 
-    # Minimum candle body size to qualify as an OB
-    min_size = 20 * pip if is_d1 else 5 * pip
+    # Minimum candle body size to qualify as an OB — scaled per asset class.
+    # Flat 5× pip is meaningless for Gold ($0.50) and BTC ($5); use real dollar floors.
+    if current_price > 10_000:     # BTC
+        min_size = 500 * pip if is_d1 else 100 * pip   # $500 D1 / $100 intraday
+    elif current_price > 500:      # Gold
+        min_size = 150 * pip if is_d1 else 30 * pip    # $15 D1 / $3 intraday
+    else:                          # FX + JPY — unchanged
+        min_size = 20 * pip if is_d1 else 5 * pip
 
     # How close to current price the OB centre must be
     # Proximity expressed as fraction of current_price.
@@ -99,7 +105,7 @@ def detect_order_blocks(
                         if not has_sb:
                             continue
                     # Mitigated = price already closed back below the OB low
-                    mit_buf = 50 * pip if current_price > 10_000 else 5 * pip if current_price > 500 else 2 * pip
+                    mit_buf = 100 * pip if current_price > 10_000 else 20 * pip if current_price > 500 else 2 * pip
                     mitigated = any(
                         fc["close"] < c["low"] - mit_buf
                         for fc in candles[i + 1:]
@@ -138,7 +144,7 @@ def detect_order_blocks(
                         )
                         if not has_sb:
                             continue
-                    mit_buf = 50 * pip if current_price > 10_000 else 5 * pip if current_price > 500 else 2 * pip
+                    mit_buf = 100 * pip if current_price > 10_000 else 20 * pip if current_price > 500 else 2 * pip
                     mitigated = any(
                         fc["close"] > c["high"] + mit_buf
                         for fc in candles[i + 1:]

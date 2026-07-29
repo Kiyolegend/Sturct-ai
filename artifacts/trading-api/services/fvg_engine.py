@@ -41,7 +41,13 @@ def detect_fvgs(
 
     pip     = _pip_size(current_price)
     is_high = timeframe in ("d1", "w1")
-    min_gap   = (10 if is_high else 3) * pip
+    # Minimum FVG gap — scaled per asset so $0.30 doesn't qualify as a meaningful Gold FVG
+    if current_price > 10_000:     # BTC
+        min_gap = (200 if is_high else 50) * pip    # $200 D1 / $50 intraday
+    elif current_price > 500:      # Gold
+        min_gap = (80 if is_high else 20) * pip     # $8 D1 / $2 intraday
+    else:                          # FX + JPY — unchanged
+        min_gap = (10 if is_high else 3) * pip
     proximity = (
         min(0.02, 400 * pip / current_price) if is_high
         else min(0.01, 100 * pip / current_price)
