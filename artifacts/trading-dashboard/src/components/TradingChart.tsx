@@ -38,6 +38,14 @@ const MTF_ZONE_COLORS: Record<string, { bg: string; border: string; label: strin
   '1h': { bg: 'rgba(234,179,8,0.12)', border: 'rgba(250,204,21,0.60)', label: '1H' },
 };
 
+// Opacity per timeframe — higher TF = more prominent
+const MTF_TF_OPACITY: Record<string, number> = {
+  w1:  1.00,
+  d1:  0.90,
+  '4h': 0.75,
+  '1h': 0.35,
+};
+
 interface TradingChartProps {
   data: TradingAnalysisResponse | undefined;
   srLevels: SRLevel[] | undefined;
@@ -467,7 +475,7 @@ containerRef.current?.addEventListener('click', handleChartClick);
 
   useEffect(() => {
     setTimeout(tick, 50);
-  }, [sessions, toggles.sessions, toggles.zones, toggles.ob, toggles.fvg, toggles.d1Zones, toggles.w1Zones, data, computedOBs, computedFVGs]);
+  }, [sessions, toggles.sessions, toggles.zones, toggles.ob, toggles.fvg, toggles.d1Zones, toggles.w1Zones, toggles.zonesW1, toggles.zonesD1, toggles.zones4h, toggles.zones1h, mtfZones, data, computedOBs, computedFVGs]);
 
   // ── Effect 3: S/R price lines ──────────────────────────────────────────────
   useEffect(() => {
@@ -679,14 +687,27 @@ containerRef.current?.addEventListener('click', handleChartClick);
         const height = Math.abs(y2 - y1);
         if (height < 2) return;
 
+                // Border thickness by quality: high quality = thicker border
+        const quality = (zone as any).quality ?? 0;
+        const zStatus = (zone as any).status ?? "fresh";
+        const borderW = quality >= 70 ? '2px' : '1px';
+        const borderS = zStatus === 'tested_multiple' ? 'dashed' : 'solid';
+        const statusLabel = zStatus === 'fresh'
+          ? '● FRESH'
+          : zStatus === 'tested_once'
+          ? '◎ TESTED'
+          : zStatus === 'tested_multiple'
+          ? '○ WORN'
+          : '';
+
         elements.push(
           <div key={`zone-${idx}`} style={{
             position: 'absolute', left: 0, top,
             width: containerWidth,
             height: Math.max(height, 3),
             background: style.bg,
-            borderTop: `1px solid ${style.border}`,
-            borderBottom: `1px solid ${style.border}`,
+            borderTop: `${borderW} ${borderS} ${style.border}`,
+            borderBottom: `${borderW} ${borderS} ${style.border}`,
             boxSizing: 'border-box', pointerEvents: 'none',
           }}>
             <span style={{
@@ -694,14 +715,23 @@ containerRef.current?.addEventListener('click', handleChartClick);
               letterSpacing: '0.06em', color: style.textColor, fontFamily: 'monospace',
               lineHeight: 1, userSelect: 'none', opacity: 0.9,
             }}>
-              {isSupply ? 'SUPPLY' : 'DEMAND'}
+              {isSupply ? 'SUPPLY' : 'DEMAND'}{statusLabel ? ' ' + statusLabel : ''}
             </span>
+            {quality > 0 && (
+              <span style={{
+                position: 'absolute', top: 2, right: 6, fontSize: '7px', fontWeight: 600,
+                color: style.textColor, fontFamily: 'monospace', lineHeight: 1,
+                userSelect: 'none', opacity: 0.7,
+              }}>
+                Q{quality}
+              </span>
+            )}
           </div>
         );
       });
     }
     
-        // ── MTF Zone overlays (W1 / D1 / 4H / 1H) ────────────────────────────
+    // ── MTF Zone overlays (W1 / D1 / 4H / 1H) ────────────────────────────
     const MTF_LAYERS: [string, keyof ToggleState, any[]][] = [
       ['w1', 'zonesW1', mtfZones?.zones_w1 ?? []],
       ['d1', 'zonesD1', mtfZones?.zones_d1 ?? []],
@@ -709,12 +739,38 @@ containerRef.current?.addEventListener('click', handleChartClick);
       ['1h', 'zones1h', mtfZones?.zones_1h ?? []],
     ];
 
-    const PROXIMITY_MTF = 0.025; // 2.5% proximity — wider than current-TF zones
+    const PROXIMITY_MTF = 0.025;
+
+    // Build a flat list of all active nearby zones so we can detect confluence
+    const allActiveNearby: { tf: string; top: number; bottom: number; center: number; isSupply: boolean }[] = [];
+    for (const [tf, toggleKey, zoneList] of MTF_LAYERS) {
+      if (!toggles[toggleKey] || !zoneList.length || currentPrice === null) continue;
+      (zoneList as any[]).filter(z =>
+        !z.broken &&
+        z.strength >= 2 &&
+        Math.abs(z.center - currentPrice) / currentPrice <= PROXIMITY_MTF
+      ).forEach((z: any) => {
+        allActiveNearby.push({ tf, top: z.top, bottom: z.bottom, center: z.center, isSupply: z.center > currentPrice });
+      });
+    }
+
+    // Confluence detection: group zones that overlap across different TFs
+    const rendered = new Set<string>();
 
     for (const [tf, toggleKey, zoneList] of MTF_LAYERS) {
       if (!toggles[toggleKey] || !zoneList.length || currentPrice === null) continue;
       const tfColors = MTF_ZONE_COLORS[tf];
       if (!tfColors) continue;
+      const baseOpacity = MTF_TF_OPACITY[tf] ?? 0.75;
+
+      // When higher-TF zones are present nearby, fade lower-TF ones further
+      const higherPresent = tf === '1h'
+        ? allActiveNearby.some(z => z.tf === 'w1' || z.tf === 'd1')
+        : tf === '4h'
+        ? allActiveNearby.some(z => z.tf === 'w1')
+        : false;
+      const opacityMult = higherPresent ? 0.5 : 1.0;
+      const finalOpacity = baseOpacity * opacityMult;
 
       const nearby = (zoneList as any[]).filter(z =>
         !z.broken &&
@@ -733,6 +789,23 @@ containerRef.current?.addEventListener('click', handleChartClick);
 
       [...supply, ...demand].forEach((zone: any, idx: number) => {
         const isSupply = zone.center > currentPrice;
+        const zoneKey = `${isSupply ? 's' : 'd'}-${Math.round(zone.center * 1e4)}`;
+
+        // Confluence: find other TFs that overlap this zone
+        const confluenceTFs = allActiveNearby
+          .filter(other =>
+            other.tf !== tf &&
+            other.isSupply === isSupply &&
+            other.top >= zone.bottom &&
+            other.bottom <= zone.top
+          )
+          .map(o => o.tf.toUpperCase());
+        const isConfluence = confluenceTFs.length > 0;
+
+        // Skip if already rendered as part of a higher-TF confluence
+        if (rendered.has(zoneKey) && !isConfluence) return;
+        rendered.add(zoneKey);
+
         const y1 = priceSeries.priceToCoordinate(zone.top);
         const y2 = priceSeries.priceToCoordinate(zone.bottom);
         if (y1 === null || y2 === null) return;
@@ -740,24 +813,34 @@ containerRef.current?.addEventListener('click', handleChartClick);
         const top = Math.min(y1, y2);
         const height = Math.abs(y2 - y1);
         if (height < 2) return;
+
+        // Confluence zones get a slightly stronger border
+        const borderStyle = isConfluence ? 'solid' : 'dashed';
+        const borderWidth  = isConfluence ? '2px' : '1px';
+
+        const confluenceLabel = isConfluence
+          ? `${tfColors.label}+${confluenceTFs.join('+')} ${isSupply ? 'S' : 'D'}`
+          : `${tfColors.label} ${isSupply ? 'S' : 'D'}`;
+
         elements.push(
           <div key={`mtf-${tf}-${isSupply ? 's' : 'd'}-${idx}`} style={{
             position: 'absolute', left: 0, top,
             width: containerWidth,
             height: Math.max(height, 3),
-            background: tfColors.bg,
-            borderTop:    `1px dashed ${tfColors.border}`,
-            borderBottom: `1px dashed ${tfColors.border}`,
+            background: tfColors.bg.replace('0.12)', `${0.12 * finalOpacity})`),
+            borderTop:    `${borderWidth} ${borderStyle} ${tfColors.border}`,
+            borderBottom: `${borderWidth} ${borderStyle} ${tfColors.border}`,
             boxSizing: 'border-box', pointerEvents: 'none',
+            opacity: finalOpacity,
           }}>
             <span style={{
               position: 'absolute', top: 2, right: 6,
-              fontSize: '8px', fontWeight: 700,
+              fontSize: '8px', fontWeight: isConfluence ? 800 : 700,
               letterSpacing: '0.06em', color: tfColors.border,
               fontFamily: 'monospace', lineHeight: 1,
               userSelect: 'none', opacity: 0.9,
             }}>
-              {tfColors.label} {isSupply ? 'S' : 'D'}
+              {confluenceLabel}
             </span>
           </div>
         );

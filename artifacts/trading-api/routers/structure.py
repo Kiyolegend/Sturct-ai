@@ -50,7 +50,7 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     _bar_secs     = {"5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "d1": 86400, "w1": 604800}.get(interval, 900)
     trendlines    = compute_trendlines(structure_labels, current_price=current_price, latest_time=latest_time, bar_seconds=_bar_secs)
     zigzag_lines  = swings_to_zigzag_lines(swings)
-    zones         = detect_zones(swings, interval, current_price)
+    zones         = detect_zones(swings, interval, current_price, df=df)
     candles = candles_to_dict(df)
     result = {
         "current_price": current_price,
@@ -157,7 +157,7 @@ async def get_zones(
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
         swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 5))
         current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
-        zones = detect_zones(swings, interval, current_price)
+        zones = detect_zones(swings, interval, current_price, df=df)
         return {"symbol": symbol, "interval": interval, "zones": zones}
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -186,7 +186,7 @@ async def get_zones_mtf(
                 return []
             swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 3))
             current_price = float(df["close"].iloc[-1])
-            return detect_zones(swings, interval, current_price)
+            return detect_zones(swings, interval, current_price, df=df)
 
         return {
             "symbol": symbol,
@@ -220,7 +220,7 @@ async def get_patterns(
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
         swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 5))
         current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
-        zones = detect_zones(swings, interval, current_price)
+        zones = detect_zones(swings, interval, current_price, df=df)
         patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_get_proximity(symbol, interval))
         return {"symbol": symbol, "interval": interval, "patterns": patterns}
     except ValueError as e:
@@ -244,7 +244,7 @@ async def get_pattern_summary(
         def _last_pattern(df, fractal_n: int, interval: str):
             swings = detect_swings(df, fractal_n=fractal_n)
             current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
-            zones = detect_zones(swings, interval, current_price)
+            zones = detect_zones(swings, interval, current_price, df=df)
             patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_get_proximity(symbol, interval))
             return patterns[0] if patterns else None
         return {

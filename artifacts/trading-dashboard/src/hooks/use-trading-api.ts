@@ -73,11 +73,16 @@ export interface Zone {
   bottom: number;
   center: number;
   touches: number;
-  strength: number;
+  strength: number;       // kept for backward compat (0–5)
   timeframe: string;
   start_time: number;
   end_time: number;
   broken?: boolean;
+  // Phase 2 additions:
+  status?: "fresh" | "tested_once" | "tested_multiple" | "broken";
+  confidence?: number;    // 0–100
+  departure_pips?: number;
+  quality?: number;       // 0–100
 }
 
 export interface ZoneMTF extends Zone {
