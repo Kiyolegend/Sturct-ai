@@ -256,7 +256,12 @@ def compute_framework_status(
 
         entry = (ob["top"] + ob["bottom"]) / 2
         # SL below OB for bullish, above for bearish
-        sl_dist = 15 * pip
+        if current_price > 10_000:   # BTC — SL at least $300 below/above OB edge
+            sl_dist = max(300 * pip, 0.008 * current_price)
+        elif current_price > 500:    # Gold — SL at least $5 below/above OB edge
+            sl_dist = max(50 * pip, 0.003 * current_price)
+        else:                        # FX — original 15 pip
+            sl_dist = 15 * pip
         sl = (ob["bottom"] - sl_dist) if direction == "bullish" else (ob["top"] + sl_dist)
 
         # TP: nearest opposing S/R level
@@ -271,7 +276,13 @@ def compute_framework_status(
                     tp = p
 
         if tp is None:
-            tp = entry + 50 * pip if direction == "bullish" else entry - 50 * pip
+            if current_price > 10_000:
+                fallback_dist = 1000 * pip   # BTC ~$1000 fallback TP
+            elif current_price > 500:
+                fallback_dist = 150 * pip    # Gold ~$15 fallback TP
+            else:
+                fallback_dist = 50 * pip     # FX unchanged
+            tp = entry + fallback_dist if direction == "bullish" else entry - fallback_dist
 
         risk   = abs(entry - sl)
         reward = abs(tp - entry)

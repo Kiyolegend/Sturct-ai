@@ -41,7 +41,7 @@ def classify_structure(swings: list[SwingPoint]) -> list[dict]:
             if prev_high is not None:
                 # Use a 2-pip tolerance so near-equal highs (double tops) are caught
                 _pip = 1.0 if swing["price"] > 10_000 else 0.1 if swing["price"] > 500 else 0.01 if swing["price"] > 50 else 0.0001
-                _tol = 2 * _pip
+_tol =          (10 * _pip) if swing["price"] > 10_000 else (10 * _pip) if swing["price"] > 500 else (2 * _pip)
                 if swing["price"] > prev_high + _tol:
                     label = LABEL_HH
                 elif abs(swing["price"] - prev_high) <= _tol:

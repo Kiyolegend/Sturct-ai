@@ -26,7 +26,7 @@ class SwingPoint(TypedDict):
     kind: str  # "high" or "low"
 
 
-def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoint]:
+def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N, timeframe: str = "1h") -> list[SwingPoint]:
     """
     Detect swing highs and lows using fractal logic.
     Returns a strictly alternating list of swing points.
@@ -90,10 +90,14 @@ def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N) -> list[SwingPoi
     if len(alternating) >= 2:
         p   = alternating[0]["price"]
         pip = 1.0 if p > 10_000 else 0.1 if p > 500 else 0.01 if p > 50 else 0.0001
-        # Minimum swing scaled by asset class: BTC needs $100+, Gold $5+, FX 5 pips
-        if p > 10_000:  min_pips = 100   # BTC
-        elif p > 500:   min_pips = 50    # Gold
-        else:           min_pips = 5     # JPY + standard FX
+
+        _tf = timeframe.lower()
+        if p > 10_000:   # BTC
+            min_pips = {"w1": 2000, "d1": 1000, "4h": 500, "1h": 200, "15m": 100, "5m": 50}.get(_tf, 200)
+        elif p > 500:    # Gold
+            min_pips = {"w1": 800, "d1": 400, "4h": 150, "1h": 50, "15m": 30, "5m": 15}.get(_tf, 50)
+        else:            # FX
+            min_pips = {"w1": 100, "d1": 50, "4h": 20, "1h": 10, "15m": 5, "5m": 3}.get(_tf, 5)
         min_move = min_pips * pip
         sized = [alternating[0]]
         for pt in alternating[1:]:
