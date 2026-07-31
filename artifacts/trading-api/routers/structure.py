@@ -313,8 +313,8 @@ async def get_mtf_bias(
             fetch_ohlc(symbol=symbol, interval="w1",  outputsize=300),
         )
 
-        def _bias(df, fractal_n: int = 5):
-            swings = detect_swings(df, fractal_n=fractal_n, timeframe=interval)
+        def _bias(df, fractal_n: int = 5, timeframe: str = "1h"):
+            swings = detect_swings(df, fractal_n=fractal_n, timeframe=timeframe)
             labels = classify_structure(swings)
             trend_data = detect_trend(labels)
 
@@ -347,11 +347,11 @@ async def get_mtf_bias(
                 "last_swing_time": last_swing_time,
             }
 
-        t15m = _bias(df_15m, fractal_n=5)
-        t1h  = _bias(df_1h,  fractal_n=3)
-        t4h  = _bias(df_4h,  fractal_n=3)
-        td1  = _bias(df_d1,  fractal_n=3)
-        tw1  = _bias(df_w1,  fractal_n=2)
+        t15m = _bias(df_15m, fractal_n=5, timeframe="15m")
+        t1h  = _bias(df_1h,  fractal_n=3, timeframe="1h")
+        t4h  = _bias(df_4h,  fractal_n=3, timeframe="4h")
+        td1  = _bias(df_d1,  fractal_n=3, timeframe="d1")
+        tw1  = _bias(df_w1,  fractal_n=2, timeframe="w1")
 
         
 
@@ -478,7 +478,7 @@ async def get_confluence(
             ("d1",  df_d1),  ("w1", df_w1),
         ]:
             fractal_n = TF_FRACTAL_N.get(tf, 5)
-            swings    = detect_swings(df, fractal_n=fractal_n)
+            swings    = detect_swings(df, fractal_n=fractal_n, timeframe=tf)
             all_zones.extend(detect_zones(swings, tf, current_price, df=df))
             try:
                 labels = classify_structure(swings)
