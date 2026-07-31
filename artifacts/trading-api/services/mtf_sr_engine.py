@@ -222,7 +222,7 @@ def detect_sr_levels(df_map: dict, timeframe: str, current_price: float) -> list
         atr = 0.0
     threshold   = max(cfg["cluster_pips"] * pip, 0.2 * atr)
 
-    swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(timeframe, 5))
+    swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(timeframe, 5), timeframe=timeframe)
     if not swings:
         return []
 

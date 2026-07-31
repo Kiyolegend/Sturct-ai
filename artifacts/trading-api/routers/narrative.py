@@ -79,7 +79,7 @@ async def _analyse_timeframe(symbol: str, interval: str, outputsize: int) -> dic
         if df is None or len(df) < 5:
             return {}
         fractal_n     = TF_FRACTAL_N.get(interval, 5)
-        swings        = detect_swings(df, fractal_n=fractal_n)
+        swings        = detect_swings(df, fractal_n=fractal_n, timeframe=interval)
         labels        = classify_structure(swings)
         trend         = detect_trend(labels)
         bos           = detect_bos(df, swings, labels, trend["trend"])

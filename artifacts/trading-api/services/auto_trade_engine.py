@@ -219,7 +219,7 @@ async def _evaluate_pair(symbol: str) -> dict:
         except ValueError:
             return {"status": "WAITING", "reason": "No D1 data from MT5 yet", "symbol": symbol}
 
-        swings_d1     = detect_swings(df_d1, fractal_n=3)
+        swings_d1     = detect_swings(df_d1, fractal_n=3, timeframe="d1")
         labels_d1     = classify_structure(swings_d1)
         trend_d1_data = detect_trend(labels_d1)
         d1_dir        = trend_d1_data.get("trend", "neutral")
@@ -261,7 +261,7 @@ async def _evaluate_pair(symbol: str) -> dict:
                 **exhaustion,
             }
 
-        swings_4h     = detect_swings(df_4h, fractal_n=3)
+        swings_4h     = detect_swings(df_4h, fractal_n=3, timeframe="4h")
         labels_4h     = classify_structure(swings_4h)
         trend_4h_data = detect_trend(labels_4h)
         choch_4h      = detect_choch(
@@ -329,7 +329,7 @@ async def _evaluate_pair(symbol: str) -> dict:
         obs_1h     = detect_order_blocks(candles_1h, current_price, "1h")
         ob_1h      = next((o for o in obs_1h if o["type"] == d1_dir), None)
 
-        swings_1h     = detect_swings(df_1h, fractal_n=3)
+        swings_1h     = detect_swings(df_1h, fractal_n=3, timeframe="1h")
         labels_1h     = classify_structure(swings_1h)
         trend_1h_data = detect_trend(labels_1h)
         choch_1h      = detect_choch(

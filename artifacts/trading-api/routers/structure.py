@@ -28,7 +28,7 @@ async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
         
     df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
     tf_fractal_n = TF_FRACTAL_N.get(interval, 5)
-    swings = detect_swings(df, fractal_n=tf_fractal_n)
+    swings = detect_swings(df, fractal_n=tf_fractal_n, timeframe=interval)
     structure_labels = classify_structure(swings)
     trend_data = detect_trend(structure_labels)
     last_high_price = None
@@ -78,7 +78,7 @@ async def get_structure(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 5))
+        swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 5), timeframe=interval)
         structure_labels = classify_structure(swings)
         zigzag_lines = swings_to_zigzag_lines(swings)
         return {
@@ -101,7 +101,7 @@ async def get_trend(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 5))
+        swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 5), timeframe=interval)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
         return {"symbol": symbol, "interval": interval, **trend_data}
@@ -119,7 +119,7 @@ async def get_bos(
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
         tf_fractal_n = TF_FRACTAL_N.get(interval, 5)
-        swings = detect_swings(df, fractal_n=tf_fractal_n)
+        swings = detect_swings(df, fractal_n=tf_fractal_n, timeframe=interval)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
         _bos_hours = {"5m": 8, "15m": 48, "1h": 72, "4h": 336, "d1": 8760, "w1": 87600}.get(interval, 48)
@@ -139,7 +139,7 @@ async def get_choch(
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
         tf_fractal_n = TF_FRACTAL_N.get(interval, 5)
-        swings = detect_swings(df, fractal_n=tf_fractal_n)
+        swings = detect_swings(df, fractal_n=tf_fractal_n, timeframe=interval)
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
         _choch_hours = {"5m": 8, "15m": 24, "1h": 72, "4h": 336, "d1": 4320, "w1": 43800}.get(interval, 24)
@@ -158,7 +158,7 @@ async def get_zones(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 5))
+        swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 5), timeframe=interval)
         current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
         zones = detect_zones(swings, interval, current_price, df=df)
         return {"symbol": symbol, "interval": interval, "zones": zones}
@@ -187,7 +187,7 @@ async def get_zones_mtf(
         def _zones(df, interval: str) -> list:
             if len(df) == 0:
                 return []
-            swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 3))
+            swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 3), timeframe=interval)
             current_price = float(df["close"].iloc[-1])
             return detect_zones(swings, interval, current_price, df=df)
 
@@ -221,7 +221,7 @@ async def get_patterns(
 ):
     try:
         df = await fetch_ohlc(symbol=symbol, interval=interval, outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 5))
+        swings = detect_swings(df, fractal_n=TF_FRACTAL_N.get(interval, 5), timeframe=interval)
         current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
         zones = detect_zones(swings, interval, current_price, df=df)
         patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_get_proximity(symbol, interval))
@@ -245,7 +245,7 @@ async def get_pattern_summary(
             fetch_ohlc(symbol=symbol, interval="w1", outputsize=300),
         )
         def _last_pattern(df, fractal_n: int, interval: str):
-            swings = detect_swings(df, fractal_n=fractal_n)
+            swings = detect_swings(df, fractal_n=fractal_n, timeframe=interval)
             current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
             zones = detect_zones(swings, interval, current_price, df=df)
             patterns = detect_candle_patterns(df, swings, zones, proximity_pips=_get_proximity(symbol, interval))
@@ -314,7 +314,7 @@ async def get_mtf_bias(
         )
 
         def _bias(df, fractal_n: int = 5):
-            swings = detect_swings(df, fractal_n=fractal_n)
+            swings = detect_swings(df, fractal_n=fractal_n, timeframe=interval)
             labels = classify_structure(swings)
             trend_data = detect_trend(labels)
 
@@ -380,7 +380,7 @@ async def get_bos_choch(
     """
     try:
         df = await fetch_ohlc(symbol=symbol, interval="1h", outputsize=outputsize)
-        swings = detect_swings(df, fractal_n=3)
+        swings = detect_swings(df, fractal_n=3, timeframe="1h")
         structure_labels = classify_structure(swings)
         trend_data = detect_trend(structure_labels)
         _bos_hours = 72
