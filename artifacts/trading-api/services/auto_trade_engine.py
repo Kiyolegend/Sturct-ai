@@ -487,8 +487,8 @@ async def _run_loop() -> None:
                 sid = result.get("signal_id", "")
                 if sid and sid not in _fired_ids:
                     _fired_ids.add(sid)
-                    _fired_times[sid] = time.time()
                     _fired_times[sid] = _get_broker_time() or int(time.time())
+                    entry = {**result, "fired_at": _get_broker_time() or int(time.time()), "paper_mode": _paper_mode}
                     _trade_log.insert(0, entry)
                     if len(_trade_log) > 50:
                         _trade_log.pop()
