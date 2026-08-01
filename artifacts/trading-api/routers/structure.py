@@ -345,6 +345,16 @@ async def get_mtf_bias(
 
             # ── True ATR-14 (shared utility, correct gap-aware formula) ─
             atr_14 = compute_atr14(df)
+            # ── Fibonacci anchor size guard ────────────────────────────
+            # Reject swing pairs that are too small to be a meaningful
+            # institutional move. Minimum = 1× ATR-14 for the timeframe.
+            # If the pair fails, both go None → frontend shows no golden zone
+            # (already handles None: "if (!hi || !lo || hi <= lo) return []")
+            _MIN_FIB_ATR = 1.0
+            if (last_high_price is not None and last_low_price is not None
+                    and (last_high_price - last_low_price) < _MIN_FIB_ATR * atr_14):
+                last_high_price = None
+                last_low_price  = None
 
             # ── BOS and CHoCH ───────────────────────────────────────────
             _bos_hours   = {"15m": 48, "1h": 72, "4h": 336, "d1": 8760,  "w1": 87600}.get(timeframe, 48)
