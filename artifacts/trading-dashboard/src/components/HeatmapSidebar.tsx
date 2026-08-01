@@ -29,12 +29,32 @@ type TrendDir = "bullish" | "bearish" | "neutral";
 
 // ATR multiplier for warning threshold — tune this one number to adjust all 13 pairs at once
 const WARNING_ATR_MULTIPLIER = 0.25;
+// Timeframe-aware amber window: how many bars after a fresh opposing CHoCH
+// the dot shows amber. 3 bars on 15M = 45 min (too tight). 3 bars on W1 = 3 weeks (fine).
+const CHOCH_TRANSITION_BARS: Record<string, number> = {
+  "15m": 8,   // 2 hours
+  "1h":  6,   // 6 hours
+  "4h":  6,   // 24 hours
+  "d1":  5,   // 5 days
+  "w1":  3,   // 3 weeks
+};
 
-function dotColor(trend?: TrendDir, isLoading?: boolean) {
+function isChochTransition(
+  trend: TrendDir | undefined,
+  choch: LatestStructureEvent | null | undefined,
+  timeframe: string,
+): boolean {
+  if (!trend || trend === "neutral" || !choch) return false;
+  const window = CHOCH_TRANSITION_BARS[timeframe] ?? 6;
+  return choch.age_bars <= window;
+}
+
+function dotColor(trend?: TrendDir, isLoading?: boolean, transition?: boolean) {
+  if (isLoading) return "bg-white/30 animate-pulse";
+  if (transition) return "bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.7)]";
   if (trend === "bullish") return "bg-green-400 shadow-[0_0_4px_rgba(74,222,128,0.6)]";
   if (trend === "bearish") return "bg-red-400 shadow-[0_0_4px_rgba(248,113,113,0.6)]";
   if (trend === "neutral") return "bg-orange-400 shadow-[0_0_4px_rgba(251,146,60,0.5)]";
-  if (isLoading) return "bg-white/30 animate-pulse";
   return "bg-white/20";
 }
 
@@ -113,6 +133,11 @@ function HeatmapRow({
   const warn4h  = isWarning(data?.bias_4h.trend,  data?.bias_4h.current_price,  data?.bias_4h.last_high_price,  data?.bias_4h.last_low_price,  data?.bias_4h.atr_14);
   const warnd1  = isWarning(data?.bias_d1?.trend,  data?.bias_d1?.current_price,  data?.bias_d1?.last_high_price,  data?.bias_d1?.last_low_price,  data?.bias_d1?.atr_14);
   const warnw1  = isWarning(data?.bias_w1?.trend, data?.bias_w1?.current_price, data?.bias_w1?.last_high_price, data?.bias_w1?.last_low_price, data?.bias_w1?.atr_14);
+  const trans15m = isChochTransition(data?.bias_15m.trend, data?.bias_15m.latest_choch, "15m");
+  const trans1h  = isChochTransition(data?.bias_1h.trend,  data?.bias_1h.latest_choch,  "1h");
+  const trans4h  = isChochTransition(data?.bias_4h.trend,  data?.bias_4h.latest_choch,  "4h");
+  const transd1  = isChochTransition(data?.bias_d1?.trend, data?.bias_d1?.latest_choch, "d1");
+  const transw1  = isChochTransition(data?.bias_w1?.trend, data?.bias_w1?.latest_choch, "w1");
   const warnTag = (w: boolean) => (w ? " ⚠" : "");
   const tooltip = isLoading
     ? `${display}: loading…`
@@ -149,11 +174,11 @@ function HeatmapRow({
 
       {/* Right: 15M / 1H / 4H bias dots */}
       <div className="flex items-center gap-1 self-start mt-0.5">
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_15m.trend, isLoading), dotOpacity(data?.bias_15m.trend_health), warn15 && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_1h.trend,  isLoading), dotOpacity(data?.bias_1h.trend_health),  warn1h  && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_4h.trend,  isLoading), dotOpacity(data?.bias_4h.trend_health),  warn4h  && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_d1?.trend, isLoading), dotOpacity(data?.bias_d1?.trend_health), warnd1  && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_w1?.trend, isLoading), dotOpacity(data?.bias_w1?.trend_health), warnw1  && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_15m.trend, isLoading,trans15m), dotOpacity(data?.bias_15m.trend_health), warn15 && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_1h.trend,  isLoading,trans1h), dotOpacity(data?.bias_1h.trend_health),  warn1h  && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_4h.trend,  isLoading,trans4h), dotOpacity(data?.bias_4h.trend_health),  warn4h  && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_d1?.trend, isLoading,transd1), dotOpacity(data?.bias_d1?.trend_health), warnd1  && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_w1?.trend, isLoading,transw1), dotOpacity(data?.bias_w1?.trend_health), warnw1  && WARNING_CLASS)} />
       </div>
     </button>
   );

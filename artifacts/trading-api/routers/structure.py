@@ -3,6 +3,7 @@ from fastapi import APIRouter, Query, HTTPException
 import asyncio
 import time
 from services.data_service import fetch_ohlc, candles_to_dict
+import math
 
 
 from services.zigzag_engine import detect_swings, swings_to_zigzag_lines, TF_FRACTAL_N
@@ -382,7 +383,7 @@ async def get_mtf_bias(
                 round((now_ts - last_swing_time) / _bar_secs)
                 if last_swing_time and now_ts else 20
             )
-            freshness = max(0, min(100, 100 - bars_since_swing * 4))
+            freshness = max(0, round(100 * math.exp(-bars_since_swing / 15)))
 
             # Component 4 (15%): event alignment — opposing BOS / CHoCH recency
             _bars_opp_choch = (
