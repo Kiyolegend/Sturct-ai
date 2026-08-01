@@ -26,7 +26,7 @@ from services.trend_engine import detect_trend
 from services.choch_engine import detect_choch
 from services.framework_checker import detect_order_blocks, _pip
 from services.bos_engine import detect_bos
-
+from services.mt5_store import get_latest_timestamp as _get_broker_time
 
 log = logging.getLogger(__name__)
 
@@ -481,14 +481,14 @@ async def _run_loop() -> None:
             if not _enabled:
                 break
             result = await _evaluate_pair(symbol)
-            _pair_status[symbol] = {**result, "evaluated_at": int(time.time())}
+            _pair_status[symbol] = {**result, "evaluated_at": _get_broker_time() or int(time.time())}
 
             if result.get("status") == "READY":
                 sid = result.get("signal_id", "")
                 if sid and sid not in _fired_ids:
                     _fired_ids.add(sid)
                     _fired_times[sid] = time.time()
-                    entry = {**result, "fired_at": int(time.time()), "paper_mode": _paper_mode}
+                    _fired_times[sid] = _get_broker_time() or int(time.time())
                     _trade_log.insert(0, entry)
                     if len(_trade_log) > 50:
                         _trade_log.pop()
@@ -513,7 +513,7 @@ async def _run_loop() -> None:
                         log.info(f"[AutoTrade] PAPER: {symbol} {result['direction']} entry={result['entry']} R:R={result['rr']}")
 
                 # Prune stale IDs — runs every cycle
-                now_t   = time.time()
+                now_t = _get_broker_time() or int(time.time())
                 expired = [k for k, v in _fired_times.items() if now_t - v > _FIRED_TTL_S]
                 for k in expired:
                     _fired_ids.discard(k)

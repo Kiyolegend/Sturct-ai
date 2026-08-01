@@ -321,8 +321,8 @@ async def get_mtf_bias(
             trend      = trend_data["trend"]
 
             current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
-            now_ts = int(df["time"].astype("datetime64[s]").astype("int64").iloc[-1]) if len(df) > 0 else 0
             _bar_secs = {"15m": 900, "1h": 3600, "4h": 14400, "d1": 86400, "w1": 604800}.get(timeframe, 900)
+            now_ts = (int(df["time"].astype("datetime64[s]").astype("int64").iloc[-1]) + _bar_secs) if len(df) > 0 else 0
 
             # ── Last confirmed swing prices + times ────────────────────
             last_high_price = None
