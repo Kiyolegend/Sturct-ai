@@ -181,6 +181,14 @@ export interface BosChochResponse {
   levels: BosChochLevel[];
 }
 
+export interface LatestStructureEvent {
+  direction: "bullish" | "bearish";
+  time: number;
+  price: number;
+  age_hours: number;
+  age_bars: number;
+}
+
 export interface MTFBias {
   trend: "bullish" | "bearish" | "neutral";
   confidence: number;
@@ -188,6 +196,11 @@ export interface MTFBias {
   last_high_price: number | null;
   last_low_price: number | null;
   last_swing_time?: number | null;
+  // New additive fields — undefined when running an older backend build
+  atr_14?: number | null;
+  trend_health?: number | null;
+  latest_bos?: LatestStructureEvent | null;
+  latest_choch?: LatestStructureEvent | null;
 }
 
 export interface MTFBiasResponse {

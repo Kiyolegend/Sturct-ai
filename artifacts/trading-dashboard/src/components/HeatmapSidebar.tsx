@@ -1,7 +1,7 @@
 import React from "react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useMTFBias,  } from "../hooks/use-trading-api";
+import { useMTFBias, type LatestStructureEvent } from "../hooks/use-trading-api";
 
 
 function cn(...inputs: ClassValue[]) {
@@ -27,7 +27,8 @@ const SYMBOLS = [
 
 type TrendDir = "bullish" | "bearish" | "neutral";
 
-const WARNING_THRESHOLDS = { "15m": 0.003, "1h": 0.005, "4h": 0.008, "d1": 0.015, "w1": 0.025 };
+// ATR multiplier for warning threshold — tune this one number to adjust all 13 pairs at once
+const WARNING_ATR_MULTIPLIER = 0.25;
 
 function dotColor(trend?: TrendDir, isLoading?: boolean) {
   if (trend === "bullish") return "bg-green-400 shadow-[0_0_4px_rgba(74,222,128,0.6)]";
@@ -44,21 +45,48 @@ function trendLabel(trend?: TrendDir) {
   return "—";
 }
 
+// ATR-based warning: fires when price moved more than 0.25×ATR beyond the last
+// confirmed structural level — naturally scales across FX, JPY, Gold, BTC.
 function isWarning(
   trend: TrendDir | undefined,
   currentPrice: number | null | undefined,
   lastHighPrice: number | null | undefined,
   lastLowPrice: number | null | undefined,
-  thresholdPct: number,
+  atr14: number | null | undefined,
 ): boolean {
   if (!currentPrice) return false;
+  // No false positives when ATR not yet available from backend
+  if (!atr14 || atr14 <= 0) return false;
+  const threshold = WARNING_ATR_MULTIPLIER * atr14;
   if (trend === "bullish" && lastLowPrice != null) {
-    return (lastLowPrice - currentPrice) > currentPrice * thresholdPct;
+    return (lastLowPrice - currentPrice) > threshold;
   }
   if (trend === "bearish" && lastHighPrice != null) {
-    return (currentPrice - lastHighPrice) > currentPrice * thresholdPct;
+    return (currentPrice - lastHighPrice) > threshold;
   }
   return false;
+}
+
+// Maps trend_health (0–100) to a Tailwind opacity class
+function dotOpacity(health: number | null | undefined): string {
+  if (health == null) return "";
+  if (health >= 80)   return "";
+  if (health >= 60)   return "opacity-75";
+  if (health >= 40)   return "opacity-50";
+  return "opacity-30";
+}
+
+// Tooltip helpers for new structural event fields
+function healthTag(h: number | null | undefined): string {
+  return h != null ? ` [${h}]` : "";
+}
+function eventTag(ev: LatestStructureEvent | null | undefined): string {
+  if (!ev) return "";
+  return ` ${ev.direction === "bullish" ? "↑" : "↓"}BOS(${ev.age_hours}h)`;
+}
+function chochTag(ev: LatestStructureEvent | null | undefined): string {
+  if (!ev) return "";
+  return ` ${ev.direction === "bullish" ? "↑" : "↓"}CHoCH(${ev.age_hours}h)`;
 }
 
 const WARNING_CLASS = "ring-2 ring-red-500 shadow-[0_0_6px_rgba(239,68,68,0.9)]";
@@ -80,18 +108,17 @@ function HeatmapRow({
 }) {
   const { data, isLoading, isError } = useMTFBias(api);
 
-  const warn15 = isWarning(data?.bias_15m.trend, data?.bias_15m.current_price, data?.bias_15m.last_high_price, data?.bias_15m.last_low_price, WARNING_THRESHOLDS["15m"]);
-  const warn1h  = isWarning(data?.bias_1h.trend,  data?.bias_1h.current_price,  data?.bias_1h.last_high_price,  data?.bias_1h.last_low_price,  WARNING_THRESHOLDS["1h"]);
-  const warn4h  = isWarning(data?.bias_4h.trend,  data?.bias_4h.current_price,  data?.bias_4h.last_high_price,  data?.bias_4h.last_low_price,  WARNING_THRESHOLDS["4h"]);
-  const warnd1  = isWarning(data?.bias_d1?.trend,  data?.bias_d1?.current_price,  data?.bias_d1?.last_high_price,  data?.bias_d1?.last_low_price,  WARNING_THRESHOLDS["d1"]);
-  const warnw1 = isWarning(data?.bias_w1?.trend, data?.bias_w1?.current_price, data?.bias_w1?.last_high_price, data?.bias_w1?.last_low_price, WARNING_THRESHOLDS["w1"]);
-
+  const warn15  = isWarning(data?.bias_15m.trend, data?.bias_15m.current_price, data?.bias_15m.last_high_price, data?.bias_15m.last_low_price, data?.bias_15m.atr_14);
+  const warn1h  = isWarning(data?.bias_1h.trend,  data?.bias_1h.current_price,  data?.bias_1h.last_high_price,  data?.bias_1h.last_low_price,  data?.bias_1h.atr_14);
+  const warn4h  = isWarning(data?.bias_4h.trend,  data?.bias_4h.current_price,  data?.bias_4h.last_high_price,  data?.bias_4h.last_low_price,  data?.bias_4h.atr_14);
+  const warnd1  = isWarning(data?.bias_d1?.trend,  data?.bias_d1?.current_price,  data?.bias_d1?.last_high_price,  data?.bias_d1?.last_low_price,  data?.bias_d1?.atr_14);
+  const warnw1  = isWarning(data?.bias_w1?.trend, data?.bias_w1?.current_price, data?.bias_w1?.last_high_price, data?.bias_w1?.last_low_price, data?.bias_w1?.atr_14);
   const warnTag = (w: boolean) => (w ? " ⚠" : "");
   const tooltip = isLoading
     ? `${display}: loading…`
     : isError
       ? `${display}: data not yet available`
-      : `${display}\n15M: ${trendLabel(data?.bias_15m.trend)}${warnTag(warn15)}   1H: ${trendLabel(data?.bias_1h.trend)}${warnTag(warn1h)}   4H: ${trendLabel(data?.bias_4h.trend)}${warnTag(warn4h)}  D1: ${trendLabel(data?.bias_d1?.trend)}${warnTag(warnd1)} W1: ${trendLabel(data?.bias_w1?.trend)}${warnTag(warnw1)}`;
+      : `${display}\n15M: ${trendLabel(data?.bias_15m.trend)}${healthTag(data?.bias_15m.trend_health)}${eventTag(data?.bias_15m.latest_bos)}${chochTag(data?.bias_15m.latest_choch)}${warnTag(warn15)}\n1H: ${trendLabel(data?.bias_1h.trend)}${healthTag(data?.bias_1h.trend_health)}${eventTag(data?.bias_1h.latest_bos)}${chochTag(data?.bias_1h.latest_choch)}${warnTag(warn1h)}\n4H: ${trendLabel(data?.bias_4h.trend)}${healthTag(data?.bias_4h.trend_health)}${eventTag(data?.bias_4h.latest_bos)}${chochTag(data?.bias_4h.latest_choch)}${warnTag(warn4h)}\nD1: ${trendLabel(data?.bias_d1?.trend)}${healthTag(data?.bias_d1?.trend_health)}${eventTag(data?.bias_d1?.latest_bos)}${chochTag(data?.bias_d1?.latest_choch)}${warnTag(warnd1)}\nW1: ${trendLabel(data?.bias_w1?.trend)}${healthTag(data?.bias_w1?.trend_health)}${eventTag(data?.bias_w1?.latest_bos)}${chochTag(data?.bias_w1?.latest_choch)}${warnTag(warnw1)}`;
 
   // Flash ring when any strategy is active
   
@@ -122,11 +149,11 @@ function HeatmapRow({
 
       {/* Right: 15M / 1H / 4H bias dots */}
       <div className="flex items-center gap-1 self-start mt-0.5">
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_15m.trend, isLoading), warn15 && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_1h.trend,  isLoading), warn1h  && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_4h.trend,  isLoading), warn4h  && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_d1?.trend,  isLoading), warnd1  && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_w1?.trend, isLoading), warnw1 && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_15m.trend, isLoading), dotOpacity(data?.bias_15m.trend_health), warn15 && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_1h.trend,  isLoading), dotOpacity(data?.bias_1h.trend_health),  warn1h  && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_4h.trend,  isLoading), dotOpacity(data?.bias_4h.trend_health),  warn4h  && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_d1?.trend, isLoading), dotOpacity(data?.bias_d1?.trend_health), warnd1  && WARNING_CLASS)} />
+        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_w1?.trend, isLoading), dotOpacity(data?.bias_w1?.trend_health), warnw1  && WARNING_CLASS)} />
       </div>
     </button>
   );

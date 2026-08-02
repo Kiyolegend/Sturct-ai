@@ -9,9 +9,10 @@ Only candle close prices are used (wicks are ignored).
 A BOS is confirmed at the candle that closes beyond the level.
 """
 import pandas as pd
-import math
+
 from .zigzag_engine import SwingPoint
 from .pip_utils import pip_size as _pip
+from .atr_utils import compute_atr14
 BOS_BREAK_ATR_RATIO = 0.05  # fraction of ATR-14 required as minimum break beyond level
 
 
@@ -32,9 +33,7 @@ def detect_bos(df: pd.DataFrame, swings: list[SwingPoint], structure_labels: lis
     closes = df["close"].values
     times_arr = df["time"].astype("datetime64[s]").astype("int64").tolist()
     _last_close = float(closes[-1]) if len(closes) > 0 else 1.0
-    _hl_ranges  = df["high"].values - df["low"].values
-    _atr14_raw  = float(_hl_ranges[-14:].mean()) if len(_hl_ranges) >= 14 else float(_hl_ranges.mean()) if len(_hl_ranges) > 0 else 0.0
-    _atr14      = _atr14_raw if math.isfinite(_atr14_raw) else 0.0
+    _atr14      = compute_atr14(df)
     _min_break  = max(_pip(_last_close), BOS_BREAK_ATR_RATIO * _atr14)
 
     # Track which swing highs/lows have been broken already to avoid duplicates

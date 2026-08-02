@@ -19,7 +19,7 @@ from services.candle_pattern_engine import detect_candle_patterns
 from services.confluence_engine import find_confluence
 from services.framework_checker import detect_order_blocks
 from services.fvg_engine import detect_fvgs
-
+from services.atr_utils import compute_atr14
 router = APIRouter()
 
 async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
@@ -314,12 +314,16 @@ async def get_mtf_bias(
         )
 
         def _bias(df, fractal_n: int = 5, timeframe: str = "1h"):
-            swings = detect_swings(df, fractal_n=fractal_n, timeframe=timeframe)
-            labels = classify_structure(swings)
+            swings     = detect_swings(df, fractal_n=fractal_n, timeframe=timeframe)
+            labels     = classify_structure(swings)
             trend_data = detect_trend(labels)
+            trend      = trend_data["trend"]
 
             current_price = float(df["close"].iloc[-1]) if len(df) > 0 else None
+            now_ts = int(df["time"].astype("datetime64[s]").astype("int64").iloc[-1]) if len(df) > 0 else 0
+            _bar_secs = {"15m": 900, "1h": 3600, "4h": 14400, "d1": 86400, "w1": 604800}.get(timeframe, 900)
 
+            # ── Last confirmed swing prices + times ────────────────────
             last_high_price = None
             last_low_price  = None
             last_high_time  = None
@@ -338,13 +342,102 @@ async def get_mtf_bias(
             times = [t for t in (last_high_time, last_low_time) if t is not None]
             last_swing_time = max(times) if times else None
 
+            # ── True ATR-14 (shared utility, correct gap-aware formula) ─
+            atr_14 = compute_atr14(df)
+
+            # ── BOS and CHoCH ───────────────────────────────────────────
+            _bos_hours   = {"15m": 48, "1h": 72, "4h": 336, "d1": 8760,  "w1": 87600}.get(timeframe, 48)
+            _choch_hours = {"15m": 24, "1h": 72, "4h": 336, "d1": 4320,  "w1": 43800}.get(timeframe, 24)
+
+            # "neutral" trend arg so detect_bos returns ALL directions;
+            # we then isolate opposing events ourselves for health scoring.
+            all_bos   = detect_bos(df, swings, labels, "neutral",
+                                   lookback_hours=_bos_hours, fractal_n=fractal_n)
+            # detect_choch already returns only opposing events when given the current trend
+            all_choch = detect_choch(df, swings, labels, trend,
+                                     lookback_hours=_choch_hours, fractal_n=fractal_n)
+
+            # Latest event opposing the current trend
+            opp_bos   = [b for b in all_bos if b["direction"] != trend] if trend != "neutral" else all_bos
+            latest_opp_bos   = opp_bos[-1]   if opp_bos   else None
+            latest_opp_choch = all_choch[-1] if all_choch else None
+
+            # ── Trend health: weighted score 0-100 ──────────────────────
+            # Component 1 (40%): trend integrity — how clean are the swing labels?
+            _integrity_map = {
+                ("HH", "HL"): 100,   # textbook bullish
+                ("LH", "LL"): 100,   # textbook bearish
+                ("EQH", "HL"):  65,  # weakly bullish
+                ("LH", "EQL"):  65,  # weakly bearish
+            }
+            integrity = _integrity_map.get(
+                (trend_data.get("last_high_label"), trend_data.get("last_low_label")), 35
+            )
+
+            # Component 2 (25%): structural confidence (existing metric, unchanged)
+            struct_score = trend_data["confidence"]
+
+            # Component 3 (20%): freshness — bars since the last confirmed swing
+            bars_since_swing = (
+                round((now_ts - last_swing_time) / _bar_secs)
+                if last_swing_time and now_ts else 20
+            )
+            freshness = max(0, min(100, 100 - bars_since_swing * 4))
+
+            # Component 4 (15%): event alignment — opposing BOS / CHoCH recency
+            _bars_opp_choch = (
+                round((now_ts - latest_opp_choch["time"]) / _bar_secs)
+                if latest_opp_choch and now_ts else None
+            )
+            _bars_opp_bos = (
+                round((now_ts - latest_opp_bos["time"]) / _bar_secs)
+                if latest_opp_bos and now_ts else None
+            )
+
+            if latest_opp_choch is not None and _bars_opp_choch is not None and _bars_opp_choch < 5:
+                alignment = 10   # fresh opposing CHoCH — strong structural warning
+            elif latest_opp_choch is not None:
+                alignment = 50   # older opposing CHoCH — moderate
+            elif latest_opp_bos is not None and _bars_opp_bos is not None and _bars_opp_bos < 5:
+                alignment = 40   # fresh opposing BOS
+            elif latest_opp_bos is not None:
+                alignment = 75   # older opposing BOS — minor concern
+            else:
+                alignment = 100  # no opposing structural events
+
+            trend_health = round(
+                integrity    * 0.40 +
+                struct_score * 0.25 +
+                freshness    * 0.20 +
+                alignment    * 0.15
+            )
+
+            # ── Helper: structured event object with age ────────────────
+            def _event_obj(ev):
+                if ev is None:
+                    return None
+                age_secs = (now_ts - ev["time"]) if now_ts and ev.get("time") else 0
+                return {
+                    "direction": ev["direction"],
+                    "time":      ev["time"],
+                    "price":     ev["price"],
+                    "age_hours": round(age_secs / 3600, 1),
+                    "age_bars":  round(age_secs / _bar_secs),
+                }
+
             return {
+                # ── Existing fields (UNCHANGED — no consumer breaks) ───
                 "trend":           trend_data["trend"],
                 "confidence":      trend_data["confidence"],
                 "current_price":   current_price,
                 "last_high_price": last_high_price,
                 "last_low_price":  last_low_price,
                 "last_swing_time": last_swing_time,
+                # ── New additive fields ────────────────────────────────
+                "atr_14":          round(atr_14, 6),
+                "trend_health":    trend_health,
+                "latest_bos":      _event_obj(latest_opp_bos),
+                "latest_choch":    _event_obj(latest_opp_choch),
             }
 
         t15m = _bias(df_15m, fractal_n=5, timeframe="15m")

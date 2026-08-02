@@ -12,7 +12,7 @@ After detecting raw pivots, enforces strict alternation: High → Low → High �
 import pandas as pd
 import numpy as np
 from typing import TypedDict
-
+from .pip_utils import pip_size as _pip_size
 FRACTAL_N = 5  # bars on each side to confirm a swing point
 TF_FRACTAL_N: dict[str, int] = {
     "w1": 2, "d1": 3, "4h": 3, "1h": 3, "15m": 5, "5m": 5
@@ -89,7 +89,7 @@ def detect_swings(df: pd.DataFrame, fractal_n: int = FRACTAL_N, timeframe: str =
     # Filter: remove swings smaller than 5 pips from the previous swing
     if len(alternating) >= 2:
         p   = alternating[0]["price"]
-        pip = 1.0 if p > 10_000 else 0.1 if p > 500 else 0.01 if p > 50 else 0.0001
+        pip = _pip_size(p)
 
         _tf = timeframe.lower()
         if p > 10_000:   # BTC
