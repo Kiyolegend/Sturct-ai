@@ -22,7 +22,8 @@ from services.framework_checker import detect_order_blocks
 from services.fvg_engine import detect_fvgs
 from services.atr_utils import compute_atr14
 router = APIRouter()
-
+# Health formula version — bump this when weights or components change
+HEALTH_VERSION = 1
 async def _get_full_analysis(symbol: str, interval: str, outputsize: int):
     
     
@@ -297,6 +298,7 @@ async def get_sessions(
 @router.get("/mtf-bias")
 async def get_mtf_bias(
     symbol: str = Query(default="USD/JPY"),
+    debug: bool = Query(default=True),
 ):
     """
     Multi-timeframe bias: returns 15M, 1H and 4H trend direction.
@@ -314,7 +316,7 @@ async def get_mtf_bias(
             fetch_ohlc(symbol=symbol, interval="w1",  outputsize=300),
         )
 
-        def _bias(df, fractal_n: int = 5, timeframe: str = "1h"):
+        def _bias(df, fractal_n: int = 5, timeframe: str = "1h", debug: bool = True):
             swings     = detect_swings(df, fractal_n=fractal_n, timeframe=timeframe)
             labels     = classify_structure(swings)
             trend_data = detect_trend(labels)
@@ -436,26 +438,35 @@ async def get_mtf_bias(
                     "age_bars":  round(age_secs / _bar_secs),
                 }
 
-            return {
+            out = {
                 # ── Existing fields (UNCHANGED — no consumer breaks) ───
-                "trend":           trend_data["trend"],
-                "confidence":      trend_data["confidence"],
-                "current_price":   current_price,
-                "last_high_price": last_high_price,
-                "last_low_price":  last_low_price,
-                "last_swing_time": last_swing_time,
+                "trend":               trend_data["trend"],
+                "confidence":          trend_data["confidence"],
+                "current_price":       current_price,
+                "last_high_price":     last_high_price,
+                "last_low_price":      last_low_price,
+                "last_swing_time":     last_swing_time,
                 # ── New additive fields ────────────────────────────────
-                "atr_14":          round(atr_14, 6),
-                "trend_health":    trend_health,
-                "latest_bos":      _event_obj(latest_opp_bos),
-                "latest_choch":    _event_obj(latest_opp_choch),
+                "atr_14":              round(atr_14, 6),
+                "trend_health":        trend_health,
+                "trend_health_version": HEALTH_VERSION,
+                "latest_bos":          _event_obj(latest_opp_bos),
+                "latest_choch":        _event_obj(latest_opp_choch),
             }
+            if debug:
+                out["health_breakdown"] = {
+                    "integrity":  integrity,
+                    "confidence": struct_score,
+                    "freshness":  freshness,
+                    "alignment":  alignment,
+                }
+            return out
 
-        t15m = _bias(df_15m, fractal_n=5, timeframe="15m")
-        t1h  = _bias(df_1h,  fractal_n=3, timeframe="1h")
-        t4h  = _bias(df_4h,  fractal_n=3, timeframe="4h")
-        td1  = _bias(df_d1,  fractal_n=3, timeframe="d1")
-        tw1  = _bias(df_w1,  fractal_n=2, timeframe="w1")
+        t15m = _bias(df_15m, fractal_n=5, timeframe="15m", debug=debug)
+        t1h  = _bias(df_1h,  fractal_n=3, timeframe="1h",  debug=debug)
+        t4h  = _bias(df_4h,  fractal_n=3, timeframe="4h",  debug=debug)
+        td1  = _bias(df_d1,  fractal_n=3, timeframe="d1",  debug=debug)
+        tw1  = _bias(df_w1,  fractal_n=2, timeframe="w1",  debug=debug)
 
         
 
