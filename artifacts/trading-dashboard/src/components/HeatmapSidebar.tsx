@@ -255,27 +255,7 @@ function storySection(data: MTFBiasResponse | undefined): string {
     `Confidence: ${stars} ${confidence}/100`
   );
 }
-  const ltf = trends.slice(0, 2);
-  const htf = trends.slice(2).filter(Boolean) as string[];
-  const ltfBull  = ltf.filter(t => t === "bullish").length;
-  const ltfBear  = ltf.filter(t => t === "bearish").length;
-  const htfBull  = htf.filter(t => t === "bullish").length;
-  const htfBear  = htf.filter(t => t === "bearish").length;
-  const allBull  = ltfBull === 2 && htfBull === htf.length;
-  const allBear  = ltfBear === 2 && htfBear === htf.length;
-  const allCons  = trends.every(t => t === "neutral");
-
-  if (allBull)                          return "FULL BULL ALIGNMENT — strong buy confluence";
-  if (allBear)                          return "FULL BEAR ALIGNMENT — strong sell confluence";
-  if (htfBull >= 2 && ltfBear >= 1)    return "LTF pullback in HTF bull → wait for LTF to realign, then buy";
-  if (htfBear >= 2 && ltfBull >= 1)    return "LTF bounce in HTF bear → wait for LTF to realign, then sell";
-  if (htfBull >= 2 && ltfBull >= 1)    return "HTF + LTF bullish aligning → buy confluence building";
-  if (htfBear >= 2 && ltfBear >= 1)    return "HTF + LTF bearish aligning → sell confluence building";
-  if (allCons)                          return "All timeframes ranging — no direction, avoid";
-  if (htfBull >= 2 && ltfBull === 0 && ltfBear === 0) return "HTF bullish but LTF ranging — wait for LTF breakout upward";
-  if (htfBear >= 2 && ltfBull === 0 && ltfBear === 0) return "HTF bearish but LTF ranging — wait for LTF breakdown lower";
-  return "Mixed signals — no clear multi-TF bias";
-}
+  
 
 const WARNING_CLASS = "ring-2 ring-red-500 shadow-[0_0_6px_rgba(239,68,68,0.9)]";
 
@@ -334,8 +314,8 @@ function HeatmapRow({
             const note = `   → ${rowNote(bias.trend, h, reg, b, hasBos, hasChoch)}`;
             return `${dataLine}\n${note}`;
           });
-          const summary = pairSummary(data);
-          return `${display}\n${lines.join("\n")}\n─────────────────────\n${summary}`;
+          const summary = storySection(data);
+          return `${display}\n${lines.join("\n")}\n${summary}`;
         })();
   return (
     <button
