@@ -2,7 +2,7 @@ import React from "react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useMTFBias, type LatestStructureEvent, type MTFBiasResponse, type MTFBias } from "../hooks/use-trading-api";
-
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -297,7 +297,7 @@ function storySection(data: MTFBiasResponse | undefined): string {
     `─────────────────────`,
     `Market Narrative`,
     statusLines,
-    keyDriverLine,
+    ...(keyDriverLine ? [keyDriverLine] : []),
     ``,
     interpretation,
     ``,
@@ -371,38 +371,46 @@ function HeatmapRow({
           return `${display}\n${lines.join("\n")}\n${summary}`;
         })();
   return (
-    <button
-      onClick={onSelect}
-      title={tooltip}
-      className={cn(
-        "w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left",
-        active
-          ? "bg-primary/15 border border-primary/30"
-          : "border border-transparent hover:bg-white/5"
-      )}
-    >
-      {/* Left: pair name + S1/S2/S3 dots stacked */}
-      <div className="flex flex-col items-start">
-        <span
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={onSelect}
           className={cn(
-            "font-mono text-xs font-bold tracking-tight",
-            active ? "text-primary" : "text-white/80"
+            "w-full flex items-center justify-between px-2.5 py-1.5 rounded-md transition-colors text-left",
+            active
+              ? "bg-primary/15 border border-primary/30"
+              : "border border-transparent hover:bg-white/5"
           )}
         >
-          {display}
-        </span>
-        
-      </div>
+          {/* Left: pair name */}
+          <div className="flex flex-col items-start">
+            <span
+              className={cn(
+                "font-mono text-xs font-bold tracking-tight",
+                active ? "text-primary" : "text-white/80"
+              )}
+            >
+              {display}
+            </span>
+          </div>
 
-      {/* Right: 15M / 1H / 4H bias dots */}
-      <div className="flex items-center gap-1 self-start mt-0.5">
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_15m.trend, isLoading,trans15m), dotOpacity(data?.bias_15m.trend_health), warn15 && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_1h.trend,  isLoading,trans1h), dotOpacity(data?.bias_1h.trend_health),  warn1h  && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_4h.trend,  isLoading,trans4h), dotOpacity(data?.bias_4h.trend_health),  warn4h  && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_d1?.trend, isLoading,transd1), dotOpacity(data?.bias_d1?.trend_health), warnd1  && WARNING_CLASS)} />
-        <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_w1?.trend, isLoading,transw1), dotOpacity(data?.bias_w1?.trend_health), warnw1  && WARNING_CLASS)} />
-      </div>
-    </button>
+          {/* Right: 15M / 1H / 4H / D1 / W1 bias dots */}
+          <div className="flex items-center gap-1 self-start mt-0.5">
+            <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_15m.trend, isLoading,trans15m), dotOpacity(data?.bias_15m.trend_health), warn15 && WARNING_CLASS)} />
+            <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_1h.trend,  isLoading,trans1h), dotOpacity(data?.bias_1h.trend_health),  warn1h  && WARNING_CLASS)} />
+            <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_4h.trend,  isLoading,trans4h), dotOpacity(data?.bias_4h.trend_health),  warn4h  && WARNING_CLASS)} />
+            <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_d1?.trend, isLoading,transd1), dotOpacity(data?.bias_d1?.trend_health), warnd1  && WARNING_CLASS)} />
+            <span className={cn("w-2 h-2 rounded-full", dotColor(data?.bias_w1?.trend, isLoading,transw1), dotOpacity(data?.bias_w1?.trend_health), warnw1  && WARNING_CLASS)} />
+          </div>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="right"
+        className="max-w-sm whitespace-pre-wrap text-xs font-mono"
+      >
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
