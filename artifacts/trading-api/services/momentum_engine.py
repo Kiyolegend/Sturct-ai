@@ -3,12 +3,13 @@ momentum_engine.py — Volatility regime and directional momentum metrics.
 
 Measures HOW the market is moving, independent of structural direction.
 Complements trend (what direction) and health (how clean the structure is).
-_ATR_EXPANDING    = 1.25  # recent ATR > older ATR by this factor → expanding
-_ATR_CONTRACTING  = 0.80  # recent ATR < older ATR by this factor → contracting
 """
 import math
 import numpy as np
 import pandas as pd
+
+_ATR_EXPANDING    = 1.25  # recent ATR > older ATR by this factor → expanding
+_ATR_CONTRACTING  = 0.80  # recent ATR < older ATR by this factor → contracting
 
 
 def compute_momentum(df: pd.DataFrame, atr_14: float) -> dict:

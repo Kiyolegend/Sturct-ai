@@ -148,10 +148,7 @@ function HeatmapRow({
     ? `${display}: loading…`
     : isError
       ? `${display}: data not yet available`
-      : `${display}\n15M: ${trendLabel(data?.bias_15m.trend)}${healthTag(data?.bias_15m.trend_health)}${eventTag(data?.bias_15m.latest_bos)}${chochTag(data?.bias_15m.latest_choch)}${warnTag(warn15)}\n1H: ${trendLabel(data?.bias_1h.trend)}${healthTag(data?.bias_1h.trend_health)}${eventTag(data?.bias_1h.latest_bos)}${chochTag(data?.bias_1h.latest_choch)}${warnTag(warn1h)}\n4H: ${trendLabel(data?.bias_4h.trend)}${healthTag(data?.bias_4h.trend_health)}${eventTag(data?.bias_4h.latest_bos)}${chochTag(data?.bias_4h.latest_choch)}${warnTag(warn4h)}\nD1: ${trendLabel(data?.bias_d1?.trend)}${healthTag(data?.bias_d1?.trend_health)}${eventTag(data?.bias_d1?.latest_bos)}${chochTag(data?.bias_d1?.latest_choch)}${warnTag(warnd1)}\nW1: ${trendLabel(data?.bias_w1?.trend)}${healthTag(data?.bias_w1?.trend_health)}${eventTag(data?.bias_w1?.latest_bos)}${chochTag(data?.bias_w1?.latest_choch)}${warnTag(warnw1)}`;
-
-  // Flash ring when any strategy is active
-  
+      : `${display}\n15M: ${trendLabel(data?.bias_15m.trend)}${healthTag(data?.bias_15m.trend_health)}${momentumTag(data?.bias_15m.momentum)}${eventTag(data?.bias_15m.latest_bos)}${chochTag(data?.bias_15m.latest_choch)}${warnTag(warn15)}\n1H: ${trendLabel(data?.bias_1h.trend)}${healthTag(data?.bias_1h.trend_health)}${momentumTag(data?.bias_1h.momentum)}${eventTag(data?.bias_1h.latest_bos)}${chochTag(data?.bias_1h.latest_choch)}${warnTag(warn1h)}\n4H: ${trendLabel(data?.bias_4h.trend)}${healthTag(data?.bias_4h.trend_health)}${momentumTag(data?.bias_4h.momentum)}${eventTag(data?.bias_4h.latest_bos)}${chochTag(data?.bias_4h.latest_choch)}${warnTag(warn4h)}\nD1: ${trendLabel(data?.bias_d1?.trend)}${healthTag(data?.bias_d1?.trend_health)}${momentumTag(data?.bias_d1?.momentum)}${eventTag(data?.bias_d1?.latest_bos)}${chochTag(data?.bias_d1?.latest_choch)}${warnTag(warnd1)}\nW1: ${trendLabel(data?.bias_w1?.trend)}${healthTag(data?.bias_w1?.trend_health)}${momentumTag(data?.bias_w1?.momentum)}${eventTag(data?.bias_w1?.latest_bos)}${chochTag(data?.bias_w1?.latest_choch)}${warnTag(warnw1)}`;
 
   return (
     <button
