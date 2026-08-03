@@ -140,6 +140,7 @@ function rowNote(
   body: number | null | undefined,
   hasBos: boolean,
   hasChoch: boolean,
+  tf: string = "",           // ← add this parameter
 ): string {
   const h = health ?? 0;
   const b = body ?? 0;
@@ -166,15 +167,26 @@ function rowNote(
     return "Bear trend present.";
   }
 
-  // consolidation
-  if (hasBos && b < 0.40)              return "A break happened but candles aren't committing. Could be false. Wait for bigger bodies.";
-  if (regime === "expanding" && b >= 0.55) return "Breaking out with real conviction — direction not confirmed by structure yet.";
-  if (regime === "expanding" && b <  0.45) return "Big ranges but mostly wicks. Looks like a liquidity grab, not a real breakout.";
-  if (regime === "contracting" && b < 0.30) return "Market coiling very tightly. Big move is coming — wait for the structural break.";
-  if (regime === "contracting")         return "Both sides fighting but nobody taking control. Wait for one side to dominate.";
-  if (h < 45)                           return "Weak structure with no direction. Avoid trading this timeframe.";
-  return "Range market. No clear bias. Wait for structural confirmation.";
+  // Consolidation — vary note by timeframe to avoid repetition
+  if (hasBos && b < 0.40)
+    return "A break appeared but candles aren't committing. Could be a false breakout. Wait for stronger candle closes.";
+  if (regime === "expanding" && b >= 0.55)
+    return "Breaking out with conviction — structural direction not confirmed yet.";
+  if (regime === "expanding" && b <  0.45)
+    return "Big ranges but mostly wicks. Looks like a liquidity grab, not a real breakout.";
+  if (regime === "contracting" && b < 0.30)
+    return "Market coiling very tightly. Big move coming — wait for the structural break.";
+  if (regime === "contracting") {
+    if (tf === "15M" || tf === "1H")
+      return "Market is balanced. Neither side has gained control yet. Wait for a decisive break.";
+    if (tf === "4H")
+      return "The range is intact. Institutional direction not yet decided on this timeframe. Patience required.";
+    return "Both sides active but no clear winner. Wait for one side to take control.";
+  }
+  if (h < 45) return "Weak structure with no direction. Avoid trading this timeframe.";
+  return "Range market. No clear bias. Wait for structural confirmation before taking a side.";
 }
+
 
 function storySection(data: MTFBiasResponse | undefined): string {
   if (!data) return "";
@@ -187,6 +199,7 @@ function storySection(data: MTFBiasResponse | undefined): string {
     { label: "15M", bias: data.bias_15m ?? null },
   ];
 
+  // ── Status list ─────────────────────────────
   const statusLines = tfs
     .filter(t => t.bias)
     .map(({ label, bias }) => {
@@ -196,6 +209,18 @@ function storySection(data: MTFBiasResponse | undefined): string {
     })
     .join("\n");
 
+  // ── Key Driver ──────────────────────────────
+  const driverCandidates = tfs
+    .filter(t => t.bias && t.bias.trend !== "neutral" && t.bias.trend_health != null)
+    .map(t => ({ label: t.label, bias: t.bias! }));
+  const best = driverCandidates.length > 0
+    ? driverCandidates.reduce((a, b) => a.bias.trend_health! >= b.bias.trend_health! ? a : b)
+    : null;
+  const keyDriverLine = best
+    ? `Key Driver: ${best.label} ${best.bias.trend === "bullish" ? "Bull" : "Bear"} Trend (${best.bias.trend_health} · ${healthWord(best.bias.trend_health)})`
+    : "";
+
+  // ── Story logic ─────────────────────────────
   const htf = [data.bias_4h, data.bias_d1, data.bias_w1].filter(Boolean) as typeof data.bias_4h[];
   const ltf = [data.bias_1h, data.bias_15m].filter(Boolean) as typeof data.bias_1h[];
   const htfBull = htf.filter(b => b.trend === "bullish").length;
@@ -207,37 +232,59 @@ function storySection(data: MTFBiasResponse | undefined): string {
   let interpretation: string;
   let tradeBias: string;
   let confidence: number;
+  let action: string;
+  let actionReason: string;
 
   if (htfBull + ltfBull === 5) {
-    interpretation = "Every timeframe is aligned bullish. This is a high-conviction environment. Favor buys on pullbacks.";
+    interpretation = "Every timeframe is aligned bullish. This is a high-conviction environment. Favor buys on pullbacks to structure.";
     tradeBias = "🟢 Strongly Bullish"; confidence = 95;
+    action = "✔ Look for Buy Setups";
+    actionReason = "Full multi-timeframe alignment. Enter on the next 15M pullback to a structural level.";
   } else if (htfBear + ltfBear === 5) {
-    interpretation = "Every timeframe is aligned bearish. This is a high-conviction environment. Favor sells on bounces.";
+    interpretation = "Every timeframe is aligned bearish. This is a high-conviction environment. Favor sells on bounces to structure.";
     tradeBias = "🔴 Strongly Bearish"; confidence = 95;
+    action = "✔ Look for Sell Setups";
+    actionReason = "Full multi-timeframe alignment. Enter on the next 15M bounce to a structural level.";
   } else if (htfBull >= 2 && ltfBear >= 1) {
-    interpretation = "Higher timeframes remain bullish but lower timeframes are pulling back. This looks like a retracement, not a reversal. Wait for 15M and 1H to turn bullish again before entering long.";
+    interpretation = "Higher timeframes remain bullish but lower timeframes are pulling back. This looks like a retracement, not a reversal. The higher-probability play is to wait for lower timeframes to resume bullish structure before entering long.";
     tradeBias = "🟢 Moderately Bullish"; confidence = 78;
+    action = "✔ Wait";
+    actionReason = "LTF pullback in progress. Let 15M and 1H reclaim bullish structure first.";
   } else if (htfBear >= 2 && ltfBull >= 1) {
-    interpretation = "Higher timeframes remain bearish but lower timeframes are bouncing. Looks like a correction inside the downtrend. Wait for the bounce to fade before selling.";
+    interpretation = "Higher timeframes remain bearish but lower timeframes are bouncing. This looks like a correction inside the downtrend. Wait for the bounce to fade and lower timeframes to turn bearish again before selling.";
     tradeBias = "🔴 Moderately Bearish"; confidence = 78;
+    action = "✔ Wait";
+    actionReason = "LTF bounce in progress. Let 15M and 1H turn bearish again before selling.";
   } else if (htfBull >= 2 && ltfCons === 2) {
-    interpretation = "The long-term trend is bullish but lower timeframes are resting in a range. This looks like a pause, not a reversal. Wait for 15M and 1H to break bullish before buying.";
+    interpretation = "The long-term trend is bullish but lower timeframes are resting inside a range. Current price action resembles a healthy pause rather than a reversal. Wait for the 15M and 1H to resume bullish structure before entering long positions.";
     tradeBias = "🟡 Cautiously Bullish"; confidence = 68;
+    action = "✔ Wait";
+    actionReason = "Higher timeframe trend bullish but entry not confirmed yet. Watch for LTF breakout upward.";
   } else if (htfBear >= 2 && ltfCons === 2) {
-    interpretation = "The long-term trend is bearish but lower timeframes are ranging. Looks like a pause inside the downtrend. Wait for lower TFs to break bearish again before selling.";
+    interpretation = "The long-term trend is bearish but lower timeframes are ranging. Looks like a pause inside the downtrend. Wait for the 15M and 1H to break back bearish before looking for sells.";
     tradeBias = "🟡 Cautiously Bearish"; confidence = 68;
+    action = "✔ Wait";
+    actionReason = "Higher timeframe trend bearish but entry not confirmed yet. Watch for LTF breakdown lower.";
   } else if (htfBull >= 2 && ltfBull >= 1) {
-    interpretation = "Higher and lower timeframes are aligning bullish. Confluence is building. Watch for remaining timeframes to confirm.";
+    interpretation = "Higher and lower timeframes are aligning bullish. Confluence is building. Watch for remaining timeframes to confirm direction before committing.";
     tradeBias = "🟢 Building Bullish"; confidence = 72;
+    action = "✔ Prepare for Buys";
+    actionReason = "Alignment building. Wait for final timeframe confirmation before entering.";
   } else if (htfBear >= 2 && ltfBear >= 1) {
-    interpretation = "Higher and lower timeframes are aligning bearish. Confluence is building. Watch for remaining timeframes to confirm.";
+    interpretation = "Higher and lower timeframes are aligning bearish. Confluence is building. Watch for remaining timeframes to confirm before committing.";
     tradeBias = "🔴 Building Bearish"; confidence = 72;
+    action = "✔ Prepare for Sells";
+    actionReason = "Alignment building. Wait for final timeframe confirmation before entering.";
   } else if (htf.every(b => b.trend === "neutral") && ltf.every(b => b.trend === "neutral")) {
-    interpretation = "No directional trend on any timeframe. The market is ranging everywhere. Avoid directional trades entirely.";
+    interpretation = "No directional trend on any timeframe. The market is ranging at every level. Avoid directional trades entirely until structure forms.";
     tradeBias = "⚪ No Direction"; confidence = 20;
+    action = "✔ Stay Flat";
+    actionReason = "No directional structure anywhere. Wait for a trend to form.";
   } else {
-    interpretation = "Timeframes are giving conflicting signals with no clear story. This is a low-quality environment. Sit on your hands and wait for alignment.";
+    interpretation = "Timeframes are giving conflicting signals with no clear narrative. This is a low-quality environment for trend trades. The highest-probability action is to wait for alignment.";
     tradeBias = "⚫ Mixed — Avoid"; confidence = 35;
+    action = "✔ Stay Flat";
+    actionReason = "Conflicting signals across timeframes. No high-probability setup available.";
   }
 
   const stars =
@@ -246,14 +293,20 @@ function storySection(data: MTFBiasResponse | undefined): string {
     confidence >= 60 ? "★★★☆☆" :
     confidence >= 40 ? "★★☆☆☆" : "★☆☆☆☆";
 
-  return (
-    `─────────────────────\n` +
-    `OVERALL MARKET STORY\n` +
-    `${statusLines}\n\n` +
-    `${interpretation}\n\n` +
-    `Trade Bias: ${tradeBias}\n` +
-    `Confidence: ${stars} ${confidence}/100`
-  );
+  return [
+    `─────────────────────`,
+    `Market Narrative`,
+    statusLines,
+    keyDriverLine,
+    ``,
+    interpretation,
+    ``,
+    `Trade Bias: ${tradeBias}`,
+    `Confidence: ${stars} ${confidence}/100`,
+    ``,
+    `Suggested Action: ${action}`,
+    `Reason: ${actionReason}`,
+  ].join("\n");
 }
   
 
@@ -311,7 +364,7 @@ function HeatmapRow({
               `${momentumTag(bias.momentum)}·${bodyWord(b)}` +
               `${eventTag(bias.latest_bos)}${chochTag(bias.latest_choch)}` +
               `${warn ? " ⚠" : ""}`;
-            const note = `   → ${rowNote(bias.trend, h, reg, b, hasBos, hasChoch)}`;
+            const note = `   → ${rowNote(bias.trend, h, reg, b, hasBos, hasChoch, label)}`;
             return `${dataLine}\n${note}`;
           });
           const summary = storySection(data);
