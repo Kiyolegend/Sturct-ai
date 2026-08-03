@@ -201,6 +201,25 @@ export interface MTFBias {
   trend_health?: number | null;
   latest_bos?: LatestStructureEvent | null;
   latest_choch?: LatestStructureEvent | null;
+  momentum?: {  
+    atr_regime: "expanding" | "normal" | "contracting" | "unknown";
+    body_ratio: number;
+    impulse_ratio: number;
+  } | null;
+}
+
+export interface MTFBias {
+  trend: "bullish" | "bearish" | "neutral";
+  confidence: number;
+  current_price: number | null;
+  last_high_price: number | null;
+  last_low_price: number | null;
+  last_swing_time?: number | null;
+  // New additive fields — undefined when running an older backend build
+  atr_14?: number | null;
+  trend_health?: number | null;
+  latest_bos?: LatestStructureEvent | null;
+  latest_choch?: LatestStructureEvent | null;
 }
 
 export interface MTFBiasResponse {

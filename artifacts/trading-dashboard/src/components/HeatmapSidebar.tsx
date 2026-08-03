@@ -108,6 +108,11 @@ function chochTag(ev: LatestStructureEvent | null | undefined): string {
   if (!ev) return "";
   return ` ${ev.direction === "bullish" ? "↑" : "↓"}CHoCH(${ev.age_hours}h)`;
 }
+function momentumTag(m?: { atr_regime: string; body_ratio: number; impulse_ratio: number } | null): string {
+  if (!m) return "";
+  const regime = m.atr_regime === "expanding" ? "📈XPND" : m.atr_regime === "contracting" ? "📉CONT" : "NORM";
+  return ` ${regime}(b:${m.body_ratio})`;
+}
 
 const WARNING_CLASS = "ring-2 ring-red-500 shadow-[0_0_6px_rgba(239,68,68,0.9)]";
 

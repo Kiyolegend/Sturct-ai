@@ -19,8 +19,9 @@ from services.session_engine import compute_sessions
 from services.candle_pattern_engine import detect_candle_patterns
 from services.confluence_engine import find_confluence
 from services.framework_checker import detect_order_blocks
-from services.fvg_engine import detect_fvgs
 from services.atr_utils import compute_atr14
+from services.momentum_engine import compute_momentum
+from services.fvg_engine import detect_fvgs
 router = APIRouter()
 # Health formula version — bump this when weights or components change
 HEALTH_VERSION = 1
@@ -357,6 +358,9 @@ async def get_mtf_bias(
                     and (last_high_price - last_low_price) < _MIN_FIB_ATR * atr_14):
                 last_high_price = None
                 last_low_price  = None
+            # ── Momentum regime ────────────────────────────────────────
+            momentum = compute_momentum(df, atr_14)   
+            # ── BOS and CHoCH ──────────────────────────────────────────
 
             # ── BOS and CHoCH ───────────────────────────────────────────
             _bos_hours   = {"15m": 48, "1h": 72, "4h": 336, "d1": 8760,  "w1": 87600}.get(timeframe, 48)
@@ -448,6 +452,7 @@ async def get_mtf_bias(
                 "last_swing_time":     last_swing_time,
                 # ── New additive fields ────────────────────────────────
                 "atr_14":              round(atr_14, 6),
+                "momentum":            momentum,
                 "trend_health":        trend_health,
                 "trend_health_version": HEALTH_VERSION,
                 "latest_bos":          _event_obj(latest_opp_bos),
