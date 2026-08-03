@@ -1,7 +1,7 @@
 import React from "react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useMTFBias, type LatestStructureEvent } from "../hooks/use-trading-api";
+import { useMTFBias, type LatestStructureEvent, type MTFBiasResponse } from "../hooks/use-trading-api";
 
 
 function cn(...inputs: ClassValue[]) {
@@ -111,7 +111,98 @@ function chochTag(ev: LatestStructureEvent | null | undefined): string {
 function momentumTag(m?: { atr_regime: string; body_ratio: number; impulse_ratio: number } | null): string {
   if (!m) return "";
   const regime = m.atr_regime === "expanding" ? "📈XPND" : m.atr_regime === "contracting" ? "📉CONT" : "NORM";
-  return ` ${regime}(b:${m.body_ratio})`;
+  return ` ${regime} b:${m.body_ratio}`;
+}
+
+// ── Tooltip interpretation helpers ────────────────────────────────────────────
+
+function healthWord(h: number | null | undefined): string {
+  if (h == null) return "";
+  if (h >= 85) return "Excellent";
+  if (h >= 65) return "Good";
+  if (h >= 45) return "Fair";
+  if (h >= 25) return "Weak";
+  return "Poor";
+}
+
+function bodyWord(b: number | null | undefined): string {
+  if (b == null) return "";
+  if (b >= 0.70) return "Strong conv.";
+  if (b >= 0.45) return "Good conv.";
+  if (b >= 0.25) return "Weak conv.";
+  return "Mostly wicks";
+}
+
+function rowNote(
+  trend: string | undefined,
+  health: number | null | undefined,
+  regime: string | undefined,
+  body: number | null | undefined,
+  hasBos: boolean,
+  hasChoch: boolean,
+): string {
+  const h = health ?? 0;
+  const b = body ?? 0;
+
+  if (trend === "bullish") {
+    if (h >= 75 && regime === "expanding"    && b >= 0.55) return "Strong bull push — high conviction";
+    if (h >= 75 && regime === "expanding"    && b <  0.45) return "Bull expanding but wicks dominate — possible sweep";
+    if (h >= 75 && regime === "contracting"  && b >= 0.45) return "Bull pausing/coiling — healthy, wait for expansion";
+    if (h >= 75 && regime === "contracting"  && b <  0.35) return "Bull compressing hard — energy building";
+    if (h >= 65)                                           return "Steady bull — normal conditions";
+    if (h <  45 && hasChoch)                               return "Bull weakening — fresh CHoCH is a real warning";
+    if (h <  45)                                           return "Bull degraded — old structure, low conviction";
+    return "Bull trend present";
+  }
+
+  if (trend === "bearish") {
+    if (h >= 75 && regime === "expanding"    && b >= 0.55) return "Strong bear push — high conviction";
+    if (h >= 75 && regime === "expanding"    && b <  0.45) return "Bear expanding but wicks dominate — possible sweep";
+    if (h >= 75 && regime === "contracting"  && b >= 0.45) return "Bear pausing/coiling — healthy, watch for continuation";
+    if (h >= 75 && regime === "contracting"  && b <  0.35) return "Bear compressing — coiling before next leg";
+    if (h >= 65)                                           return "Steady bear — normal conditions";
+    if (h <  45 && hasChoch)                               return "Bear weakening — fresh CHoCH is a real warning";
+    if (h <  45)                                           return "Bear degraded — old structure, low conviction";
+    return "Bear trend present";
+  }
+
+  // neutral / consolidation
+  if (hasBos && b < 0.40)   return "BOS printed but candle conviction low — wait for follow-through";
+  if (regime === "expanding" && b >= 0.55) return "Breakout in progress — direction unconfirmed yet";
+  if (regime === "expanding" && b <  0.45) return "Volatile, wicks everywhere — likely stop hunt";
+  if (regime === "contracting" && b < 0.30) return "Compressing hard — coiling for big move";
+  if (regime === "contracting")             return "Range contracting — two sides, nobody winning";
+  if (h < 45)                               return "Weak structure — candles indecisive, avoid";
+  return "Consolidation — wait for direction";
+}
+
+function pairSummary(data: MTFBiasResponse | undefined): string {
+  if (!data) return "";
+  const trends = [
+    data.bias_15m?.trend,
+    data.bias_1h?.trend,
+    data.bias_4h?.trend,
+    data.bias_d1?.trend,
+    data.bias_w1?.trend,
+  ];
+  const ltf = trends.slice(0, 2);
+  const htf = trends.slice(2).filter(Boolean) as string[];
+  const ltfBull  = ltf.filter(t => t === "bullish").length;
+  const ltfBear  = ltf.filter(t => t === "bearish").length;
+  const htfBull  = htf.filter(t => t === "bullish").length;
+  const htfBear  = htf.filter(t => t === "bearish").length;
+  const allBull  = ltfBull === 2 && htfBull === htf.length;
+  const allBear  = ltfBear === 2 && htfBear === htf.length;
+  const allCons  = trends.every(t => t === "neutral");
+
+  if (allBull)                          return "FULL BULL ALIGNMENT — strong buy confluence";
+  if (allBear)                          return "FULL BEAR ALIGNMENT — strong sell confluence";
+  if (htfBull >= 2 && ltfBear >= 1)    return "LTF pullback in HTF bull → wait for LTF to realign, then buy";
+  if (htfBear >= 2 && ltfBull >= 1)    return "LTF bounce in HTF bear → wait for LTF to realign, then sell";
+  if (htfBull >= 2 && ltfBull >= 1)    return "HTF + LTF bullish aligning → buy confluence building";
+  if (htfBear >= 2 && ltfBear >= 1)    return "HTF + LTF bearish aligning → sell confluence building";
+  if (allCons)                          return "All timeframes ranging — no direction, avoid";
+  return "Mixed signals — no clear multi-TF bias";
 }
 
 const WARNING_CLASS = "ring-2 ring-red-500 shadow-[0_0_6px_rgba(239,68,68,0.9)]";
@@ -148,8 +239,32 @@ function HeatmapRow({
     ? `${display}: loading…`
     : isError
       ? `${display}: data not yet available`
-      : `${display}\n15M: ${trendLabel(data?.bias_15m.trend)}${healthTag(data?.bias_15m.trend_health)}${momentumTag(data?.bias_15m.momentum)}${eventTag(data?.bias_15m.latest_bos)}${chochTag(data?.bias_15m.latest_choch)}${warnTag(warn15)}\n1H: ${trendLabel(data?.bias_1h.trend)}${healthTag(data?.bias_1h.trend_health)}${momentumTag(data?.bias_1h.momentum)}${eventTag(data?.bias_1h.latest_bos)}${chochTag(data?.bias_1h.latest_choch)}${warnTag(warn1h)}\n4H: ${trendLabel(data?.bias_4h.trend)}${healthTag(data?.bias_4h.trend_health)}${momentumTag(data?.bias_4h.momentum)}${eventTag(data?.bias_4h.latest_bos)}${chochTag(data?.bias_4h.latest_choch)}${warnTag(warn4h)}\nD1: ${trendLabel(data?.bias_d1?.trend)}${healthTag(data?.bias_d1?.trend_health)}${momentumTag(data?.bias_d1?.momentum)}${eventTag(data?.bias_d1?.latest_bos)}${chochTag(data?.bias_d1?.latest_choch)}${warnTag(warnd1)}\nW1: ${trendLabel(data?.bias_w1?.trend)}${healthTag(data?.bias_w1?.trend_health)}${momentumTag(data?.bias_w1?.momentum)}${eventTag(data?.bias_w1?.latest_bos)}${chochTag(data?.bias_w1?.latest_choch)}${warnTag(warnw1)}`;
-
+      : (() => {
+          const rows: Array<{ label: string; bias: typeof data.bias_15m; warn: boolean }> = [
+            { label: "15M", bias: data!.bias_15m, warn: warn15 },
+            { label: "1H",  bias: data!.bias_1h,  warn: warn1h  },
+            { label: "4H",  bias: data!.bias_4h,  warn: warn4h  },
+            { label: "D1",  bias: data!.bias_d1,  warn: warnd1  },
+            { label: "W1",  bias: data!.bias_w1 ?? data!.bias_d1, warn: warnw1 },
+          ];
+          const lines = rows.map(({ label, bias, warn }) => {
+            if (!bias) return "";
+            const h    = bias.trend_health;
+            const b    = bias.momentum?.body_ratio;
+            const reg  = bias.momentum?.atr_regime;
+            const hasBos   = !!bias.latest_bos;
+            const hasChoch = !!bias.latest_choch;
+            const dataLine =
+              `${label}: ${trendLabel(bias.trend)} [${h ?? "—"}·${healthWord(h)}]` +
+              `${momentumTag(bias.momentum)}·${bodyWord(b)}` +
+              `${eventTag(bias.latest_bos)}${chochTag(bias.latest_choch)}` +
+              `${warn ? " ⚠" : ""}`;
+            const note = `   → ${rowNote(bias.trend, h, reg, b, hasBos, hasChoch)}`;
+            return `${dataLine}\n${note}`;
+          });
+          const summary = pairSummary(data);
+          return `${display}\n${lines.join("\n")}\n─────────────────────\n${summary}`;
+        })();
   return (
     <button
       onClick={onSelect}
