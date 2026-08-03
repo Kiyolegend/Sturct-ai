@@ -120,16 +120,16 @@ function healthWord(h: number | null | undefined): string {
   if (h == null) return "";
   if (h >= 85) return "Excellent";
   if (h >= 65) return "Good";
-  if (h >= 45) return "Fair";
+  if (h >= 45) return "Average";
   if (h >= 25) return "Weak";
   return "Poor";
 }
 
 function bodyWord(b: number | null | undefined): string {
   if (b == null) return "";
-  if (b >= 0.70) return "Strong conv.";
-  if (b >= 0.45) return "Good conv.";
-  if (b >= 0.25) return "Weak conv.";
+  if (b >= 0.70) return "Strong commitment";
+  if (b >= 0.45) return "Good commitment";
+  if (b >= 0.25) return "Weak commitment";
   return "Mostly wicks";
 }
 
@@ -145,46 +145,116 @@ function rowNote(
   const b = body ?? 0;
 
   if (trend === "bullish") {
-    if (h >= 75 && regime === "expanding"    && b >= 0.55) return "Strong bull push — high conviction";
-    if (h >= 75 && regime === "expanding"    && b <  0.45) return "Bull expanding but wicks dominate — possible sweep";
-    if (h >= 75 && regime === "contracting"  && b >= 0.45) return "Bull pausing/coiling — healthy, wait for expansion";
-    if (h >= 75 && regime === "contracting"  && b <  0.35) return "Bull compressing hard — energy building";
-    if (h >= 65)                                           return "Steady bull — normal conditions";
-    if (h <  45 && hasChoch)                               return "Bull weakening — fresh CHoCH is a real warning";
-    if (h <  45)                                           return "Bull degraded — old structure, low conviction";
-    return "Bull trend present";
+    if (h >= 75 && regime === "expanding"   && b >= 0.55) return "Bulls pushing hard with big committed candles. Strong buy environment.";
+    if (h >= 75 && regime === "expanding"   && b <  0.45) return "Volatility expanding but candles are mostly wicks. Looks like a sweep, not a clean push.";
+    if (h >= 75 && regime === "contracting" && b >= 0.45) return "Trend is healthy but taking a breath. Wait for volatility to return before entering.";
+    if (h >= 75 && regime === "contracting" && b <  0.35) return "Very tight coil inside a clean bull. Big move building — favor upside.";
+    if (h >= 65)                                          return "Clean healthy bull trend. Favor buys on pullbacks.";
+    if (h <  45 && hasChoch)                              return "Fresh CHoCH is challenging this trend. Watch closely — may be turning.";
+    if (h <  45)                                          return "Structure is technically bullish but weak and old. Low weight as confluence.";
+    return "Bull trend present.";
   }
 
   if (trend === "bearish") {
-    if (h >= 75 && regime === "expanding"    && b >= 0.55) return "Strong bear push — high conviction";
-    if (h >= 75 && regime === "expanding"    && b <  0.45) return "Bear expanding but wicks dominate — possible sweep";
-    if (h >= 75 && regime === "contracting"  && b >= 0.45) return "Bear pausing/coiling — healthy, watch for continuation";
-    if (h >= 75 && regime === "contracting"  && b <  0.35) return "Bear compressing — coiling before next leg";
-    if (h >= 65)                                           return "Steady bear — normal conditions";
-    if (h <  45 && hasChoch)                               return "Bear weakening — fresh CHoCH is a real warning";
-    if (h <  45)                                           return "Bear degraded — old structure, low conviction";
-    return "Bear trend present";
+    if (h >= 75 && regime === "expanding"   && b >= 0.55) return "Bears pushing hard with big committed candles. Strong sell environment.";
+    if (h >= 75 && regime === "expanding"   && b <  0.45) return "Volatility expanding but mostly wicks. Looks like a sweep, not a clean push.";
+    if (h >= 75 && regime === "contracting" && b >= 0.45) return "Bear trend healthy but pausing. Wait for volatility to return before selling.";
+    if (h >= 75 && regime === "contracting" && b <  0.35) return "Very tight coil inside a clean bear. Favor next leg down.";
+    if (h >= 65)                                          return "Clean healthy bear trend. Favor sells on bounces.";
+    if (h <  45 && hasChoch)                              return "Fresh CHoCH challenging this trend. Possible reversal building.";
+    if (h <  45)                                          return "Technically bearish but structure is weak and old. Low weight as confluence.";
+    return "Bear trend present.";
   }
 
-  // neutral / consolidation
-  if (hasBos && b < 0.40)   return "BOS printed but candle conviction low — wait for follow-through";
-  if (regime === "expanding" && b >= 0.55) return "Breakout in progress — direction unconfirmed yet";
-  if (regime === "expanding" && b <  0.45) return "Volatile, wicks everywhere — likely stop hunt";
-  if (regime === "contracting" && b < 0.30) return "Compressing hard — coiling for big move";
-  if (regime === "contracting")             return "Range contracting — two sides, nobody winning";
-  if (h < 45)                               return "Weak structure — candles indecisive, avoid";
-  return "Consolidation — wait for direction";
+  // consolidation
+  if (hasBos && b < 0.40)              return "A break happened but candles aren't committing. Could be false. Wait for bigger bodies.";
+  if (regime === "expanding" && b >= 0.55) return "Breaking out with real conviction — direction not confirmed by structure yet.";
+  if (regime === "expanding" && b <  0.45) return "Big ranges but mostly wicks. Looks like a liquidity grab, not a real breakout.";
+  if (regime === "contracting" && b < 0.30) return "Market coiling very tightly. Big move is coming — wait for the structural break.";
+  if (regime === "contracting")         return "Both sides fighting but nobody taking control. Wait for one side to dominate.";
+  if (h < 45)                           return "Weak structure with no direction. Avoid trading this timeframe.";
+  return "Range market. No clear bias. Wait for structural confirmation.";
 }
 
-function pairSummary(data: MTFBiasResponse | undefined): string {
+function storySection(data: MTFBiasResponse | undefined): string {
   if (!data) return "";
-  const trends = [
-    data.bias_15m?.trend,
-    data.bias_1h?.trend,
-    data.bias_4h?.trend,
-    data.bias_d1?.trend,
-    data.bias_w1?.trend,
+
+  const tfs = [
+    { label: "W1",  bias: data.bias_w1  ?? null },
+    { label: "D1",  bias: data.bias_d1  ?? null },
+    { label: "4H",  bias: data.bias_4h  ?? null },
+    { label: "1H",  bias: data.bias_1h  ?? null },
+    { label: "15M", bias: data.bias_15m ?? null },
   ];
+
+  const statusLines = tfs
+    .filter(t => t.bias)
+    .map(({ label, bias }) => {
+      const icon = bias!.trend === "bullish" ? "✓" : bias!.trend === "bearish" ? "✗" : "•";
+      const word = bias!.trend === "bullish" ? "Bullish" : bias!.trend === "bearish" ? "Bearish" : "Consolidating";
+      return `${icon} ${label}: ${word}`;
+    })
+    .join("\n");
+
+  const htf = [data.bias_4h, data.bias_d1, data.bias_w1].filter(Boolean) as typeof data.bias_4h[];
+  const ltf = [data.bias_1h, data.bias_15m].filter(Boolean) as typeof data.bias_1h[];
+  const htfBull = htf.filter(b => b.trend === "bullish").length;
+  const htfBear = htf.filter(b => b.trend === "bearish").length;
+  const ltfBull = ltf.filter(b => b.trend === "bullish").length;
+  const ltfBear = ltf.filter(b => b.trend === "bearish").length;
+  const ltfCons = ltf.filter(b => b.trend === "neutral").length;
+
+  let interpretation: string;
+  let tradeBias: string;
+  let confidence: number;
+
+  if (htfBull + ltfBull === 5) {
+    interpretation = "Every timeframe is aligned bullish. This is a high-conviction environment. Favor buys on pullbacks.";
+    tradeBias = "🟢 Strongly Bullish"; confidence = 95;
+  } else if (htfBear + ltfBear === 5) {
+    interpretation = "Every timeframe is aligned bearish. This is a high-conviction environment. Favor sells on bounces.";
+    tradeBias = "🔴 Strongly Bearish"; confidence = 95;
+  } else if (htfBull >= 2 && ltfBear >= 1) {
+    interpretation = "Higher timeframes remain bullish but lower timeframes are pulling back. This looks like a retracement, not a reversal. Wait for 15M and 1H to turn bullish again before entering long.";
+    tradeBias = "🟢 Moderately Bullish"; confidence = 78;
+  } else if (htfBear >= 2 && ltfBull >= 1) {
+    interpretation = "Higher timeframes remain bearish but lower timeframes are bouncing. Looks like a correction inside the downtrend. Wait for the bounce to fade before selling.";
+    tradeBias = "🔴 Moderately Bearish"; confidence = 78;
+  } else if (htfBull >= 2 && ltfCons === 2) {
+    interpretation = "The long-term trend is bullish but lower timeframes are resting in a range. This looks like a pause, not a reversal. Wait for 15M and 1H to break bullish before buying.";
+    tradeBias = "🟡 Cautiously Bullish"; confidence = 68;
+  } else if (htfBear >= 2 && ltfCons === 2) {
+    interpretation = "The long-term trend is bearish but lower timeframes are ranging. Looks like a pause inside the downtrend. Wait for lower TFs to break bearish again before selling.";
+    tradeBias = "🟡 Cautiously Bearish"; confidence = 68;
+  } else if (htfBull >= 2 && ltfBull >= 1) {
+    interpretation = "Higher and lower timeframes are aligning bullish. Confluence is building. Watch for remaining timeframes to confirm.";
+    tradeBias = "🟢 Building Bullish"; confidence = 72;
+  } else if (htfBear >= 2 && ltfBear >= 1) {
+    interpretation = "Higher and lower timeframes are aligning bearish. Confluence is building. Watch for remaining timeframes to confirm.";
+    tradeBias = "🔴 Building Bearish"; confidence = 72;
+  } else if (htf.every(b => b.trend === "neutral") && ltf.every(b => b.trend === "neutral")) {
+    interpretation = "No directional trend on any timeframe. The market is ranging everywhere. Avoid directional trades entirely.";
+    tradeBias = "⚪ No Direction"; confidence = 20;
+  } else {
+    interpretation = "Timeframes are giving conflicting signals with no clear story. This is a low-quality environment. Sit on your hands and wait for alignment.";
+    tradeBias = "⚫ Mixed — Avoid"; confidence = 35;
+  }
+
+  const stars =
+    confidence >= 90 ? "★★★★★" :
+    confidence >= 75 ? "★★★★☆" :
+    confidence >= 60 ? "★★★☆☆" :
+    confidence >= 40 ? "★★☆☆☆" : "★☆☆☆☆";
+
+  return (
+    `─────────────────────\n` +
+    `OVERALL MARKET STORY\n` +
+    `${statusLines}\n\n` +
+    `${interpretation}\n\n` +
+    `Trade Bias: ${tradeBias}\n` +
+    `Confidence: ${stars} ${confidence}/100`
+  );
+}
   const ltf = trends.slice(0, 2);
   const htf = trends.slice(2).filter(Boolean) as string[];
   const ltfBull  = ltf.filter(t => t === "bullish").length;
