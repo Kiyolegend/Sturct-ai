@@ -202,6 +202,8 @@ function pairSummary(data: MTFBiasResponse | undefined): string {
   if (htfBull >= 2 && ltfBull >= 1)    return "HTF + LTF bullish aligning → buy confluence building";
   if (htfBear >= 2 && ltfBear >= 1)    return "HTF + LTF bearish aligning → sell confluence building";
   if (allCons)                          return "All timeframes ranging — no direction, avoid";
+  if (htfBull >= 2 && ltfBull === 0 && ltfBear === 0) return "HTF bullish but LTF ranging — wait for LTF breakout upward";
+  if (htfBear >= 2 && ltfBull === 0 && ltfBear === 0) return "HTF bearish but LTF ranging — wait for LTF breakdown lower";
   return "Mixed signals — no clear multi-TF bias";
 }
 
