@@ -96,10 +96,7 @@ function dotOpacity(health: number | null | undefined): string {
   return "opacity-30";
 }
 
-// Tooltip helpers for new structural event fields
-function healthTag(h: number | null | undefined): string {
-  return h != null ? ` [${h}]` : "";
-}
+
 function eventTag(ev: LatestStructureEvent | null | undefined): string {
   if (!ev) return "";
   return ` ${ev.direction === "bullish" ? "↑" : "↓"}BOS(${ev.age_hours}h)`;
