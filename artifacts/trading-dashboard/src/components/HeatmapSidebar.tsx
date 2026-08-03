@@ -1,7 +1,7 @@
 import React from "react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useMTFBias, type LatestStructureEvent, type MTFBiasResponse } from "../hooks/use-trading-api";
+import { useMTFBias, type LatestStructureEvent, type MTFBiasResponse, type MTFBias } from "../hooks/use-trading-api";
 
 
 function cn(...inputs: ClassValue[]) {
@@ -234,18 +234,18 @@ function HeatmapRow({
   const trans4h  = isChochTransition(data?.bias_4h.trend,  data?.bias_4h.latest_choch,  "4h");
   const transd1  = isChochTransition(data?.bias_d1?.trend, data?.bias_d1?.latest_choch, "d1");
   const transw1  = isChochTransition(data?.bias_w1?.trend, data?.bias_w1?.latest_choch, "w1");
-  const warnTag = (w: boolean) => (w ? " ⚠" : "");
+  
   const tooltip = isLoading
     ? `${display}: loading…`
     : isError
       ? `${display}: data not yet available`
       : (() => {
-          const rows: Array<{ label: string; bias: typeof data.bias_15m; warn: boolean }> = [
+          const rows: Array<{ label: string; bias: MTFBias | undefined; warn: boolean }> = [
             { label: "15M", bias: data!.bias_15m, warn: warn15 },
             { label: "1H",  bias: data!.bias_1h,  warn: warn1h  },
             { label: "4H",  bias: data!.bias_4h,  warn: warn4h  },
             { label: "D1",  bias: data!.bias_d1,  warn: warnd1  },
-            { label: "W1",  bias: data!.bias_w1 ?? data!.bias_d1, warn: warnw1 },
+            { label: "W1",  bias: data!.bias_w1, warn: warnw1 },
           ];
           const lines = rows.map(({ label, bias, warn }) => {
             if (!bias) return "";
