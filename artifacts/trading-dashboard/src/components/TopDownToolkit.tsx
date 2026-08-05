@@ -81,15 +81,15 @@ export function TopDownToolkit({
   const tfData = useMemo(() => TF_KEYS.map(({ label, biasKey, zoneKey, srTf }) => {
     const bias = biasData?.[biasKey] as MTFBias | undefined;
     const allZones: ZoneMTF[] = zoneKey ? (zonesMTFData?.[zoneKey] ?? []) as ZoneMTF[] : [];
-    const demands  = allZones.filter(z => z.kind === "demand"  && z.status !== "broken").sort((a, b) => (b.quality ?? 0) - (a.quality ?? 0));
-    const supplies = allZones.filter(z => z.kind === "supply"  && z.status !== "broken").sort((a, b) => (b.quality ?? 0) - (a.quality ?? 0));
+    const demands  = allZones.filter(z => z.kind === "demand"  && z.status !== "broken").sort((a, b) => Math.abs(currentPrice - a.center) - Math.abs(currentPrice - b.center));
+    const supplies = allZones.filter(z => z.kind === "supply"  && z.status !== "broken").sort((a, b) => Math.abs(currentPrice - a.center) - Math.abs(currentPrice - b.center));
     const supports    = (srData?.levels ?? []).filter(l => l.kind === "support"    && (l.timeframe as string) === srTf).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 2);
     const resistances = (srData?.levels ?? []).filter(l => l.kind === "resistance" && (l.timeframe as string) === srTf).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 2);
     const cfHits = (confluenceData?.confluence ?? []).filter(c => c.zone_timeframe === srTf);
     const hasOB  = cfHits.some(c => c.has_ob);
     const hasFVG = cfHits.some(c => c.has_fvg);
     return { label, bias, demands, supplies, supports, resistances, hasOB, hasFVG };
-  }), [biasData, zonesMTFData, srData, confluenceData]);
+  }), [biasData, zonesMTFData, srData, confluenceData, currentPrice]);
 
   const summary = useMemo(() => {
     const biases = TF_KEYS.map(k => (biasData?.[k.biasKey] as MTFBias | undefined)?.trend);
