@@ -829,9 +829,10 @@ containerRef.current?.addEventListener('click', handleChartClick);
         const borderStyle = isConfluence ? 'solid' : 'dashed';
         const borderWidth  = isConfluence ? '2px' : '1px';
 
+        const statusDot = zone.status === 'fresh' ? ' ●' : zone.status === 'tested_once' ? ' ◎' : zone.status === 'tested_multiple' ? ' ○' : '';
         const confluenceLabel = isConfluence
-          ? `${tfColors.label}+${confluenceTFs.join('+')} ${isSupply ? 'S' : 'D'}`
-          : `${tfColors.label} ${isSupply ? 'S' : 'D'}`;
+          ? `${tfColors.label}+${confluenceTFs.join('+')} ${isSupply ? 'S' : 'D'}${statusDot}`
+          : `${tfColors.label} ${isSupply ? 'S' : 'D'}${statusDot}`;
 
         elements.push(
           <div key={`mtf-${tf}-${isSupply ? 's' : 'd'}-${idx}`} style={{
