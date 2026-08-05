@@ -335,6 +335,7 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
           srData={srData}
           confluenceData={confluenceData}
           currentPrice={data?.candles?.at(-1)?.close ?? 0}
+          toggles={toggles}
           onClose={() => setShowToolkit(false)}
         />
       )}
