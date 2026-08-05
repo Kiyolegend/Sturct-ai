@@ -4,7 +4,7 @@ import { TradingChart, type FibLevel } from "@/components/TradingChart";
 import { HeatmapSidebar } from "@/components/HeatmapSidebar";
 import { TradePanel } from "@/components/TradePanel";
 import { NewsPanel } from "@/components/NewsPanel";
-
+import { TopDownToolkit } from "@/components/TopDownToolkit";
 
 import { useTradingAnalysis, useSRLevels, useMTFBias, usePatternSummary, useSessions, useBrokerTime, useZonesMTF, type ActiveSetup, useConfluence, type ConfluenceHit } from "@/hooks/use-trading-api";
 import { Loader2, AlertTriangle, RefreshCw, Moon } from "lucide-react";
@@ -29,6 +29,7 @@ const CANDLE_LIMITS: Record<string, number> = {
 
 export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetups?: ActiveSetup[]; symbol: string; setSymbol: (s: string) => void }) {
   const [timeframe, setTimeframe] = useState("5m");
+  const [showToolkit, setShowToolkit] = useState(false);
   const [toggles, setToggles] = useState<ToggleState>({
     zigzag:   true,
     labels:   true,
@@ -323,7 +324,20 @@ export function Dashboard({ activeSetups = [], symbol, setSymbol }: { activeSetu
         patternd1={patternData?.pattern_d1}
         patternw1={patternData?.pattern_w1}
         activeSetups={activeSetups}
+        showToolkit={showToolkit}
+        onToggleToolkit={() => setShowToolkit(t => !t)}
       />
+      {showToolkit && (
+        <TopDownToolkit
+          symbol={symbol}
+          biasData={biasData}
+          zonesMTFData={zonesMTFData}
+          srData={srData}
+          confluenceData={confluenceData}
+          currentPrice={data?.candles?.at(-1)?.close ?? 0}
+          onClose={() => setShowToolkit(false)}
+        />
+      )}
 
       <div className="flex-1 flex flex-row min-h-0">
         <HeatmapSidebar activeSymbol={symbol} onSelectSymbol={setSymbol}>

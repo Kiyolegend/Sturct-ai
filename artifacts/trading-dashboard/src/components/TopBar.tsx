@@ -53,6 +53,8 @@ interface TopBarProps {
   patternd1?:  CandlePattern | null;
   patternw1?:  CandlePattern | null;
   activeSetups?: ActiveSetup[];
+  showToolkit?: boolean;
+  onToggleToolkit?: () => void;
 }
 
 
@@ -265,7 +267,7 @@ function SymbolSelector({ symbol, setSymbol }: { symbol: string; setSymbol: (s: 
   );
 }
 
-export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, biasd1, biasw1, pattern15m, pattern1h, pattern4h, patternd1, patternw1, activeSetups = [] }: TopBarProps) {
+export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = "USDJPY", setSymbol, trend, bias15m, bias1h, bias4h, biasd1, biasw1, pattern15m, pattern1h, pattern4h, patternd1, patternw1, activeSetups = [], showToolkit = false, onToggleToolkit }: TopBarProps) {
   const [soundMuted, setSoundMuted] = useState(() => localStorage.getItem("struct_sound_muted") === "true");
   const { data: brokerTimeData } = useBrokerTime();
   const timeframes = ["5M", "15M", "1H", "4H","D1", "W1"];
@@ -509,6 +511,16 @@ export function TopBar({ timeframe, setTimeframe, toggles, setToggles, symbol = 
             </div>
           </div>
         )}
+        <button
+          onClick={onToggleToolkit}
+          className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            showToolkit
+              ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+              : "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
+          }`}
+        >
+          ⊞ Toolkit
+        </button>
 
         <a
           href="/analysis"
