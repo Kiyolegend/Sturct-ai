@@ -4,17 +4,20 @@
  *
  * Shows exactly what the frontend chart would display if ALL toggles were ON.
  * Organized W1 → D1 → 4H → 1H → 15M.
+ * UI scaled for comfortable reading at 75% browser zoom.
  */
 
 import React, { useState, useMemo } from "react";
-import { useMTFBias, useZonesMTF, useSRLevels, useConfluence } from "@/hooks/use-trading-api";
-import type { ZoneMTF, SRLevel, MTFBias, ConfluenceHit } from "@/hooks/use-trading-api";
+import { useMTFBias, useZonesMTF, useSRLevels, useConfluence, useTradingAnalysis } from "@/hooks/use-trading-api";
+import type { ZoneMTF, SRLevel, MTFBias } from "@/hooks/use-trading-api";
+import { detectOrderBlocks, detectFVGs } from "@/components/TradingChart";
+import type { OrderBlockData, FVGData } from "@/components/TradingChart";
 import { LoginGate } from "@/components/LoginGate";
 
 // ── Chart filter constants (mirror of TradingChart.tsx) ───────────────────────
 
 const PROXIMITY_MTF = 0.025;
-const STRENGTH_MIN  = 2;
+const STRENGTH_MIN  = 3;
 
 const SR_PROXIMITY: Record<string, number> = {
   "15m": 0.012,
@@ -34,10 +37,6 @@ function getPip(price: number): number {
   return 0.0001;
 }
 
-/**
- * Format price with appropriate decimals:
- * BTC ~60000 → 0 dp | Gold ~2300 → 2 dp | JPY ~157 → 3 dp | EUR/USD ~1.08 → 5 dp
- */
 function fmt(price: number, ref: number): string {
   if (!price) return "—";
   if (ref > 10000) return price.toFixed(0);
@@ -51,10 +50,10 @@ function pipDist(a: number, b: number, pip: number): string {
 }
 
 function freshLabel(s?: string): { text: string; color: string } {
-  if (s === "fresh")           return { text: "Fr",  color: "#34d399" };
-  if (s === "tested_once")     return { text: "Tst", color: "#fbbf24" };
-  if (s === "tested_multiple") return { text: "Wrn", color: "#f97316" };
-  if (s === "broken")          return { text: "Brk", color: "#ef4444" };
+  if (s === "fresh")           return { text: "Fresh",  color: "#34d399" };
+  if (s === "tested_once")     return { text: "Tested", color: "#fbbf24" };
+  if (s === "tested_multiple") return { text: "Worn",   color: "#f97316" };
+  if (s === "broken")          return { text: "Broken", color: "#ef4444" };
   return { text: "—", color: "#475569" };
 }
 
@@ -80,44 +79,12 @@ const TF_CONFIG = [
   { label: "15M", zoneKey: null,                srKey: "15m" as const, biasKey: "bias_15m" as const, color: "#94a3b8" },
 ];
 
-// ── OB / FVG cell ─────────────────────────────────────────────────────────────
-
-function ObFvgCell({
-  hit, currentPrice,
-}: {
-  hit: ConfluenceHit | null;
-  currentPrice: number;
-  accentColor: string;
-}) {
-  if (!hit) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", width: "100%" }}>
-        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.13)" }}>✗</span>
-      </div>
-    );
-  }
-  const isBull   = hit.zone_kind === "demand";
-  const mid      = (hit.zone_top + hit.zone_bottom) / 2;
-  const dirColor = isBull ? "#34d399" : "#f87171";
-
-  return (
-    <div style={{ padding: "4px 5px", textAlign: "center", width: "100%" }}>
-      <div style={{ fontSize: 8, fontWeight: 900, color: dirColor, letterSpacing: 0.5, lineHeight: 1.3 }}>
-        {isBull ? "↑" : "↓"} {isBull ? "BULL" : "BEAR"}
-      </div>
-      <div style={{ fontSize: 8, fontFamily: "monospace", color: "rgba(255,255,255,0.38)", marginTop: 1, lineHeight: 1.3 }}>
-        {fmt(mid, currentPrice)}
-      </div>
-    </div>
-  );
-}
-
 // ── TFBlock component ─────────────────────────────────────────────────────────
 
 function TFBlock({
   label, color, bias,
   supplyZones, demandZones, srLevels,
-  obHit, fvgHit, currentPrice,
+  obs, fvgs, currentPrice,
 }: {
   label: string;
   color: string;
@@ -125,8 +92,8 @@ function TFBlock({
   supplyZones: ZoneMTF[];
   demandZones: ZoneMTF[];
   srLevels: SRLevel[];
-  obHit: ConfluenceHit | null;
-  fvgHit: ConfluenceHit | null;
+  obs: OrderBlockData[];
+  fvgs: FVGData[];
   currentPrice: number;
 }) {
   const pip        = getPip(currentPrice);
@@ -139,7 +106,7 @@ function TFBlock({
   const noSR     = srLevels.length === 0;
 
   const emptyMark = (
-    <div style={{ padding: "4px", fontSize: 10, color: "rgba(255,255,255,0.12)", textAlign: "center" }}>✗</div>
+    <div style={{ padding: "10px", fontSize: 14, color: "rgba(255,255,255,0.12)", textAlign: "center" }}>✗</div>
   );
 
   const zoneItem = (z: ZoneMTF, i: number) => {
@@ -149,26 +116,26 @@ function TFBlock({
     const isS    = z.kind === "supply";
     return (
       <div key={i} style={{
-        padding: "3px 3px",
-        marginBottom: 2,
-        borderLeft: `2px solid ${isS ? "rgba(248,113,113,0.55)" : "rgba(52,211,153,0.55)"}`,
+        padding: "6px 5px",
+        marginBottom: 5,
+        borderLeft: `3px solid ${isS ? "rgba(248,113,113,0.55)" : "rgba(52,211,153,0.55)"}`,
         background: inside ? (isS ? "rgba(248,113,113,0.07)" : "rgba(52,211,153,0.07)") : "transparent",
-        borderRadius: "0 2px 2px 0",
+        borderRadius: "0 3px 3px 0",
       }}>
-        <div style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: isS ? "#fca5a5" : "#6ee7b7", lineHeight: 1.3 }}>
+        <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700, color: isS ? "#fca5a5" : "#6ee7b7", lineHeight: 1.4 }}>
           {fmt(z.bottom, currentPrice)} → {fmt(z.top, currentPrice)}
         </div>
-        <div style={{ display: "flex", gap: 4, marginTop: 1, alignItems: "center" }}>
-          <span style={{ fontSize: 7, color: fl.color, fontWeight: 700 }}>{fl.text}</span>
+        <div style={{ display: "flex", gap: 6, marginTop: 3, alignItems: "center" }}>
+          <span style={{ fontSize: 11, color: fl.color, fontWeight: 700 }}>{fl.text}</span>
           {z.quality != null && (
-            <span style={{ fontSize: 7, color: "rgba(255,255,255,0.22)", fontFamily: "monospace" }}>Q{z.quality}</span>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.22)", fontFamily: "monospace" }}>Q{z.quality}</span>
           )}
           <span style={{
-            fontSize: 7, fontFamily: "monospace", marginLeft: "auto",
+            fontSize: 11, fontFamily: "monospace", marginLeft: "auto",
             color: inside ? "#fbbf24" : "rgba(255,255,255,0.17)",
             fontWeight: inside ? 700 : 400,
           }}>
-            {inside ? "▶IN" : pipDist(center, currentPrice, pip)}
+            {inside ? "▶ IN" : pipDist(center, currentPrice, pip)}
           </span>
         </div>
       </div>
@@ -179,19 +146,19 @@ function TFBlock({
     const isS = l.kind === "support";
     return (
       <div key={i} style={{
-        padding: "2px 3px",
-        marginBottom: 2,
-        borderLeft: `2px solid ${isS ? "rgba(129,140,248,0.55)" : "rgba(251,146,60,0.55)"}`,
-        borderRadius: "0 2px 2px 0",
+        padding: "5px 5px",
+        marginBottom: 5,
+        borderLeft: `3px solid ${isS ? "rgba(129,140,248,0.55)" : "rgba(251,146,60,0.55)"}`,
+        borderRadius: "0 3px 3px 0",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-          <span style={{ fontSize: 9, fontFamily: "monospace", fontWeight: 700, color: isS ? "#a5b4fc" : "#fdba74", lineHeight: 1.3 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700, color: isS ? "#a5b4fc" : "#fdba74", lineHeight: 1.4 }}>
             {fmt(l.price, currentPrice)}
           </span>
-          <span style={{ fontSize: 7, fontWeight: 800, color: isS ? "#818cf8" : "#f97316" }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: isS ? "#818cf8" : "#f97316" }}>
             {isS ? "S" : "R"}
           </span>
-          <span style={{ fontSize: 7, color: "rgba(255,255,255,0.17)", fontFamily: "monospace", marginLeft: "auto" }}>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.17)", fontFamily: "monospace", marginLeft: "auto" }}>
             {pipDist(l.price, currentPrice, pip)}
           </span>
         </div>
@@ -201,46 +168,46 @@ function TFBlock({
 
   return (
     <div style={{
-      marginBottom: 4,
+      marginBottom: 10,
       border: "1px solid rgba(255,255,255,0.07)",
-      borderRadius: 6,
+      borderRadius: 8,
       overflow: "hidden",
     }}>
       {/* ── Header ── */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 7,
-        padding: "4px 8px",
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "8px 12px",
         background: "rgba(255,255,255,0.03)",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
       }}>
-        <span style={{ fontSize: 12, fontWeight: 900, color, letterSpacing: 1, minWidth: 28 }}>{label}</span>
+        <span style={{ fontSize: 20, fontWeight: 900, color, letterSpacing: 1, minWidth: 40 }}>{label}</span>
         {bias && (
           <span style={{
-            fontSize: 9, fontWeight: 800, color: tp.color,
-            background: tp.bg, padding: "1px 7px", borderRadius: 10, letterSpacing: 0.5,
+            fontSize: 13, fontWeight: 800, color: tp.color,
+            background: tp.bg, padding: "2px 10px", borderRadius: 10, letterSpacing: 0.5,
           }}>
             {tp.label}{bias.trend_health != null ? ` ${Math.round(bias.trend_health)}%` : ""}
           </span>
         )}
         {bias?.latest_choch && (
-          <span style={{ fontSize: 8, color: "#fbbf24", fontFamily: "monospace" }}>
+          <span style={{ fontSize: 12, color: "#fbbf24", fontFamily: "monospace" }}>
             {bias.latest_choch.direction === "bullish" ? "↑" : "↓"}CHoCH {bias.latest_choch.age_hours.toFixed(0)}h
           </span>
         )}
         {bias?.latest_bos && (
-          <span style={{ fontSize: 8, color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>
             {bias.latest_bos.direction === "bullish" ? "↑" : "↓"}BOS {bias.latest_bos.age_hours.toFixed(0)}h
           </span>
         )}
-        <div style={{ marginLeft: "auto", fontSize: 7, color: "rgba(255,255,255,0.16)", display: "flex", gap: 8 }}>
-          <span>{supplyZones.length}S·{demandZones.length}D</span>
-          <span>{resistance.length}R·{support.length}Sup</span>
+        <div style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.16)", display: "flex", gap: 12 }}>
+          <span>{supplyZones.length}S · {demandZones.length}D</span>
+          <span>{resistance.length}R · {support.length}Sup</span>
         </div>
       </div>
 
       {/* ── Column headers ── */}
       <div style={{
-        display: "grid", gridTemplateColumns: "1fr 1fr 1fr 80px 80px",
+        display: "grid", gridTemplateColumns: "1fr 1fr 1fr 120px 120px",
         background: "rgba(0,0,0,0.22)",
         borderBottom: "1px solid rgba(255,255,255,0.04)",
       }}>
@@ -248,12 +215,12 @@ function TFBlock({
           { text: "▲ SUPPLY",   color: "rgba(248,113,113,0.50)" },
           { text: "▼ DEMAND",   color: "rgba(52,211,153,0.50)"  },
           { text: "S/R LEVELS", color: "rgba(148,163,184,0.40)" },
-          { text: "OB",         color: "rgba(192,132,252,0.55)" },
-          { text: "FVG",        color: "rgba(56,189,248,0.55)"  },
+          { text: "ORDER BLOCKS", color: "rgba(192,132,252,0.55)" },
+          { text: "FAIR VALUE GAPS", color: "rgba(56,189,248,0.55)" },
         ].map((h, i) => (
           <div key={i} style={{
-            padding: "2px 6px",
-            fontSize: 7, fontWeight: 900, letterSpacing: 1.4, color: h.color,
+            padding: "5px 8px",
+            fontSize: 10, fontWeight: 900, letterSpacing: 1.2, color: h.color,
             borderRight: i < 4 ? "1px solid rgba(255,255,255,0.04)" : "none",
             textAlign: i >= 3 ? "center" : "left",
           }}>
@@ -263,27 +230,27 @@ function TFBlock({
       </div>
 
       {/* ── Body ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 80px 80px", alignItems: "start", minHeight: 36 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 120px 120px", alignItems: "start", minHeight: 56 }}>
 
         {/* Supply */}
-        <div style={{ padding: "4px 5px", borderRight: "1px solid rgba(255,255,255,0.04)" }}>
+        <div style={{ padding: "8px 7px", borderRight: "1px solid rgba(255,255,255,0.04)" }}>
           {noSupply ? emptyMark : supplyZones.map(zoneItem)}
         </div>
 
         {/* Demand */}
-        <div style={{ padding: "4px 5px", borderRight: "1px solid rgba(255,255,255,0.04)" }}>
+        <div style={{ padding: "8px 7px", borderRight: "1px solid rgba(255,255,255,0.04)" }}>
           {noDemand ? emptyMark : demandZones.map(zoneItem)}
         </div>
 
         {/* S/R */}
-        <div style={{ padding: "4px 5px", borderRight: "1px solid rgba(255,255,255,0.04)" }}>
+        <div style={{ padding: "8px 7px", borderRight: "1px solid rgba(255,255,255,0.04)" }}>
           {noSR ? emptyMark : (
             <>
               {resistance.map(srItem)}
               {resistance.length > 0 && support.length > 0 && (
                 <div style={{
-                  margin: "2px 0", padding: "1px 3px",
-                  fontSize: 7, fontFamily: "monospace", fontWeight: 700, color: "#fbbf24",
+                  margin: "4px 0", padding: "3px 5px",
+                  fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: "#fbbf24",
                   background: "rgba(251,191,36,0.05)",
                   borderTop: "1px dashed rgba(251,191,36,0.2)",
                   borderBottom: "1px dashed rgba(251,191,36,0.2)",
@@ -296,14 +263,28 @@ function TFBlock({
           )}
         </div>
 
-        {/* OB */}
-        <div style={{ borderRight: "1px solid rgba(255,255,255,0.04)", alignSelf: "stretch", display: "flex", alignItems: "center" }}>
-          <ObFvgCell hit={obHit} currentPrice={currentPrice} accentColor="#c084fc" />
+        {/* OB — real candle-based, same as TradingChart */}
+        <div style={{ borderRight: "1px solid rgba(255,255,255,0.04)", alignSelf: "stretch", display: "flex", flexDirection: "column", justifyContent: "center", padding: "7px 7px" }}>
+          {obs.length === 0
+            ? <span style={{ fontSize: 14, color: "rgba(255,255,255,0.13)", textAlign: "center" }}>✗</span>
+            : obs.map((ob, i) => (
+                <div key={i} style={{ fontSize: 12, fontFamily: "monospace", color: ob.type === "bullish" ? "#a3e635" : "#c084fc", marginBottom: 4, lineHeight: 1.5 }}>
+                  {ob.type === "bullish" ? "▲" : "▼"} {fmt(ob.bottom, currentPrice)}–{fmt(ob.top, currentPrice)}
+                </div>
+              ))
+          }
         </div>
 
-        {/* FVG */}
-        <div style={{ alignSelf: "stretch", display: "flex", alignItems: "center" }}>
-          <ObFvgCell hit={fvgHit} currentPrice={currentPrice} accentColor="#38bdf8" />
+        {/* FVG — real candle-based, same as TradingChart */}
+        <div style={{ alignSelf: "stretch", display: "flex", flexDirection: "column", justifyContent: "center", padding: "7px 7px" }}>
+          {fvgs.length === 0
+            ? <span style={{ fontSize: 14, color: "rgba(255,255,255,0.13)", textAlign: "center" }}>✗</span>
+            : fvgs.map((fvg, i) => (
+                <div key={i} style={{ fontSize: 12, fontFamily: "monospace", color: fvg.type === "bullish" ? "#22d3ee" : "#e879f9", marginBottom: 4, lineHeight: 1.5 }}>
+                  {fvg.type === "bullish" ? "▲" : "▼"} {fmt(fvg.bottom, currentPrice)}–{fmt(fvg.top, currentPrice)}
+                </div>
+              ))
+          }
         </div>
 
       </div>
@@ -320,6 +301,11 @@ export function StructurePage() {
   const { data: zonesMTFData,   isLoading: zonesLoading      } = useZonesMTF(symbol);
   const { data: srData,         isLoading: srLoading         } = useSRLevels(symbol);
   const { data: confluenceData, isLoading: confluenceLoading } = useConfluence(symbol);
+  const { data: dataW1  } = useTradingAnalysis(symbol, "w1",  300);
+  const { data: dataD1  } = useTradingAnalysis(symbol, "d1",  365);
+  const { data: data4h  } = useTradingAnalysis(symbol, "4h",  400);
+  const { data: data1h  } = useTradingAnalysis(symbol, "1h",  400);
+  const { data: data15m } = useTradingAnalysis(symbol, "15m", 500);
 
   const currentPrice = useMemo(() =>
     biasData?.bias_15m?.current_price ?? biasData?.bias_1h?.current_price ?? 0,
@@ -369,77 +355,79 @@ export function StructurePage() {
         .sort((a, b) => Math.abs(a.price - currentPrice) - Math.abs(b.price - currentPrice))
         .slice(0, SR_MAX_EACH);
 
-      // ── OB / FVG — pick best confluence hit per type ──
-      const confForTF = (confluenceData?.confluence ?? []).filter(
-        h => h.zone_timeframe === config.srKey
-      );
-      const obHit  = confForTF
-        .filter(h => h.has_ob)
-        .sort((a, b) => b.confluence_score - a.confluence_score)[0] ?? null;
-      const fvgHit = confForTF
-        .filter(h => h.has_fvg)
-        .sort((a, b) => b.confluence_score - a.confluence_score)[0] ?? null;
+      // ── OB / FVG — real candle-based detection, same as TradingChart ──
+      const candleMap: Record<string, any[]> = {
+        "w1":  dataW1?.candles  ?? [],
+        "d1":  dataD1?.candles  ?? [],
+        "4h":  data4h?.candles  ?? [],
+        "1h":  data1h?.candles  ?? [],
+        "15m": data15m?.candles ?? [],
+      };
+      const candles  = candleMap[config.srKey] ?? [];
+      const isD1tf   = config.srKey === "d1" || config.srKey === "w1";
+      const obs:  OrderBlockData[] = candles.length ? detectOrderBlocks(candles, currentPrice, isD1tf) : [];
+      const fvgs: FVGData[]        = candles.length ? detectFVGs(candles, currentPrice, isD1tf) : [];
 
       return {
         config,
         supplyZones,
         demandZones,
         srLevels: [...resistance, ...support],
-        obHit,
-        fvgHit,
+        obs,
+        fvgs,
         bias: biasData?.[config.biasKey],
       };
     });
-  }, [zonesMTFData, srData, confluenceData, biasData, currentPrice]);
+  }, [zonesMTFData, srData, biasData, currentPrice, dataW1, dataD1, data4h, data1h, data15m]);
 
   const isLoading = biasLoading || zonesLoading || srLoading || confluenceLoading;
 
   return (
-    <LoginGate>
+    <LoginGate showPanic={false}>
       <div style={{ minHeight: "100vh", background: "#080c14", color: "white", fontFamily: "'Roboto Mono', monospace" }}>
 
         {/* ── Header ── */}
         <div style={{
-          height: 44, display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "0 14px", borderBottom: "1px solid rgba(255,255,255,0.06)",
+          height: 56, display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "0 18px", borderBottom: "1px solid rgba(255,255,255,0.06)",
           background: "rgba(8,12,20,0.98)", position: "sticky", top: 0, zIndex: 50,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 900, color: "rgba(255,255,255,0.70)", letterSpacing: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 17, fontWeight: 900, color: "rgba(255,255,255,0.70)", letterSpacing: 2 }}>
               STRUCT<span style={{ color: "hsl(210,100%,60%)" }}>.ai</span>
             </span>
-            <span style={{ fontSize: 7, color: "rgba(255,255,255,0.18)", letterSpacing: 3 }}>/ STRUCTURE</span>
-            <span style={{ fontSize: 7, color: "rgba(255,255,255,0.11)", marginLeft: 6 }}>
-              chart filters applied · all toggles ON
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.18)", letterSpacing: 3 }}>/ STRUCTURE</span>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.11)", marginLeft: 8 }}>
+              all toggles ON
             </span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 7, color: "rgba(255,255,255,0.22)", letterSpacing: 1 }}>PAIR</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.22)", letterSpacing: 1 }}>PAIR</span>
             <select
               value={symbol}
               onChange={e => setSymbol(e.target.value)}
               style={{
                 background: "#161e2c", border: "1px solid rgba(255,255,255,0.10)",
-                color: "white", fontSize: 11, fontWeight: 700,
-                padding: "2px 6px", borderRadius: 4, outline: "none", cursor: "pointer",
+                color: "white", fontSize: 15, fontWeight: 700,
+                padding: "3px 8px", borderRadius: 4, outline: "none", cursor: "pointer",
               }}
             >
               {SYMBOLS.map(s => <option key={s} value={s}>{s.replace("/", "")}</option>)}
             </select>
             {currentPrice > 0 && (
-              <span style={{ fontSize: 10, fontFamily: "monospace", color: "rgba(255,255,255,0.32)" }}>
+              <span style={{ fontSize: 14, fontFamily: "monospace", color: "rgba(255,255,255,0.32)" }}>
                 @ {fmt(currentPrice, currentPrice)}
               </span>
             )}
             {isLoading && (
-              <span style={{ fontSize: 7, color: "rgba(255,255,255,0.18)", letterSpacing: 2 }}>LOADING…</span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.18)", letterSpacing: 2 }}>LOADING…</span>
             )}
           </div>
         </div>
 
         {/* ── TF blocks ── */}
-        <div style={{ padding: "8px 10px" }}>
+        <div style={{ padding: "10px 14px" }}>
           {tfData
             ? tfData.map(d => (
                 <TFBlock
@@ -450,13 +438,13 @@ export function StructurePage() {
                   supplyZones={d.supplyZones}
                   demandZones={d.demandZones}
                   srLevels={d.srLevels}
-                  obHit={d.obHit}
-                  fvgHit={d.fvgHit}
+                  obs={d.obs}
+                  fvgs={d.fvgs}
                   currentPrice={currentPrice}
                 />
               ))
             : (
-              <div style={{ padding: 20, fontSize: 10, color: "rgba(255,255,255,0.15)" }}>
+              <div style={{ padding: 30, fontSize: 13, color: "rgba(255,255,255,0.15)" }}>
                 Waiting for price data…
               </div>
             )

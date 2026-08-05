@@ -15,7 +15,7 @@ const inputStyle: React.CSSProperties = {
   fontSize: 12,
 };
 
-export function LoginGate({ children }: { children: React.ReactNode }) {
+export function LoginGate({ children, showPanic = true }: { children: React.ReactNode; showPanic?: boolean }) {
   const [unlocked, setUnlocked] = useState(false);
   const [password, setPassword] = useState("");
   const [totp, setTotp] = useState("");
@@ -50,13 +50,14 @@ useEffect(() => {
     return (
       <>
         {children}
-        <PanicButton
-          onRevoked={() => {
-            lock();
-            setUnlocked(false);
-          }}
-        />
-      </>
+        {showPanic && (
+          <PanicButton
+            onRevoked={() => {
+              lock();
+              setUnlocked(false);
+            }}
+          />
+        )}
     );
   }
 
