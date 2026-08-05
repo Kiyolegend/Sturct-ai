@@ -10,7 +10,7 @@ import { ChochMonitor } from "@/components/ChochMonitor";
 import NotFound from "@/pages/not-found";
 import { ChochMonitorPage } from "@/pages/ChochMonitorPage";
 import { AutoTradePage } from "@/pages/AutoTradePage";
-
+import { StructurePage } from "@/pages/StructurePage";
 
 
 
@@ -54,7 +54,7 @@ function Router({ symbol, setSymbol }: {
       <Route path="/analysis" component={AnalysisPage} />
       <Route path="/choch" component={ChochMonitorPage} />
       <Route path="/auto-trade" component={AutoTradePage} />
-      
+      <Route path="/structure" component={StructurePage} />
       <Route component={NotFound} />
     </Switch>
   );
