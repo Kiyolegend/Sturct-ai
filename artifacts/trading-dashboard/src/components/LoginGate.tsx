@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { login, installSecureFetch, lock, getStoredDeviceKey } from "@/lib/secureApi";
+import { login, installSecureFetch, lock, getStoredDeviceKey, isUnlocked } from "@/lib/secureApi";
 import { PanicButton } from "@/components/PanicButton";
 
 installSecureFetch();
@@ -16,7 +16,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function LoginGate({ children, showPanic = true }: { children: React.ReactNode; showPanic?: boolean }) {
-  const [unlocked, setUnlocked] = useState(false);
+  const [unlocked, setUnlocked] = useState(() => isUnlocked());
   const [password, setPassword] = useState("");
   const [totp, setTotp] = useState("");
   const [passphrase, setPassphrase] = useState("");

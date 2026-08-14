@@ -131,9 +131,9 @@ function TFBlock({
             <span style={{ fontSize: 11, color: "rgba(255,255,255,0.22)", fontFamily: "monospace" }}>Q{z.quality}</span>
           )}
           <span style={{
-            fontSize: 11, fontFamily: "monospace", marginLeft: "auto",
-            color: inside ? "#fbbf24" : "rgba(255,255,255,0.17)",
-            fontWeight: inside ? 700 : 400,
+            fontSize: 14, fontFamily: "monospace", marginLeft: "auto",
+            color: inside ? "#fbbf24" : "#64748b",
+            fontWeight: 700,
           }}>
             {inside ? "▶ IN" : pipDist(center, currentPrice, pip)}
           </span>
@@ -158,7 +158,7 @@ function TFBlock({
           <span style={{ fontSize: 11, fontWeight: 800, color: isS ? "#818cf8" : "#f97316" }}>
             {isS ? "S" : "R"}
           </span>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.17)", fontFamily: "monospace", marginLeft: "auto" }}>
+          <span style={{ fontSize: 14, color: "#64748b", fontFamily: "monospace", marginLeft: "auto", fontWeight: 700 }}>
             {pipDist(l.price, currentPrice, pip)}
           </span>
         </div>
