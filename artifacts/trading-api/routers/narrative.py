@@ -12,7 +12,7 @@ import time
 import requests
 import threading
 from collections import deque
-
+from services.pip_utils import pip_size as get_pip_size
 from fastapi import APIRouter, HTTPException, Query
 
 from services.data_service import fetch_ohlc
@@ -148,7 +148,7 @@ async def get_narrative(symbol: str = Query(default="USD/JPY")):
     )
     if not current_price:
         raise HTTPException(status_code=503, detail=f"No data available for {symbol}")
-    pip_size = 1.0 if current_price > 10_000 else 0.1 if current_price > 500 else 0.01 if current_price > 50 else 0.0001
+    pip_size = get_pip_size(current_price, symbol)
 
     # ── Extract analysis fields ───────────────────────────────────────────────
     trend_4h = r4h.get("trend") or {}
@@ -289,7 +289,7 @@ async def get_pair_sweep():
             )
             if not current_price:
                 return symbol, {"error": "no data"}
-            pip_size = 1.0 if current_price > 10_000 else 0.1 if current_price > 500 else 0.01 if current_price > 50 else 0.0001
+            pip_size = get_pip_size(current_price, symbol)
             bias_4h  = (r4h.get("trend")  or {}).get("trend",  "neutral")
             bias_1h  = (r1h.get("trend")  or {}).get("trend",  "neutral")
             bias_15m = (r15m.get("trend") or {}).get("trend",  "neutral")

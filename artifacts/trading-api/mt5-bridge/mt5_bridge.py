@@ -547,18 +547,33 @@ _breakeven_tracker: dict[int, dict] = {}
 _pending_be: dict[int, dict] = {}
 
 
-def _pip(price: float) -> float:
-    if price > 10_000:
-        return 1.0
+def _pip(price: float, symbol: str | None = None) -> float:
+    """
+    Return the trading pip size.
 
-    if price > 500:
-        return 0.1
+    DXY and broker-suffixed variants such as DXYm use:
+        0.001 = 1 MT5 point
+        0.010 = 1 trading pip
+    """
+    symbol_key = (
+        str(symbol or "")
+        .upper()
+        .replace("/", "")
+        .replace("_", "")
+        .strip()
+    )
 
-    if price > 50:
+    if symbol_key.startswith("DXY"):
         return 0.01
 
+    # Original fallback logic. Keep unchanged.
+    if price > 10_000:
+        return 1.0
+    if price > 500:
+        return 0.1
+    if price > 50:
+        return 0.01
     return 0.0001
-
 
 def _report(
     order_id,
@@ -772,7 +787,7 @@ def _check_breakeven_all() -> None:
         entry = info["entry"]
         original_stop_loss = info["sl_orig"]
         one_r = abs(entry - original_stop_loss)
-        pip = _pip(entry)
+        pip = _pip(entry, info["symbol"])
 
         if one_r <= 0:
             continue

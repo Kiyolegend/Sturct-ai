@@ -192,7 +192,7 @@ def _calc_lots(symbol: str, entry: float, sl: float, current_price: float) -> fl
     RISK_PCT        = 0.01          # 1% risk per trade
     risk_cash       = ACCOUNT_BALANCE * RISK_PCT   # e.g. $100
 
-    pip   = _pip(current_price)
+    pip = _pip(current_price, symbol)
     sl_pips = abs(entry - sl) / pip
     if sl_pips <= 0:
         return 0.02
