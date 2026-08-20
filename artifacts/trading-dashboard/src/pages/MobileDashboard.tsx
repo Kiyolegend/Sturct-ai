@@ -32,23 +32,29 @@ export function MobileDashboard({ activeSetups = [], symbol, setSymbol }: { acti
   const [timeframe, setTimeframe] = useState("5m");
   const [activeTab, setActiveTab] = useState<MobileTab>("chart");
   const [toggles, setToggles] = useState<ToggleState>({
-    zigzag:   true,
-    labels:   true,
-    zones:    true,
-    sr15m:    true,
-    sr1h:     true,
-    sr4h:     true,
-    sessions: true,
-    bos:      true,
-    ob:       false,
-    fvg:      false,
-    fib:      false,
-    fibD1:    false,
-    d1Zones:  false,
-    d1SR:     true,
-    w1Zones:  false, 
-    w1SR:     true,
-  });
+  zigzag:   true,
+  labels:   true,
+  zones:    true,
+  sr15m:    true,
+  sr1h:     true,
+  sr4h:     true,
+  sessions: true,
+  bos:      true,
+  ob:       false,
+  fvg:      false,
+  fib:      false,
+  fibD1:    false,
+  d1Zones:  false,
+  d1SR:     true,
+  w1Zones:  false,
+  w1SR:     true,
+
+  // Required MTF zone overlay toggles
+  zonesW1:  false,
+  zonesD1:  false,
+  zones4h:  false,
+  zones1h:  false,
+});
 
   const { data: brokerTimeData } = useBrokerTime();
   const brokerNow = brokerTimeData?.broker_time ?? 0;

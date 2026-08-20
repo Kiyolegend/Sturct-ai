@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 const PAIRS = [
   "USD/JPY", "EUR/USD", "GBP/USD", "EUR/JPY", "GBP/JPY",
   "AUD/USD", "USD/CAD", "USD/CHF", "NZD/USD", "AUD/JPY", "CAD/JPY",
+  "DXY",
 ];
 
 const STATUS_COLOR: Record<string, string> = {
