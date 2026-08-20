@@ -53,6 +53,7 @@ BASE_SYMBOLS = [
     {"base": "CADJPY", "api_symbol": "CAD/JPY"},
     {"base": "XAUUSD", "api_symbol": "XAU/USD"},
     {"base": "BTCUSD", "api_symbol": "BTC/USD"},
+    {"base": "DXY",    "api_symbol": "DXY"},
 ]
 
 MT5_PROFILES = {

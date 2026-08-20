@@ -47,7 +47,7 @@ export function ChochMonitor() {
 }, [brokerTimeData]);
   const permRequested = useRef(false);
 
-  // 11 symbols × 2 timeframes = 22 hooks (must be static — no loops allowed)
+  // 12 symbols × 2 timeframes = 24 hooks (must be static — no loops allowed)
   const d1_1h  = useChoch("USD/JPY", "1h");
   const d1_4h  = useChoch("USD/JPY", "4h");
   const d2_1h  = useChoch("EUR/USD", "1h");
@@ -70,6 +70,8 @@ export function ChochMonitor() {
   const d10_4h = useChoch("AUD/JPY", "4h");
   const d11_1h = useChoch("CAD/JPY", "1h");
   const d11_4h = useChoch("CAD/JPY", "4h");
+  const d12_1h = useChoch("DXY", "1h");
+  const d12_4h = useChoch("DXY", "4h");
 
   const allData = useMemo(() => ({
     "USD/JPY_1h": d1_1h.data,   "USD/JPY_4h": d1_4h.data,
@@ -83,13 +85,14 @@ export function ChochMonitor() {
     "NZD/USD_1h": d9_1h.data,   "NZD/USD_4h": d9_4h.data,
     "AUD/JPY_1h": d10_1h.data,  "AUD/JPY_4h": d10_4h.data,
     "CAD/JPY_1h": d11_1h.data,  "CAD/JPY_4h": d11_4h.data,
+    "DXY_1h": d12_1h.data,      "DXY_4h": d12_4h.data,
   }), [
     d1_1h.data,  d1_4h.data,  d2_1h.data,  d2_4h.data,
     d3_1h.data,  d3_4h.data,  d4_1h.data,  d4_4h.data,
     d5_1h.data,  d5_4h.data,  d6_1h.data,  d6_4h.data,
     d7_1h.data,  d7_4h.data,  d8_1h.data,  d8_4h.data,
     d9_1h.data,  d9_4h.data,  d10_1h.data, d10_4h.data,
-    d11_1h.data, d11_4h.data,
+    d11_1h.data, d11_4h.data, d12_1h.data, d12_4h.data,
   ]);
 
   // seenRef tracks the last CHoCH timestamp seen per key

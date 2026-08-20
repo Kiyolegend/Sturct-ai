@@ -22,7 +22,7 @@ const SYMBOLS = [
   { display: "CADJPY", api: "CAD/JPY" }, 
   { display: "XAUUSD", api: "XAU/USD" },
   { display: "BTCUSD", api: "BTC/USD" },
-
+  { display: "DXY"   , api: "DXY" },
 ];
 
 type TrendDir = "bullish" | "bearish" | "neutral";

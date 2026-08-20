@@ -267,7 +267,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
   const tpInvalid = isNaN(parseFloat(tp)) || (isBuy ? parseFloat(tp) <= entryPrice : parseFloat(tp) >= entryPrice);
   // BUG 6 fix: added entryPrice > 0 guard — without it canSubmit was true when currentPrice
   // is still 0 (before the MT5 bridge has pushed any data), allowing a BUY/SELL with price: 0.
-  const canSubmit  = !slInvalid && !tpInvalid && parseFloat(lots) > 0 && parseFloat(lots) <= 1 && entryPrice > 0;
+  const canSubmit  = !slInvalid && !tpInvalid && parseFloat(lots) > 0 && parseFloat(lots) <= 15 && entryPrice > 0;
 
   // BUG 9 fix: only show positions for the currently active symbol — previously positions
   // from all pairs were shown regardless of which pair was selected in the dashboard.
@@ -395,7 +395,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
           {/* LOTS */}
           <div className="flex items-center gap-2">
             <span className="text-white/40 w-16">Lots</span>
-            <input type="number" step={0.01} min={0.01} max={1} value={lots}
+            <input type="number" step={0.01} min={0.01} max={15} value={lots}
               onChange={e => setLots(e.target.value)}
               className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-white/30" />
             <span className="text-white/30">−${riskUSD.toFixed(2)}</span>

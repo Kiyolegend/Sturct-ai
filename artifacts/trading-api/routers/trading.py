@@ -48,7 +48,7 @@ _VALID_SYMBOLS = {
     "USD/JPY", "EUR/USD", "GBP/USD",
     "AUD/USD", "USD/CHF", "EUR/JPY",
     "GBP/JPY", "USD/CAD", "NZD/USD",
-    "AUD/JPY", "CAD/JPY", "XAU/USD", "BTC/USD",
+    "AUD/JPY", "CAD/JPY", "XAU/USD", "BTC/USD", "DXY",
 }
 
 
@@ -92,8 +92,8 @@ async def open_trade(order: OrderRequest):
         raise HTTPException(status_code=400, detail="order_type must be MARKET or LIMIT")
     if order.order_type == "LIMIT" and order.price is None:
         raise HTTPException(status_code=400, detail="price required for LIMIT orders")
-    if order.lots <= 0 or order.lots > 1.0:
-        raise HTTPException(status_code=400, detail="lots must be 0.01–1.0")
+    if order.lots <= 0 or order.lots > 15.0:
+        raise HTTPException(status_code=400, detail="lots must be 0.01–15.0")
 
     # FIX 2 — SL/TP validation
     if order.sl <= 0 or order.tp <= 0:

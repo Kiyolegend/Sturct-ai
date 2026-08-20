@@ -34,7 +34,7 @@ NEWS_SERVICE_URL = os.environ.get("NEWS_SERVICE_URL", "http://localhost:5003")
 # ── In-memory environment history (for shift detection) ──────────────────────
 _env_history: dict[str, deque] = {}
 _env_lock = threading.Lock()
-SCAN_SYMBOLS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF"]
+SCAN_SYMBOLS = ["USD/JPY", "EUR/USD", "GBP/USD", "AUD/USD", "USD/CHF","DXY", "XAU/USD", "BTC/USD"]
 
 # ── Timeframe analysis cache (25s TTL) ───────────────────────────────────────
 _tf_cache: dict[str, tuple[float, dict]] = {}

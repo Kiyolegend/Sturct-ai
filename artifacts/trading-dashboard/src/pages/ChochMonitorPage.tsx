@@ -11,7 +11,7 @@ import { X } from "lucide-react";
 const PAIRS = [
   "USD/JPY", "EUR/USD", "GBP/USD", "EUR/JPY", "GBP/JPY",
   "AUD/USD", "USD/CAD", "USD/CHF", "NZD/USD", "AUD/JPY", "CAD/JPY",
-  "XAU/USD", "BTC/USD",
+  "DXY", "XAU/USD", "BTC/USD",
 ];
 
 function fmt(p: number) { return p > 50 ? p.toFixed(3) : p.toFixed(5); }

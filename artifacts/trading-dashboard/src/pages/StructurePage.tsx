@@ -66,7 +66,7 @@ function trendPill(t?: string): { label: string; color: string; bg: string } {
 const SYMBOLS = [
   "USD/JPY","EUR/USD","GBP/USD","EUR/JPY","GBP/JPY",
   "AUD/USD","USD/CAD","USD/CHF","NZD/USD","AUD/JPY","CAD/JPY",
-  "XAU/USD","BTC/USD",
+  "XAU/USD","BTC/USD", "DXY",
 ];
 
 // ── TF config ─────────────────────────────────────────────────────────────────
