@@ -64,11 +64,11 @@ MT5_PROFILES = {
         "expected_server": "Exness-MT5Real2",
         "symbol_suffix": "m",
     },
-    "funding": {
-        "label": "Funding Account",
-        "terminal_path": r"C:\Program Files\FTMO Global Markets MT5 Terminal\terminal64.exe",
-        "expected_login": 1514286149,
-        "expected_server": "FTMO-Demo",
+    "secondaccount": {
+        "label": "Second Account",
+        "terminal_path": r"C:\Program Files\MetaTrader 5\terminal64.exe",
+        "expected_login": 174422977,
+        "expected_server": "Exness-MT5Real",
         "symbol_suffix": "",
     },
 }
