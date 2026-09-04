@@ -69,7 +69,21 @@ MT5_PROFILES = {
         "terminal_path": r"C:\Program Files\MetaTrader 5\terminal64.exe",
         "expected_login": 174422977,
         "expected_server": "Exness-MT5Real",
-        "symbol_suffix": "",
+        "symbol_suffix": "m",
+    },
+    "thirdaccount": {
+    "label": "Third Account",
+    "terminal_path": r"C:\Users\azaan\Desktop\MT5.3\terminal64.exe",
+    "expected_login": 256913956,
+    "expected_server": "Exness-MT5Real35",
+    "symbol_suffix": "m",
+    },
+    "fourthaccount": {
+        "label": "Fourth Account",
+        "terminal_path": r"C:\Users\azaan\Desktop\MT5 .4\terminal64.exe",
+        "expected_login": 250815725,
+        "expected_server": "Exness-MT5Real32",
+        "symbol_suffix": "m",
     },
 }
 

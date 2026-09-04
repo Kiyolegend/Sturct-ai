@@ -33,28 +33,7 @@ export function lock() {
   aesKey = null;
 }
 
-const DEVICE_KEY_STORAGE_KEY = "struct_device_key";
 
-export function getStoredDeviceKey(): string {
-  try {
-    return localStorage.getItem(DEVICE_KEY_STORAGE_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-export function setStoredDeviceKey(key: string): void {
-  try {
-    if (key) {
-      localStorage.setItem(DEVICE_KEY_STORAGE_KEY, key);
-    } else {
-      localStorage.removeItem(DEVICE_KEY_STORAGE_KEY);
-    }
-  } catch {
-    // localStorage unavailable (e.g. private browsing) — device key just
-    // won't persist across reloads; login will still work if re-entered.
-  }
-}
 
 async function deriveKey(passphrase: string): Promise<CryptoKey> {
   const enc = new TextEncoder();
@@ -104,13 +83,12 @@ export async function login(
   password: string,
   totpCode: string,
   encryptionPassphrase: string,
-  deviceKey: string,
 ): Promise<void> {
   const nativeFetch = window.__nativeFetch ?? window.fetch;
   const res = await nativeFetch("/trading-api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password, totp_code: totpCode, device_key: deviceKey }),
+    body: JSON.stringify({ password, totp_code: totpCode }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Login failed" }));
@@ -119,9 +97,7 @@ export async function login(
   const { token } = await res.json();
   sessionToken = token;
   aesKey = await deriveKey(encryptionPassphrase);
-  if (deviceKey) {
-    setStoredDeviceKey(deviceKey);
-  }
+  
 }
 
 const EXEMPT = ["/trading-api/auth/login", "/trading-api/health"];
