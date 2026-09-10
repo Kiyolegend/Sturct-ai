@@ -3,8 +3,9 @@ STRUCT.ai MT5 bridge replacement.
 
 This bridge:
 - Detects configured MT5 account profiles.
-- Automatically selects one verified account when only one is found.
-- Prompts for a selection when multiple verified accounts are found.
+- Uses only MT5 terminals that are already running.
+- Automatically selects one verified account when exactly one is running.
+- Waits safely when no terminal or multiple terminals are running.
 - Refuses to stream or trade if the account identity is wrong.
 - Preserves candle streaming, order execution, close orders, position sync,
   and framework breakeven handling.
@@ -12,6 +13,7 @@ This bridge:
 
 import datetime
 import os
+import subprocess
 import threading as _threading
 import time
 
@@ -144,6 +146,51 @@ def _safe_mt5_shutdown() -> None:
         print(f"WARNING: MT5 shutdown warning: {exc}")
 
 
+def _normalise_executable_path(path: str) -> str:
+    return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+
+
+def _running_terminal_paths() -> set[str]:
+    """Return executable paths for currently running MT5 terminals.
+
+    MetaTrader5.initialize(path=...) may launch a terminal when it is not
+    already running. Query Windows first so the bridge only attaches to
+    terminals the user has opened.
+    """
+    command = [
+        "powershell",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "(Get-CimInstance Win32_Process -Filter \"Name = 'terminal64.exe'\").ExecutablePath",
+    ]
+
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError) as exc:
+        print(f"WARNING: Could not inspect running MT5 terminals: {exc}")
+        return set()
+
+    if result.returncode != 0:
+        details = result.stderr.strip() or "unknown PowerShell error"
+        print(f"WARNING: Could not inspect running MT5 terminals: {details}")
+        return set()
+
+    paths: set[str] = set()
+    for line in result.stdout.splitlines():
+        executable_path = line.strip()
+        if executable_path:
+            paths.add(_normalise_executable_path(executable_path))
+
+    return paths
+
+
 def _build_symbols(profile: dict) -> list[dict]:
     suffix = str(profile.get("symbol_suffix", ""))
     return [
@@ -202,12 +249,20 @@ def scan_mt5_profiles() -> list[str]:
     login and server match the configured identity.
     """
     found_profiles: list[str] = []
+    running_paths = _running_terminal_paths()
 
     print()
-    print("Scanning configured MT5 accounts...")
+    print("Scanning running MT5 accounts...")
 
     for profile_name, profile in MT5_PROFILES.items():
         if not _profile_is_configured(profile_name, profile):
+            continue
+
+        terminal_path = _normalise_executable_path(
+            str(profile["terminal_path"])
+        )
+        if terminal_path not in running_paths:
+            print(f"[{profile_name}] MT5 terminal is not running; skipped")
             continue
 
         _safe_mt5_shutdown()
@@ -252,45 +307,39 @@ def scan_mt5_profiles() -> list[str]:
 
 
 def choose_mt5_profile() -> bool:
-    """
-    Select one verified profile automatically or ask when multiple profiles
-    match. The bridge does not start its order thread until this succeeds.
+    """Automatically use exactly one running and verified MT5 profile.
+
+    The current API has one shared candle store and one active MT5
+    connection. Multiple running terminals are therefore rejected instead
+    of silently choosing the wrong account.
     """
     global ACTIVE_PROFILE_NAME, ACTIVE_PROFILE, SYMBOLS
 
-    found_profiles = scan_mt5_profiles()
+    while True:
+        found_profiles = scan_mt5_profiles()
 
-    if not found_profiles:
-        print()
-        print("No configured MT5 account was verified.")
-        print("Open and log in to the desired MT5 terminal.")
-        print("Then start the bridge again.")
-        return False
+        if len(found_profiles) == 1:
+            selected_name = found_profiles[0]
+            print(
+                f"\nAutomatically selected running MT5 account: "
+                f"{selected_name}"
+            )
+            break
 
-    if len(found_profiles) == 1:
-        selected_name = found_profiles[0]
-        print(
-            f"\nOnly one verified MT5 account found: "
-            f"{selected_name}"
-        )
-    else:
-        print("\nMultiple verified MT5 accounts found.")
+        if not found_profiles:
+            print()
+            print("No verified MT5 terminal is currently running.")
+            print("Open exactly one desired MT5 account.")
+        else:
+            print()
+            print("More than one verified MT5 terminal is running.")
+            print("Close all MT5 terminals except the one you want to use.")
+            print("The bridge will retry automatically.")
+            for profile_name in found_profiles:
+                label = MT5_PROFILES[profile_name]["label"]
+                print(f"  - {label}")
 
-        for index, profile_name in enumerate(found_profiles, start=1):
-            label = MT5_PROFILES[profile_name]["label"]
-            print(f"[{index}] {label}")
-
-        while True:
-            choice = input("Select the MT5 account to use: ").strip()
-
-            if choice.isdigit():
-                selected_index = int(choice) - 1
-
-                if 0 <= selected_index < len(found_profiles):
-                    selected_name = found_profiles[selected_index]
-                    break
-
-            print("Invalid choice. Enter one of the numbers above.")
+        time.sleep(5)
 
     ACTIVE_PROFILE_NAME = selected_name
     ACTIVE_PROFILE = MT5_PROFILES[selected_name]
@@ -302,8 +351,6 @@ def choose_mt5_profile() -> bool:
     )
 
     return connect_mt5()
-
-
 def active_account_matches() -> bool:
     """
     Re-check the account while the bridge is running. This blocks data and

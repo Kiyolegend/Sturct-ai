@@ -244,6 +244,8 @@ export interface CandlePattern {
   direction: "bullish" | "bearish" | "neutral";
   price: number;
   context: string;
+  candle_state: "forming" | "confirmed";
+  bars_ago: number;
 }
 
 export interface PatternSummaryResponse {

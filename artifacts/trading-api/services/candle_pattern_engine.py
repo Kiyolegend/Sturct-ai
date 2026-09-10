@@ -164,6 +164,15 @@ def detect_candle_patterns(
         results.append({"time": int(last["time"].value // 10**9) if hasattr(last["time"], "value") else int(last["time"]), "index": len(window) - 1,
                          "pattern": "inside_bar", "direction": "neutral", "price": float(last["close"]),
                          "context": "Range compression at a structural level — often precedes a breakout."})
+    # Mark whether the detected pattern belongs to the current live candle
+    # or to a previously closed candle.
+    last_window_index = len(window) - 1
 
+    for result in results:
+        bars_ago = last_window_index - result["index"]
+        result["bars_ago"] = bars_ago
+        result["candle_state"] = (
+            "forming" if bars_ago == 0 else "confirmed"
+        )
     results.sort(key=lambda r: r["time"], reverse=True)
     return results[:10]

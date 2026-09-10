@@ -106,10 +106,22 @@ const PATTERN_LABELS: Record<CandlePattern["pattern"], string> = {
   inside_bar: "Inside Bar",
 };
 
+
 function PatternBadge({ label, pattern }: { label: string; pattern?: CandlePattern | null }) {
   if (!pattern) return null;
+
   const bull = pattern.direction === "bullish";
   const neutral = pattern.direction === "neutral";
+
+  const statusText =
+    pattern.candle_state === "forming"
+      ? "FORMING"
+      : pattern.candle_state === "confirmed" && pattern.bars_ago === 1
+        ? "CONFIRMED · PREV CANDLE"
+        : pattern.candle_state === "confirmed"
+          ? `CONFIRMED · ${pattern.bars_ago} BARS AGO`
+          : "STATUS UNKNOWN";
+
   return (
     <div
       className={cn(
@@ -118,14 +130,27 @@ function PatternBadge({ label, pattern }: { label: string; pattern?: CandlePatte
           : bull ? "bg-teal-500/10 border-teal-500/30"
           : "bg-red-500/10 border-red-500/30"
       )}
-      title={pattern.context}
+      title={`${pattern.context} · ${statusText}`}
     >
-      <span className="text-[8px] font-semibold tracking-widest uppercase text-white/40">{label}</span>
+      <span className="text-[8px] font-semibold tracking-widest uppercase text-white/40">
+        {label}
+      </span>
+
       <span className={cn(
         "text-[10px] font-bold uppercase leading-none mt-0.5",
         neutral ? "text-sky-400" : bull ? "text-teal-400" : "text-red-400"
       )}>
-        {neutral ? "" : bull ? "Bull " : "Bear "}{PATTERN_LABELS[pattern.pattern]}
+        {neutral ? "" : bull ? "Bull " : "Bear "}
+        {PATTERN_LABELS[pattern.pattern]}
+      </span>
+
+      <span className={cn(
+        "text-[7px] font-semibold uppercase tracking-wide leading-none mt-1 whitespace-nowrap",
+        pattern.candle_state === "forming"
+          ? "text-amber-300"
+          : "text-white/45"
+      )}>
+        {statusText}
       </span>
     </div>
   );
