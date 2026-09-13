@@ -84,7 +84,7 @@ async def _analyse_timeframe(symbol: str, interval: str, outputsize: int) -> dic
         trend         = detect_trend(labels)
         bos           = detect_bos(df, swings, labels, trend["trend"])
         choch         = detect_choch(df, swings, labels, trend["trend"], fractal_n=fractal_n)
-        zones         = detect_zones(swings, interval, float(df["close"].iloc[-1]))
+        zones         = detect_zones(swings, interval, float(df["close"].iloc[-1]), symbol=symbol)
 
         labels_out: list[dict] = []
         try:

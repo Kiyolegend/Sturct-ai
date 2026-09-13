@@ -42,6 +42,7 @@ def _df_time_ints(df):
 
 
 def detect_zones(
+    symbol: str | None = None,
     swings: list,
     timeframe: str = "1h",
     current_price: float | None = None,
@@ -64,11 +65,11 @@ def detect_zones(
 
     # ── Pip / reference price ────────────────────────────────────────────────
     if current_price is not None:
-        pip = _pip_size(current_price)
+        pip = _pip_size(current_price, symbol)
         ref = current_price
     else:
         ref = sorted(s["price"] for s in swings)[len(swings) // 2]
-        pip = _pip_size(ref)
+        pip = _pip_size(ref, symbol)
 
     cluster_threshold = _cluster_pips(ref, timeframe) * pip
     zone_width        = _zone_width_pips(ref) * pip

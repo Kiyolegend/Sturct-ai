@@ -18,7 +18,10 @@ import asyncio
 import time
 import logging
 from typing import Optional
-
+from services.instrument_specs import (
+    loss_per_lot,
+    normalize_volume,
+)
 from services.data_service import fetch_ohlc, candles_to_dict
 from services.zigzag_engine import detect_swings
 from services.structure_engine import classify_structure

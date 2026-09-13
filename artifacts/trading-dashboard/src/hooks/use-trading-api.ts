@@ -68,6 +68,26 @@ export interface TrendlinesData {
   bearish: TrendlineSegment | null;
 }
 
+export interface InstrumentSpec {
+  symbol: string;
+  mt5_symbol: string;
+  point: number;
+  digits: number;
+  display_pip_size: number;
+  trade_tick_size: number;
+  trade_tick_value: number;
+  trade_tick_value_profit: number;
+  trade_tick_value_loss: number;
+  trade_contract_size: number;
+  volume_min: number;
+  volume_max: number;
+  volume_step: number;
+  trade_stops_level: number;
+  trade_freeze_level: number;
+  currency_profit: string;
+  currency_margin: string;
+}
+
 export interface Zone {
   top: number;
   bottom: number;
@@ -147,6 +167,29 @@ export function useSRLevels(symbol: string = "USD/JPY") {
       !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
     retryDelay: patientRetryDelay,
     staleTime: 4 * 60 * 1000,
+  });
+}
+
+export function useInstrumentSpec(symbol: string) {
+  return useQuery<InstrumentSpec, Error>({
+    queryKey: ["instrument-spec", symbol],
+    queryFn: async () => {
+      const params = new URLSearchParams({ symbol });
+
+      const res = await fetch(
+        `/trading-api/instrument-spec?${params.toString()}`
+      );
+
+      if (!res.ok) {
+        throw new Error(
+          `Instrument specification error: ${await res.text()}`
+        );
+      }
+
+      return res.json();
+    },
+    refetchInterval: 60 * 1000,
+    staleTime: 30 * 1000,
   });
 }
 
@@ -266,7 +309,7 @@ export function usePatternSummary(symbol: string = "USD/JPY") {
       if (!res.ok) throw new Error(`${res.status}: Pattern summary API error: ${await res.text()}`);
       return res.json();
     },
-    refetchInterval: 60 * 1000,
+    refetchInterval: 15 * 1000,
     retry: (failureCount, error) =>
       !String((error as Error)?.message).includes("401") && failureCount < PATIENT_RETRY,
     retryDelay: patientRetryDelay,

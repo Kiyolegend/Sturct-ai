@@ -30,7 +30,8 @@ interface Position {
 }
 
 export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceConsumed, onSLChange, onTPChange, prefill, onPrefillConsumed  }: TradePanelProps) {
-  const pip          = PIP(currentPrice);
+  const pip = instrumentSpec?.display_pip_size ?? 0.0001;
+  const digits = instrumentSpec?.digits ?? 5;
   const defaultSL    = (price: number, dir: Direction) =>
     dir === "BUY" ? +(price - 20 * pip).toFixed(DEC(price)) : +(price + 20 * pip).toFixed(DEC(price));
   const defaultTP    = (price: number, dir: Direction) =>
@@ -38,7 +39,7 @@ export function TradePanel({ symbol, currentPrice, clickedPrice, onClickedPriceC
 
   const [direction,        setDirection]        = useState<Direction>("BUY");
   const [orderType,        setOrderType]        = useState<OrderType>("MARKET");
-  const [limitPrice,       setLimitPrice]       = useState(currentPrice.toFixed(DEC(currentPrice)));
+  const [limitPrice,       setLimitPrice]       = useState(currentPrice.toFixed(digits));
   const [sl,               setSL]               = useState(() => defaultSL(currentPrice, "BUY").toFixed(DEC(currentPrice)));
   const [tp,               setTP]               = useState(() => defaultTP(currentPrice, "BUY").toFixed(DEC(currentPrice)));
   const [lots,             setLots]             = useState("0.02");

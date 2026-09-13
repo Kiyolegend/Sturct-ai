@@ -52,7 +52,7 @@ _DEFAULT_LIMIT = 400  # fallback for any unrecognised timeframe
 _store: dict[str, pd.DataFrame] = {}
 _last_contact: float = 0.0   # unix timestamp of last successful bridge push
 _lock = threading.Lock()
-
+_symbol_specs: dict[str, dict] = {}
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -120,6 +120,31 @@ def store_candles(symbol: str, interval: str, df: pd.DataFrame) -> None:
         _store[key] = combined.tail(limit).reset_index(drop=True)
         _last_contact = time.time()
 
+def store_symbol_specs(specs: list[dict]) -> None:
+    with _lock:
+        for spec in specs:
+            symbol = str(spec["symbol"]).upper()
+            _symbol_specs[symbol] = spec
+
+
+def get_symbol_spec(symbol: str) -> dict | None:
+    key = str(symbol).upper()
+
+    with _lock:
+        spec = _symbol_specs.get(key)
+
+        if spec is None:
+            return None
+
+        return dict(spec)
+
+
+def get_all_symbol_specs() -> dict[str, dict]:
+    with _lock:
+        return {
+            symbol: dict(spec)
+            for symbol, spec in _symbol_specs.items()
+        }
 
 def get_candles(symbol: str, interval: str) -> Optional[pd.DataFrame]:
     """

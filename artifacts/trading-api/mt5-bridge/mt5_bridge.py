@@ -467,6 +467,95 @@ def fetch_candles(
         for row in rates
     ]
 
+def _display_pip_size(api_symbol: str, info) -> float:
+    """
+    Display pip convention for the configured Exness instruments.
+
+    Monetary calculations must use MT5 tick_size/tick_value.
+    This value is only for pip displays and analysis thresholds.
+    """
+    symbol = api_symbol.upper().replace("/", "")
+
+    if symbol.startswith("BTC"):
+        return 0.1
+
+    if symbol.startswith("XAU"):
+        return 0.01
+
+    if symbol.startswith("DXY"):
+        return 0.01
+
+    point = float(info.point)
+    digits = int(info.digits)
+
+    # Standard 5-digit FX and 3-digit JPY pricing.
+    if digits in (3, 5):
+        return point * 10
+
+    return point
+
+
+def get_symbol_spec(sym: dict) -> dict | None:
+    mt5_symbol = sym["mt5_name"]
+    api_symbol = sym["api_symbol"]
+
+    info = mt5.symbol_info(mt5_symbol)
+
+    if info is None:
+        print(f"WARNING: No MT5 metadata for {mt5_symbol}")
+        return None
+
+    return {
+        "symbol": api_symbol,
+        "mt5_symbol": mt5_symbol,
+        "point": float(info.point),
+        "digits": int(info.digits),
+        "display_pip_size": _display_pip_size(api_symbol, info),
+        "trade_tick_size": float(info.trade_tick_size),
+        "trade_tick_value": float(info.trade_tick_value),
+        "trade_tick_value_profit": float(
+            getattr(info, "trade_tick_value_profit", info.trade_tick_value)
+        ),
+        "trade_tick_value_loss": float(
+            getattr(info, "trade_tick_value_loss", info.trade_tick_value)
+        ),
+        "trade_contract_size": float(info.trade_contract_size),
+        "volume_min": float(info.volume_min),
+        "volume_max": float(info.volume_max),
+        "volume_step": float(info.volume_step),
+        "trade_stops_level": int(info.trade_stops_level),
+        "trade_freeze_level": int(info.trade_freeze_level),
+        "currency_profit": str(info.currency_profit),
+        "currency_margin": str(info.currency_margin),
+    }
+
+
+def push_symbol_specs() -> bool:
+    specs = []
+
+    for sym in SYMBOLS:
+        spec = get_symbol_spec(sym)
+
+        if spec is not None:
+            specs.append(spec)
+
+    try:
+        response = _session.post(
+            f"{API_BASE_URL}/trading-api/mt5/specs",
+            json={"specs": specs},
+            timeout=15,
+        )
+
+        if response.status_code == 200:
+            print(f"OK: pushed {len(specs)} MT5 symbol specifications")
+            return True
+
+        print(f"ERROR: specification push returned HTTP {response.status_code}")
+        return False
+
+    except requests.exceptions.RequestException as exc:
+        print(f"ERROR: specification push failed: {exc}")
+        return False
 
 def push_timeframe(
     api_symbol: str,
@@ -1148,6 +1237,7 @@ def run() -> None:
         print(f"\n[{broker_hms}] Pushing data...")
 
         started_at = time.time()
+        push_symbol_specs()
         success = push_all()
 
         _check_breakeven_all()

@@ -38,6 +38,29 @@ class MT5PushPayload(BaseModel):
     interval: str    # "5m" | "15m" | "1h" | "4h"
     candles: list[OHLCCandle]
 
+class SymbolSpec(BaseModel):
+    symbol: str
+    mt5_symbol: str
+    point: float
+    digits: int
+    display_pip_size: float
+    trade_tick_size: float
+    trade_tick_value: float
+    trade_tick_value_profit: float
+    trade_tick_value_loss: float
+    trade_contract_size: float
+    volume_min: float
+    volume_max: float
+    volume_step: float
+    trade_stops_level: int
+    trade_freeze_level: int
+    currency_profit: str
+    currency_margin: str
+
+
+class MT5SpecsPayload(BaseModel):
+    specs: list[SymbolSpec]
+
 
 @router.post("/mt5/push")
 async def mt5_push(
@@ -83,7 +106,42 @@ async def mt5_push(
         "candles_received": len(df),
         "latest_candle": payload.candles[-1].time,
     }
+@router.post("/mt5/specs")
+async def mt5_specs(
+    payload: MT5SpecsPayload,
+    x_mt5_secret: str = Header(default=""),
+):
+    if MT5_SECRET and x_mt5_secret != MT5_SECRET:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid MT5 bridge secret",
+        )
 
+    from services.mt5_store import store_symbol_specs
+
+    store_symbol_specs([
+        spec.model_dump()
+        for spec in payload.specs
+    ])
+
+    return {
+        "ok": True,
+        "specs_received": len(payload.specs),
+    }
+
+@router.get("/instrument-spec")
+async def instrument_spec(symbol: str):
+    from services.mt5_store import get_symbol_spec
+
+    spec = get_symbol_spec(symbol)
+
+    if not spec:
+        raise HTTPException(
+            status_code=503,
+            detail=f"MT5 specification unavailable for {symbol}",
+        )
+
+    return spec
 
 @router.get("/mt5/status")
 async def mt5_status_endpoint():

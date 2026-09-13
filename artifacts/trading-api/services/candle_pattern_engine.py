@@ -74,6 +74,7 @@ def _touches_any_level(row, levels: list[float], tolerance: float) -> bool:
 
 
 def detect_candle_patterns(
+    symbol: str | None = None,
     df: pd.DataFrame,
     swings: list[dict],
     zones: list[dict] | None = None,
@@ -89,7 +90,7 @@ def detect_candle_patterns(
         return []
 
     current_price = float(df["close"].iloc[-1])
-    pip = _pip_size(current_price)
+    pip = _pip_size(current_price, symbol)
     tolerance = proximity_pips * pip
 
     levels = _collect_levels(swings, zones or [])
